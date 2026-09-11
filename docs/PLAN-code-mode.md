@@ -14,6 +14,15 @@ a home-made loop, and approvals that can never be skipped.
 
 ---
 
+## Where it runs: the PC only
+
+The console now runs two ways (README → *Two ways to run it*): on the PC with
+its own server, and as a serverless web page. A coding agent needs the project's
+files and a shell, which only the PC's server has — so **code mode is a PC
+feature**. In the web version the switch is shown but says "Code mode runs on
+your PC" instead of turning amber; nothing tries to reach the PC from the web
+(the page-to-server bridge was removed on purpose).
+
 ## What it should feel like
 
 - **One toggle.** A mode switch in the title row (next to Configuration), and by
@@ -83,8 +92,9 @@ type CodeEvent =
 ### Client
 
 - `body.mode-code` and a `--mode-hue` token; the glass, veil, deck and core
-  palette derive from it (the core currently hard-codes its colours in
-  `stage.ts` `drawCore` — move them to a palette object first).
+  palette derive from it (the core's colours are hard-coded in `core-draw.ts`
+  `drawCore`/`drawAurora` — move them into the `CoreLook` it already takes, as a
+  palette, first).
 - A code thread renderer: commentary, diff blocks (collapsed, expandable),
   command blocks, approval cards; phone layout as a normal thread.
 - Voice commands: "switch to code mode", "back to normal", "approve", "deny",
@@ -94,7 +104,8 @@ type CodeEvent =
 
 1. **The switch and the colour** — no agent yet. Palette tokens, `body.mode-code`,
    core recolour, the toggle in the title row, voice commands, persistence.
-   QA both modes at every size.
+   QA both modes at every size, in both builds (the web build shows the switch
+   disabled, with the reason).
 2. **Server skeleton + Claude Agent SDK, read-only.** Project allowlist in
    Configuration; a code session that can read and plan, streaming into a code
    thread.
@@ -111,10 +122,17 @@ type CodeEvent =
 - Which project folders to allow at the start — just this repo?
 - On a phone: full code mode, or read-and-approve only?
 - Billing: API keys (pay per token) or the machine's Claude / ChatGPT logins.
+  OpenRouter's free models answer ordinary questions but can't drive these
+  agents: the Claude Agent SDK wants an Anthropic key or Claude login, the Codex
+  SDK an OpenAI key or ChatGPT login.
 
 ## Before any of this
 
-- DNS for `jarvis.edgarasneverdauskas.com` pointed at a tunnel to the machine,
-  with an access check in front (see README → *Running it somewhere else*).
-- A reasoning core with credit: the OpenAI account currently answers
-  `credit_balance_exhausted` for every model, so add credit or connect Gemini.
+- A key with credit for the agent chosen: Anthropic for the Claude Agent SDK,
+  OpenAI for the Codex SDK — or the matching login on the PC. The OpenAI key
+  created on 2026-09-12 sits in an organisation with no credit; the Windows
+  `OPENAI_API_KEY` belongs to one that has some, and JARVIS is set to ignore
+  it (Disconnect), so choose deliberately.
+- Nothing else: the subdomain no longer needs a tunnel — the web version is
+  static. Point `jarvis.edgarasneverdauskas.com` at GitHub Pages and set the
+  repository variable `JARVIS_SITE_URL` whenever convenient.
