@@ -1,10 +1,18 @@
 # Plan: code mode
 
 **Goal.** A switch that turns JARVIS from the research console into a
-developer at your side: in **code mode** he works on a project folder through a
-coding agent — the Claude Agent SDK or the OpenAI Codex SDK — reading, planning,
-editing and running things, with you approving what matters, by voice or by
-tap. The console's colour turns from ice blue to amber so you always know which
+developer at your side: in **code mode** he works on a project folder through
+**Claude Code, installed and signed in on the PC** — reading, planning, editing
+and running things, with you approving what matters, by voice or by tap.
+
+**Decided (2026-09-12):** no extra cost. The agent is the Claude Code CLI on
+the PC, driven headless (`claude -p --output-format stream-json`), signed in
+with the user's own **Max plan**. Not the Agent SDK with that login — its docs
+say third-party products may not offer claude.ai login, and point SDK users to
+API keys — and not Managed Agents or a cloud sandbox, which are API-billed.
+JARVIS is only the screen and the voice for the user's own Claude Code; anyone
+else running JARVIS uses their own Claude Code and login. In the product it is
+"Code mode, powered by Claude" — never branded as Claude Code. The console's colour turns from ice blue to amber so you always know which
 mode you're in.
 
 An earlier version had a built-in code agent; it was removed (conversations
@@ -44,7 +52,13 @@ your PC" instead of turning amber; nothing tries to reach the PC from the web
 
 ### Server — `src/server/code/`
 
-One interface, two adapters, so the console never cares which agent runs:
+The server starts `claude -p` in the project folder with
+`--output-format stream-json` (and `--input-format stream-json` to keep a
+session open for follow-ups, `--resume` to continue one), and turns its JSON
+events into the console's own. Approvals: `--permission-prompt-tool` names a
+small MCP tool the server provides; Claude Code calls it before any edit or
+command, the server shows an approval card and answers with what the user chose.
+Behind one interface, so another agent could be added later:
 
 ```ts
 interface CodeAgent {
@@ -62,13 +76,10 @@ type CodeEvent =
   | { t: "error"; message: string };
 ```
 
-- **Claude Agent SDK** (`@anthropic-ai/claude-agent-sdk`): `query()` with
-  `permissionMode: "default"` and a `canUseTool` callback that turns every
-  edit/command request into an `approval` event and waits for the answer.
-  Start read-only (plan mode) in phase 2.
-- **OpenAI Codex SDK** (`@openai/codex-sdk`): a Codex thread run with streamed
-  events and a sandbox policy; the same approval gate in front of writes and
-  commands.
+- **Claude Code CLI (first, and for now only)**: headless, as above. Start
+  read-only (`--permission-mode plan`) in phase 2.
+- Later, if ever wanted: the Agent SDK or the Codex SDK with an API key, behind
+  the same interface.
 - Sessions stream to the client over the same newline-delimited JSON as
   `/api/ask`; approvals come back as small POSTs.
 
@@ -86,8 +97,9 @@ type CodeEvent =
   the access check. No code mode on an exposed server without it.
 - A dirty git tree is shown before a session starts; work happens on a branch
   the session creates, so undo is a branch delete.
-- Keys stay on the server. Claude uses `ANTHROPIC_API_KEY` (or a Claude login
-  on the machine); Codex uses the OpenAI key (or a ChatGPT login).
+- No keys at all: Claude Code uses the login already on the PC. JARVIS never
+  reads or stores it. If Claude Code isn't installed or signed in, code mode
+  says so and how to fix it (install Claude Code, run `claude` once, sign in).
 
 ### Client
 
@@ -106,33 +118,28 @@ type CodeEvent =
    core recolour, the toggle in the title row, voice commands, persistence.
    QA both modes at every size, in both builds (the web build shows the switch
    disabled, with the reason).
-2. **Server skeleton + Claude Agent SDK, read-only.** Project allowlist in
+2. **Server skeleton + the Claude Code CLI, read-only.** Project allowlist in
    Configuration; a code session that can read and plan, streaming into a code
    thread.
 3. **Edits and commands with approvals.** `canUseTool` → approval cards →
    answers; diffs and command output rendered; stop.
-4. **Codex SDK adapter** behind the same interface; choose the agent per project.
+4. **Sessions:** follow-ups in the same session, resume one later, and a list of
+   past sessions per project.
 5. **Safety pass.** Branch per session, dirty-tree warning, read-only list, the
    tunnel/access rule, and tests for the approval gate with fake adapters.
 6. **Docs and QA.** README section, a code-mode section in `docs/QA.md`.
 
 ## Decisions to make first
 
-- Which agent first: Claude Agent SDK (richer tool permissions) or Codex SDK?
+- ~~Which agent~~ — decided: Claude Code on the PC, Max plan.
 - Which project folders to allow at the start — just this repo?
-- On a phone: full code mode, or read-and-approve only?
-- Billing: API keys (pay per token) or the machine's Claude / ChatGPT logins.
-  OpenRouter's free models answer ordinary questions but can't drive these
-  agents: the Claude Agent SDK wants an Anthropic key or Claude login, the Codex
-  SDK an OpenAI key or ChatGPT login.
+- On a phone (through the PC's address on the home network): full code mode,
+  or read-and-approve only?
+- ~~Billing~~ — decided: the Max plan, through Claude Code's own login.
 
 ## Before any of this
 
-- A key with credit for the agent chosen: Anthropic for the Claude Agent SDK,
-  OpenAI for the Codex SDK — or the matching login on the PC. The OpenAI key
-  created on 2026-09-12 sits in an organisation with no credit; the Windows
-  `OPENAI_API_KEY` belongs to one that has some, and JARVIS is set to ignore
-  it (Disconnect), so choose deliberately.
-- Nothing else: the subdomain no longer needs a tunnel — the web version is
-  static. Point `jarvis.edgarasneverdauskas.com` at GitHub Pages and set the
-  repository variable `JARVIS_SITE_URL` whenever convenient.
+- Claude Code installed on the PC and signed in with the Max account (`claude`
+  in a terminal once). Check `claude -p "say hello" --output-format json` works.
+- Nothing else: no API key, no tunnel. The subdomain for the web version can be
+  pointed at GitHub Pages whenever convenient (`JARVIS_SITE_URL`).
