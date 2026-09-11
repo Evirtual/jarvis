@@ -93,6 +93,7 @@ async function view(id: ProviderId, revalidate: boolean): Promise<ProviderView> 
 }
 
 async function connections(revalidate = false): Promise<ConnectionsResponse> {
+  saved = load(); // another tab may have connected something (OpenRouter's sign-in happens in one)
   const providers = await Promise.all(PROVIDER_IDS.map((id) => view(id, revalidate)));
   const ready = providers.filter((p) => p.status.state === "ready").map((p) => p.id);
   // Never advertise a core that cannot answer.
