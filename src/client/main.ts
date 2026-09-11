@@ -33,6 +33,12 @@ import "./drawer.js";
  * Boot
  * ===================================================================== */
 
+// Installable as an app on a phone or desktop. The worker caches nothing (see
+// public/sw.js); browsers only offer it on https or localhost.
+if ("serviceWorker" in navigator && window.isSecureContext) {
+  void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => { /* not installable here; everything still works */ });
+}
+
 applyMode();
 paintThread();
 // A greeting, but never a thread the user didn't ask for: on a clean screen it

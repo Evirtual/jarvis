@@ -53,6 +53,12 @@ export interface Thread {
   archivedAt?: number;
   /** A size the reader dragged the window to, when they wanted more room than the default. */
   size?: { w: number; h: number };
+  /**
+   * What Tidy up shrank it to so the board fits on the screen: a width and a
+   * cap on the conversation's height (0: no cap). Tidy up clears it before it
+   * starts again, so on a bigger screen the window gets its room back.
+   */
+  fit?: { w: number; h: number };
   /** A loose window's top-left corner on the board, in pixels from the board's top-left. */
   x?: number;
   y?: number;
@@ -77,6 +83,8 @@ export interface Group {
   collapsed?: boolean;
   /** A size the reader dragged the bubble to. */
   size?: { w: number; h: number };
+  /** What Tidy up shrank it to (see Thread.fit). */
+  fit?: { w: number; h: number };
 }
 
 export interface WorkspaceData {

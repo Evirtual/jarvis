@@ -17,6 +17,7 @@ import { clip, editDistance } from "./text.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
 import { paintCoreState, sys } from "./say.js";
+import { CROSS_ORIGIN, apiUrl } from "./server.js";
 import { fitDockIfChanged } from "./deck.js";
 
 /* ===================================================================== *
@@ -269,7 +270,7 @@ function paintScanAge(): void {
 
 function openStream(): void {
   if (events || document.hidden) return;
-  events = new EventSource("/api/events");
+  events = new EventSource(apiUrl("/api/events"), { withCredentials: CROSS_ORIGIN });
   events.addEventListener("telemetry", (e) => applyTelemetry(JSON.parse((e as MessageEvent<string>).data) as TelemetryResponse));
   events.addEventListener("scan", (e) => applyScan(JSON.parse((e as MessageEvent<string>).data) as ScanResponse));
   events.addEventListener("world", (e) => applyWorld(JSON.parse((e as MessageEvent<string>).data) as WorldResponse));

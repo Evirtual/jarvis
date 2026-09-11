@@ -1,0 +1,67 @@
+name: Pages
+
+# Publishes the console's client to GitHub Pages on every push to main. The
+# page is only the screen: everything live — readings, answers, the voice —
+# comes from the console server on your own machine, whose https address is
+# the JARVIS_SERVER repository variable (see README, "Running it somewhere
+# else"). Without it the page installs and opens, and reports the server
+# unreachable.
+#
+# Repository variables:
+#   JARVIS_SERVER    https://jarvis.example.com   the console server, behind a tunnel
+#   JARVIS_SITE_URL  https://jarvis.example.com   set once a custom domain serves the page;
+#                                                 until then it is served under /<repo>/
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build the client
+        env:
+          JARVIS_SITE_URL: ${{ vars.JARVIS_SITE_URL }}
+          VITE_JARVIS_SERVER: ${{ vars.JARVIS_SERVER }}
+        run: |
+          if [[ -n "$JARVIS_SITE_URL" ]]; then
+            export JARVIS_BASE="/"
+          else
+            export JARVIS_BASE="/${{ github.event.repository.name }}/"
+          fi
+          echo "base=$JARVIS_BASE server=${VITE_JARVIS_SERVER:-(none)}"
+          npm run build:client
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist/client
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

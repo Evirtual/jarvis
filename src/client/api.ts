@@ -12,9 +12,10 @@ import type {
   TelemetryResponse,
   WorldResponse,
 } from "../shared/types.js";
+import { CREDENTIALS, apiUrl } from "./server.js";
 
 async function getJson<T>(url: string): Promise<T> {
-  const r = await fetch(url);
+  const r = await fetch(apiUrl(url), { credentials: CREDENTIALS });
   if (!r.ok) throw new Error(`${url} -> ${r.status}`);
   return (await r.json()) as T;
 }
@@ -23,8 +24,9 @@ async function getJson<T>(url: string): Promise<T> {
 const CONSOLE = { "x-jarvis": "1" } as const;
 
 async function postJson<T>(url: string, body: unknown, method = "POST"): Promise<T> {
-  const r = await fetch(url, {
+  const r = await fetch(apiUrl(url), {
     method,
+    credentials: CREDENTIALS,
     headers: { "content-type": "application/json", ...CONSOLE },
     body: body === undefined ? null : JSON.stringify(body),
   });
@@ -64,8 +66,9 @@ export const api = {
 
   /** Recorded speech in, text out — transcribed server-side. */
   transcribe: async (audio: Blob): Promise<string> => {
-    const r = await fetch("/api/transcribe", {
+    const r = await fetch(apiUrl("/api/transcribe"), {
       method: "POST",
+      credentials: CREDENTIALS,
       headers: { "content-type": audio.type || "audio/webm", ...CONSOLE },
       body: audio,
     });
@@ -75,8 +78,9 @@ export const api = {
   },
 
   speak: async (body: SpeakRequest): Promise<Blob> => {
-    const r = await fetch("/api/speak", {
+    const r = await fetch(apiUrl("/api/speak"), {
       method: "POST",
+      credentials: CREDENTIALS,
       headers: { "content-type": "application/json", ...CONSOLE },
       body: JSON.stringify(body),
     });
@@ -94,8 +98,9 @@ export const api = {
     onStatus: (s: AskStatus) => void,
     signal?: AbortSignal,
   ): Promise<string> => {
-    const r = await fetch("/api/ask", {
+    const r = await fetch(apiUrl("/api/ask"), {
       method: "POST",
+      credentials: CREDENTIALS,
       headers: { "content-type": "application/json", ...CONSOLE },
       body: JSON.stringify(body),
       ...(signal ? { signal } : {}),

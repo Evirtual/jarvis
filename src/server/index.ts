@@ -31,6 +31,7 @@ import { PROVIDER_IDS } from "../shared/types.js";
 import {
   ROOT,
   clearKey,
+  allowedOrigin,
   getActive,
   getModel,
   getVoice,
@@ -213,11 +214,27 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   const url = new URL(req.url ?? "/", "http://localhost");
   const p = url.pathname;
 
-  // No CORS: the console is served from this origin, and in dev Vite proxies
-  // /api, so the browser never makes a cross-origin call. Anything that
-  // changes state must also come from the console itself — a page on another
-  // site can't forge the header without a preflight we never grant.
-  if (req.method === "OPTIONS") {
+  // No CORS, with one exception: the console is served from this origin (in
+  // dev Vite proxies /api), so the browser never makes a cross-origin call —
+  // unless the page is published elsewhere, in which case that one origin is
+  // named in config.json and answered with its cookies (an access check in
+  // front of the tunnel needs them). Anything that changes state must also
+  // come from the console itself — any other site can't forge the header
+  // without a preflight it is never granted.
+  const origin = req.headers.origin;
+  const allowed = allowedOrigin();
+  if (origin && allowed && origin === allowed) {
+    res.setHeader("access-control-allow-origin", origin);
+    res.setHeader("access-control-allow-credentials", "true");
+    res.setHeader("vary", "origin");
+    if (req.method === "OPTIONS") {
+      res.setHeader("access-control-allow-methods", "GET, POST, DELETE");
+      res.setHeader("access-control-allow-headers", "content-type, x-jarvis");
+      res.setHeader("access-control-max-age", "86400");
+      res.writeHead(204).end();
+      return;
+    }
+  } else if (req.method === "OPTIONS") {
     res.writeHead(403).end();
     return;
   }
@@ -539,6 +556,7 @@ function fromConsole(req: http.IncomingMessage): boolean {
   if (req.headers["x-jarvis"] !== "1") return false;
   const origin = req.headers.origin;
   if (!origin) return true; // same-origin fetches may omit it; the header already proves intent
+  if (origin === allowedOrigin()) return true; // the page, published elsewhere
   try {
     const o = new URL(origin);
     const host = String(req.headers.host ?? "").split(":")[0];

@@ -450,3 +450,29 @@ animation frames (so drags and transitions freeze in a hidden tab) and receives
 no synthetic mouse or key input; and automated "typing" inserts text without key
 presses, so the "any letter opens the keyboard" shortcut has to be checked by
 hand. Model-backed tests remain blocked until the OpenAI account has credit.
+
+### 2026-09-11 — tidy, groups, the drawer's shadow, Pages
+
+Fixes: 49. a shadow lay along the right edge of the board — the closed
+configuration drawer sits just off-screen and its shadow reached back in; it now
+has one only while open. 50. a thread inside a group could be resized on its
+own; now only the group is, and its threads take its width and share its height
+— each grows until its whole conversation shows and shrinks, scrolling, with
+the group. 51. the service worker was no longer registered after the client was
+split into modules, so the console had stopped being installable; restored.
+52. Tidy up piled everything from the top-left and treated the instrument
+panels as obstacles. It now folds every thread but the one you're in and seats
+everything in rows from the centre — the biggest in the middle, the rest
+outward left and right, further rows above and below in turn — clear of JARVIS
+and ignoring the panels. Nothing is resized unless they can't fit side by side;
+then only widths come down (to 280px at least), and the next tidy on a bigger
+screen gives them back.
+
+| Area | Result |
+| --- | --- |
+| Tidy at 780×940 with six open threads and a group: five fold, the active stays open, group in the middle, no overlaps, nothing resized | Pass |
+| Tidy at 780×600: widths down to 352px, two per row, all above JARVIS, no overlaps | Pass |
+| Tidy again at 1600×900: widths back to 440px, no overlaps | Pass |
+| Group resized wider/shorter/taller: threads follow the width; shorter scrolls inside; taller grows until nothing scrolls, then stops | Pass |
+| Closed drawer has no shadow | Pass |
+| Pages-style build (`JARVIS_BASE=/jarvis/`): assets, manifest and service worker all under `/jarvis/` | Pass |

@@ -317,59 +317,134 @@ export class Stage {
   }
 
   /**
-   * Tidy the board: every window and group gives up its seat and is seated
-   * again from the middle outward, clear of the others and of open panels.
-   * Sizes are kept. For when a smaller screen (or a busy session) has left
-   * things piled on each other.
+   * Tidy the board: every thread is folded to its title bar — all but the one
+   * you're in, while it fits — and everything is seated in rows centred on
+   * the board: the biggest in the middle of the middle row, the rest outward
+   * from it, left and right in turn; further rows go above and below it in
+   * turn, so the board grows evenly from the centre. It all stays above
+   * JARVIS; the instrument panels float over the board and are not in the way.
+   *
+   * Nothing is resized, unless there are so many that they don't fit side by
+   * side — then only their widths come down, and only as far as they must.
    */
-  tidy(): number {
-    if (this.compact) return 0; // a phone's board is already a list
-    // Everything that sits on the board by itself: groups, then loose windows,
-    // the one you're in first among them.
-    type Item = { w: number; h: number; set: (x: number, y: number) => void };
-    const items: Item[] = [];
-    for (const g of this.ws.visibleGroups) {
-      if (g.id === GENERAL_ID) continue;
-      const el = this.bubbles.get(g.id)?.el;
-      if (el) items.push({ w: el.offsetWidth, h: el.offsetHeight, set: (x, y) => { g.x = x; g.y = y; } });
-    }
-    const loose = this.ws.treeOrder(GENERAL_ID).sort((a, b) =>
-      (b.id === this.ws.activeId ? 1 : 0) - (a.id === this.ws.activeId ? 1 : 0) || b.createdAt - a.createdAt);
-    for (const t of loose) {
-      const el = this.cards.get(t.id)?.el;
-      if (el) items.push({ w: el.offsetWidth, h: el.offsetHeight, set: (x, y) => { t.x = x; t.y = y; } });
-    }
-    // Pack from the top-left: each box goes to the highest free spot it fits
-    // (leftmost among equals), never into the space kept clear above JARVIS
-    // and never over an open panel. Tighter than seating from the middle, so
-    // more fits before anything has to overlap.
+  tidy(): { seated: number } {
+    if (this.compact) return { seated: 0 }; // a phone's board is already a list
+    const hold = [...this.cards.values(), ...this.bubbles.values()].map((x) => x.el);
+    // Measured with their easing held, or a window still changing size would
+    // be measured at the size it is leaving.
+    for (const el of hold) el.classList.add("sizing");
+
     const B = this.bounds, gap = 14;
-    const placed: Rect[] = [...this.panelObstacles()];
-    const { cx } = this.core();
-    const floorFor = (x: number, w: number): number =>
-      x < cx + CORE_ZONE && x + w > cx - CORE_ZONE ? Math.min(B.bottom, this.coreFloor) : B.bottom;
-    for (const it of items) {
-      const xs = new Set<number>([B.left, B.right - it.w]);
-      for (const p of placed) { xs.add(p.x + p.w + gap); xs.add(p.x - it.w - gap); }
-      let best: { x: number; y: number; over: number } | null = null;
-      for (const x0 of xs) {
-        const x = Math.max(B.left, Math.min(B.right - it.w, Math.round(x0)));
-        // the lowest bottom of anything already in this column range
-        const y = Math.max(B.top, ...placed.filter((p) => p.x < x + it.w + gap && p.x + p.w + gap > x).map((p) => p.y + p.h + gap));
-        const over = Math.max(0, y + it.h - floorFor(x, it.w));
-        if (!best || over < best.over || (over === best.over && (y < best.y || (y === best.y && x < best.x)))) best = { x, y, over };
+    const W = B.right - B.left;
+    const room = Math.min(B.bottom, this.coreFloor) - B.top;
+    const THREAD_MIN_W = 280;
+
+    type Item = { w: number; h: number; minW: number; weight: number; at: number; fit: (w: number) => void; place: (x: number, y: number) => void };
+    /** Fold, give back what an earlier tidy took, and measure what's left. */
+    const measure = (keepOpen: string | null): Item[] => {
+      for (const t of this.ws.live) {
+        if (t.id !== keepOpen && this.ws.isOpen(t)) this.ws.setOpen(t.id, false);
+        delete t.fit;
       }
-      let { x, y } = best!;
-      // nowhere it fits: the spot that overlaps least, pulled back into the board
-      if (best!.over > 0) {
-        const r = this.seat(it.w, it.h, placed);
-        x = r.x; y = r.y;
+      for (const g of this.ws.groups) delete g.fit;
+      this.renderAll();
+      const items: Item[] = [];
+      for (const g of this.ws.visibleGroups) {
+        if (g.id === GENERAL_ID) continue;
+        const el = this.bubbles.get(g.id)?.el;
+        if (!el) continue;
+        const shut = el.classList.contains("collapsed");
+        items.push({
+          w: el.offsetWidth, h: el.offsetHeight, minW: shut ? el.offsetWidth : Math.min(el.offsetWidth, THREAD_MIN_W + 30),
+          weight: this.ws.treeOrder(g.id).reduce((sum, t) => sum + 1 + t.turns.length, 0), at: g.createdAt,
+          fit: (w) => { g.fit = { w, h: 0 }; }, place: (x, y) => { g.x = x; g.y = y; },
+        });
       }
-      it.set(Math.round(x), Math.round(y));
-      placed.push({ x, y, w: it.w, h: it.h });
+      for (const t of this.ws.treeOrder(GENERAL_ID)) {
+        const el = this.cards.get(t.id)?.el;
+        if (!el) continue;
+        items.push({
+          w: el.offsetWidth, h: el.offsetHeight, minW: Math.min(el.offsetWidth, THREAD_MIN_W),
+          weight: t.turns.length, at: t.createdAt,
+          fit: (w) => { t.fit = { w, h: 0 }; }, place: (x, y) => { t.x = x; t.y = y; },
+        });
+      }
+      // Biggest first; among equals, the one with more in it, then the newest.
+      return items.sort((a, b) => b.w * b.h - a.w * a.h || b.weight - a.weight || b.at - a.at);
+    };
+
+    /** Rows for these widths: filled in turn, then evened out so the last isn't a straggler. */
+    const rowsFor = (ws: number[]): number[][] => {
+      const fill = (cap: number): number[][] => {
+        const rows: number[][] = [[]];
+        let used = 0;
+        ws.forEach((w, i) => {
+          const row = rows[rows.length - 1]!;
+          const need = row.length ? used + gap + w : w;
+          if (row.length && need > cap) { rows.push([i]); used = w; } else { row.push(i); used = need; }
+        });
+        return rows;
+      };
+      const count = fill(W).length;
+      let lo = Math.max(...ws), hi = W;
+      while (hi - lo > 4) { const mid = (lo + hi) / 2; if (fill(mid).length > count) lo = mid; else hi = mid; }
+      return fill(hi);
+    };
+    const tall = (items: Item[], rows: number[][]): number =>
+      rows.reduce((sum, r) => sum + Math.max(...r.map((i) => items[i]!.h)), 0) + gap * (rows.length - 1);
+
+    /** The widest windows that fit: as they are if possible, narrower only as far as needed. Null if nothing fits. */
+    const plan = (items: Item[]): { widths: number[]; rows: number[][] } | null => {
+      for (let sx = 1; sx >= 0.3; sx -= 0.05) {
+        const widths = items.map((it) => Math.round(Math.max(it.minW, Math.min(it.w, it.w * sx))));
+        const rows = rowsFor(widths);
+        if (tall(items, rows) <= room) return { widths, rows };
+        if (widths.every((w, i) => w === items[i]!.minW)) break;
+      }
+      return null;
+    };
+
+    const active = this.ws.activeId || null;
+    let items = measure(active);
+    let p = plan(items);
+    // The one you're in doesn't fit open: it folds like the rest.
+    if (!p && active && this.ws.live.some((t) => t.id === active && this.ws.isOpen(t))) { items = measure(null); p = plan(items); }
+    // Still too many: the narrowest they go, from the top, and the board scrolls.
+    if (!p) { const widths = items.map((it) => it.minW); p = { widths, rows: rowsFor(widths) }; }
+    const { widths } = p;
+    items.forEach((it, i) => { if (widths[i]! < it.w) it.fit(widths[i]!); });
+
+    // Within a row: the biggest in the middle, the rest to its right and
+    // left in turn. Rows stack the same way: the first in the middle, the
+    // next above it, the next below, and so on.
+    const stacked: { line: number[]; h: number; at: "mid" | "above" | "below" }[] = [];
+    p.rows.forEach((row, k) => {
+      const line: number[] = [];
+      row.forEach((i, n) => (n % 2 ? line.push(i) : line.unshift(i)));
+      const r = { line, h: Math.max(...row.map((i) => items[i]!.h)) };
+      if (k === 0) stacked.push({ ...r, at: "mid" });
+      else if (k % 2) stacked.unshift({ ...r, at: "above" });
+      else stacked.push({ ...r, at: "below" });
+    });
+    const total = stacked.reduce((sum, r) => sum + r.h, 0) + gap * (stacked.length - 1);
+    let y = B.top + Math.max(0, (room - total) / 2);
+    const mx = (B.left + B.right) / 2;
+    for (const r of stacked) {
+      const width = r.line.reduce((sum, i) => sum + widths[i]!, 0) + gap * (r.line.length - 1);
+      let x = mx - width / 2;
+      for (const i of r.line) {
+        // Rows above hang from the middle row, rows below stand on it, and the
+        // middle one is centred on its own line.
+        const h = items[i]!.h;
+        const dy = r.at === "above" ? r.h - h : r.at === "below" ? 0 : (r.h - h) / 2;
+        items[i]!.place(Math.round(x), Math.round(y + dy));
+        x += widths[i]! + gap;
+      }
+      y += r.h + gap;
     }
     this.commit();
-    return items.length;
+    requestAnimationFrame(() => { for (const el of hold) el.classList.remove("sizing"); });
+    return { seated: items.length };
   }
 
   /* ---------------- thread windows ---------------- */
@@ -436,6 +511,7 @@ export class Stage {
       const th = this.ws.thread(t.id);
       if (!th) return;
       delete th.size;
+      delete th.fit;
       this.applySize(t.id);
       this.commit();
     });
@@ -463,15 +539,20 @@ export class Stage {
     return c;
   }
 
-  /** A window the reader has sized stays that size. */
+  /**
+   * A loose window the reader has sized stays that size, and one Tidy up
+   * shrank keeps what it was given; inside a group, the group's size rules.
+   */
   private applySize(id: string): void {
     const c = this.cards.get(id);
     const t = this.ws.thread(id);
     if (!c) return;
-    if (t?.size && !this.compact) {
-      c.el.style.width = `${Math.round(t.size.w)}px`;
-      c.body.style.height = `${Math.round(t.size.h)}px`;
-      c.body.style.maxHeight = "none";
+    if (t && (t.size || t.fit) && !this.compact && t.groupId === GENERAL_ID) {
+      const cap = t.fit?.h || Infinity;
+      c.el.style.width = `${Math.round(Math.min(t.size?.w ?? Infinity, t.fit?.w ?? Infinity))}px`;
+      // a size is a fixed height; a fit alone only caps it, so the window still grows with what's said
+      c.body.style.height = t.size ? `${Math.round(Math.min(t.size.h, cap))}px` : "";
+      c.body.style.maxHeight = t.size ? "none" : cap === Infinity ? "" : `${Math.round(cap)}px`;
       c.el.classList.add("sized");
     } else {
       c.el.style.width = "";
@@ -486,9 +567,10 @@ export class Stage {
     const b = this.bubbles.get(id);
     const g = this.ws.group(id);
     if (!b) return;
-    if (g?.size && !this.compact && !b.el.classList.contains("collapsed")) {
-      b.el.style.width = `${Math.round(g.size.w)}px`;
-      b.list.style.maxHeight = `${Math.round(g.size.h)}px`;
+    if (g && (g.size || g.fit) && !this.compact && !b.el.classList.contains("collapsed")) {
+      b.el.style.width = `${Math.round(Math.min(g.size?.w ?? Infinity, g.fit?.w ?? Infinity))}px`;
+      const cap = Math.min(g.size?.h ?? Infinity, g.fit?.h || Infinity);
+      b.list.style.maxHeight = cap === Infinity ? "" : `${Math.round(cap)}px`;
       b.el.classList.add("sized");
     } else {
       b.el.style.width = "";
@@ -536,6 +618,7 @@ export class Stage {
       const grp = this.ws.group(g.id);
       if (!grp) return;
       delete grp.size;
+      delete grp.fit;
       this.applyGroupSize(g.id);
       this.commit();
     });
@@ -599,6 +682,7 @@ export class Stage {
         // bubble's scrolling list.
         if (!loose) { c.el.style.left = ""; c.el.style.top = ""; c.el.style.zIndex = ""; }
         else track(stackKey.thread(t.id), c.el);
+        this.applySize(t.id); // a size of its own only while loose
         if (b.list.children[i] !== c.el) b.list.insertBefore(c.el, b.list.children[i] ?? null);
         i++;
       }
@@ -1056,14 +1140,12 @@ export class Stage {
         const card = grip.closest<HTMLElement>(".chatwin")!;
         const c = this.cards.get(card.dataset.id!);
         const t = this.ws.thread(card.dataset.id);
-        if (!c || !t) return;
-        // Only a loose window has a position of its own to move; one inside a
-        // group is placed by the group, so it only offers its bottom-right corner.
-        const loose = t.groupId === GENERAL_ID;
+        // Only a loose window is sized by hand; one inside a group takes the
+        // group's width, and it is the group that is resized.
+        if (!c || !t || t.groupId !== GENERAL_ID) return;
         this.sizeDrag = {
           kind: "thread", id: t.id, pid: e.pointerId, sx: e.clientX, sy: e.clientY,
-          w: c.el.offsetWidth, h: c.body.offsetHeight, ex, ey,
-          ...(loose ? { x: c.el.offsetLeft, y: c.el.offsetTop } : {}),
+          w: c.el.offsetWidth, h: c.body.offsetHeight, ex, ey, x: c.el.offsetLeft, y: c.el.offsetTop,
         };
         card.classList.add("sizing");
       }
@@ -1122,6 +1204,7 @@ export class Stage {
         const g = this.ws.group(d.id);
         if (!g) return;
         g.size = size;
+        delete g.fit;
         if (x !== undefined) g.x = x;
         if (y !== undefined) g.y = y;
         this.applyGroupSize(d.id);
@@ -1129,6 +1212,7 @@ export class Stage {
         const t = this.ws.thread(d.id);
         if (!t) return;
         t.size = size;
+        delete t.fit;
         if (x !== undefined) t.x = x;
         if (y !== undefined) t.y = y;
         this.applySize(d.id);

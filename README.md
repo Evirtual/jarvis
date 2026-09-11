@@ -308,7 +308,9 @@ The server listens on the machine's interfaces so a phone on your network can us
 it, but it is deliberately unfriendly to anything else:
 
 - **No CORS.** The console is served from the same origin; in dev, Vite proxies
-  `/api`, so the browser never makes a cross-origin call.
+  `/api`, so the browser never makes a cross-origin call. The one exception is
+  an origin you name yourself, for the page published elsewhere (see
+  [The page on GitHub Pages](#the-page-on-github-pages)).
 - Anything that changes state must carry the console's own header, which a page
   on another site cannot set without a preflight that is never granted.
 - Keys never reach the browser or a model; a key pasted into the chat is
@@ -320,16 +322,41 @@ it, but it is deliberately unfriendly to anything else:
 
 JARVIS is not a static site: the console needs its own server, on the machine
 whose readings it shows — that server reads the CPU, GPU and disks, sweeps the
-local network, runs the voice and holds the API keys. So it can't be hosted on
-GitHub Pages; a Pages copy would be a screen with nothing behind it.
+local network, runs the voice and holds the API keys. A copy on GitHub Pages
+alone is a screen with nothing behind it: it opens, installs, and reports the
+server unreachable.
 
-To reach it from a phone away from home (and so install it there), put the
-server behind an https tunnel — for example a Cloudflare Tunnel from
-`jarvis.<your-domain>` to `http://localhost:7823` — **and** put an access
-check in front of it (Cloudflare Access, or similar). The server is built to
-refuse other websites, not other people: anyone who can open the address can use
-your API credit, see your machine's readings and sweep your network. Never expose
-it without that check.
+To use it away from home (and install it on a phone there), the server has to
+be reachable over https. Put it behind a tunnel — for example a Cloudflare
+Tunnel from `jarvis.<your-domain>` to `http://localhost:7823` — **and** put an
+access check in front of it (Cloudflare Access, or similar). The server is built
+to refuse other websites, not other people: anyone who can open the address can
+use your API credit, see your machine's readings and sweep your network. Never
+expose it without that check. Once the tunnel is up, the simplest thing is to
+open the console at that address: the server serves the page itself, and nothing
+below is needed.
+
+### The page on GitHub Pages
+
+The console's page can also be published on its own — [`pages.yml`](.github/workflows/pages.yml)
+builds the client and deploys it on every push to `main` — and pointed at the
+server at home. Three settings tie the two together:
+
+- **`JARVIS_SERVER`** (a repository *variable*, Settings → Secrets and
+  variables → Actions → Variables): the server's https address, e.g.
+  `https://jarvis.example.com`. The page is built to call it. Without it the
+  page calls its own origin, where there is no server.
+- **`allowOrigin`** in the server's `config.json` (or the `JARVIS_ALLOW_ORIGIN`
+  environment variable): the page's origin, e.g. `https://evirtual.github.io`.
+  This is the one other site the server answers; every other origin is still
+  refused. Restart the server after changing it.
+- **`JARVIS_SITE_URL`** (repository variable): set it once a custom domain
+  serves the page, so it is built for `/` rather than `/<repo>/`; then add the
+  domain under Settings → Pages.
+
+Calls from the page carry the browser's cookies, so an access check in front
+of the tunnel still applies — allow the page's origin (with credentials) in
+that check's CORS settings, or the browser will refuse the calls.
 
 ## Development
 

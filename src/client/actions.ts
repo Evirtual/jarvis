@@ -238,7 +238,7 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       if (!ws.live.length) return "There's nothing on the board to tidy, sir.";
       if (mode === "compact") return "On a phone the threads are already a list, sir — drag one by its title bar to move it.";
       graph.tidy();
-      return "Tidied up, sir — everything has its own place again.";
+      return "Tidied up, sir — everything folded and in its place. Open any thread from its title bar.";
     }
     case "archive_all": {
       const n = ws.live.length;

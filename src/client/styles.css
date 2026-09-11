@@ -420,8 +420,16 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .bb-add:focus-visible, .bb-fold:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
 /* Invisible corner hit targets keep the visual surface clean. */
 .bubble.loose .bb-grip, .bubble.collapsed .bb-grip { display: none; }
+/* Inside a group only the group is sized; its threads take its width. */
+.bubble:not(.loose) .cw-grip { display: none; }
 .bubble.sizing { transition: none; }
 .bubble.sized .bb-list { overflow-y: auto; }
+/* A sized group sizes its threads: they take its width, and share out its
+   height — each grows with it until its whole conversation shows, and shrinks
+   with it, scrolling inside itself, down to its title and a line. */
+.bubble.sized:not(.loose) .chatwin { width: auto; max-width: none; }
+.bubble.sized:not(.loose) .chatwin:not(.shut) { flex: 0 1 auto; min-height: var(--cw-min-h, 82px); }
+.bubble.sized:not(.loose) .chatwin:not(.shut) .cw-body { flex: 1 1 auto; min-height: 0; max-height: none; }
 .bb-list {
   display: flex; flex-direction: column; gap: 6px; min-height: 0;
   overflow-y: auto; overflow-x: hidden; padding: 1px 2px 2px 1px;
@@ -935,11 +943,13 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .drawer {
   position: fixed; top: 0; right: 0; bottom: 0; width: 392px; max-width: 94vw; z-index: 241;
   border-left: 1px solid color-mix(in srgb, var(--ice) 45%, transparent);
-  box-shadow: -24px 0 60px rgba(0,0,0,.45);
+  /* the shadow only while open: closed, the drawer sits just off the right
+     edge and its shadow would bleed onto the board */
+  box-shadow: none;
   transform: translateX(100%); transition: transform .26s cubic-bezier(.3,.9,.3,1);
   display: flex; flex-direction: column; overflow-y: auto; padding: 16px 16px 24px; gap: 12px;
 }
-.drawer.open { transform: translateX(0); }
+.drawer.open { transform: translateX(0); box-shadow: -24px 0 60px rgba(0,0,0,.45); }
 .drawer-head { display: flex; align-items: center; gap: 10px; }
 .drawer-head h2 { margin: 0; font-family: var(--f-hud); font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--text-hi); }
 .tabs { display: flex; gap: 4px; }
