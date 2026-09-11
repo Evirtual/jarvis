@@ -1,0 +1,1255 @@
+/* =====================================================================
+   J.A.R.V.I.S. Console
+
+   Two layouts from one document:
+     .m-desk    the core and its bubbles fill the screen, mouse and keyboard
+     .m-compact the core on top, the bubbles as a list, phone in the hand
+
+   One committed visual world — a Stark workshop display. No light theme:
+   this is a screen that glows in a dark room, and it says so deliberately.
+   ===================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  --void: #04080d;
+  --panel: #0a141d;
+  --panel-hi: #0e1e2a;
+  --line: #12313f;
+  --line-hot: #1d5468;
+  --ice: #6ff0ff;
+  --ice-dim: #2e7f96;
+  --text: #9db8c4;
+  --text-hi: #d6f2fa;
+  --gold: #ffb648;
+  --red: #ff4f5f;
+  --green: #56e39f;
+
+  --f-hud: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --chamfer: none;
+
+  --gap: 12px;
+  --tap: 44px;
+
+  /* Motion: things here settle rather than snap. One curve for travel, one
+     for the small stuff, so the whole console moves with the same hand. */
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --ease-soft: cubic-bezier(.4, .8, .3, 1);
+  --travel: .42s;
+  /* One depth system for every movable surface on the board. */
+  --surface-depth: 0 18px 40px rgba(0,0,0,.42);
+  --surface-highlight: 0 0 30px color-mix(in srgb, var(--hue, var(--ice)) 14%, transparent);
+  --glass-blur: blur(16px) saturate(1.25);
+  --veil-bg: rgba(2, 8, 14, .46);
+  --veil-blur: blur(6px) saturate(.76);
+  /* A thread window is one fixed size, like an instrument panel: the screen
+     changing width never resizes it; it only narrows if it cannot fit at all. */
+  --thread-w: 440px;
+  /* the title row: nothing on the board reaches above this (HEADER_H in stage.ts) */
+  --header-h: 56px;
+  /* One margin from the screen edge for everything that lines up with it —
+     the title row, the deck, and on a phone the list and the sheets. */
+  --edge: 16px;
+  /* on a phone, the room kept clear just above JARVIS for his status line and notices */
+  --status-room: 40px;
+  /* Title-bar icons: one button size and one glyph size for every box —
+     thread windows, groups and instrument panels alike. */
+  --ic-btn: 22px;
+  --ic: 16px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--f-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* ---------- ambient ---------- */
+.ambient { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.ambient::before {
+  content: ""; position: absolute; inset: 0;
+  background:
+    linear-gradient(var(--line) 1px, transparent 1px) center / 44px 44px,
+    linear-gradient(90deg, var(--line) 1px, transparent 1px) center / 44px 44px;
+  opacity: .15;
+}
+.ambient::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 72% 58% at 50% 45%, transparent 32%, rgba(2,5,9,.85) 100%),
+    repeating-linear-gradient(180deg, rgba(111,240,255,.03) 0 1px, transparent 1px 3px);
+}
+/* ---------- shell ---------- */
+.shell {
+  position: relative; z-index: 2;
+  height: 100dvh;
+  padding: 0;
+  display: grid; grid-template-rows: minmax(0, 1fr);
+}
+
+/* =====================================================================
+   THE DECK — the bottom of the screen: JARVIS in the middle with a new
+   thread on his left and typing on his right, the readings split either
+   side — this machine left, the world around it right. He never moves, so
+   there is always one place to look and one place to press.
+   ===================================================================== */
+.deck {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 200;
+  height: var(--deck-h, 96px);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr); align-items: center; gap: 10px;
+  padding: 0 var(--edge) calc(6px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+.deck .dock-l { justify-content: flex-start; }
+.deck .dock-r { justify-content: flex-end; }
+body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
+
+/* The title row: threads in the top-left corner, configuration in the
+   top-right, level with the JARVIS title. The board never reaches up here
+   (see HEADER_H in stage.ts and BOARD_TOP in panels.ts). */
+.topbar {
+  position: absolute; top: 8px; left: var(--edge); right: var(--edge); z-index: 200; height: 38px;
+  display: flex; align-items: center; justify-content: space-between;
+  pointer-events: none;
+}
+.topbar > * { pointer-events: auto; }
+.ic { position: relative; }
+.ic-count {
+  position: absolute; top: 1px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center; border-radius: 8px;
+  font: 600 9.5px/1 var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ice);
+  background: rgba(6,16,24,.92); border: 1px solid rgba(111,240,255,.4);
+  pointer-events: none;
+}
+/* The deck's menus open inside it, so while one is open the whole deck rises
+   above notices, the web and a carried window — but stays under a confirmation. */
+.deck:has(.menu:not([hidden])) { z-index: 230; }
+.deck > * { pointer-events: auto; }
+/* the gap JARVIS is drawn in, on the canvas below */
+.core-seat { width: 150px; height: 100%; pointer-events: none; }
+.ic {
+  width: 38px; height: 38px; flex: none; display: grid; place-items: center;
+  border: 1px solid transparent; border-radius: 12px; background: transparent;
+  color: var(--ice-dim); cursor: pointer;
+  transition: color .2s, border-color .2s, background .2s, transform .2s var(--ease);
+}
+.ic svg { width: 19px; height: 19px; }
+.ic:hover { color: var(--ice); border-color: rgba(111,240,255,.25); background: rgba(111,240,255,.06); transform: translateY(-1px); }
+.ic:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
+.ic.on { color: var(--ice); border-color: rgba(111,240,255,.45); background: rgba(111,240,255,.1); }
+.ic.primary { color: var(--gold); border-color: rgba(255,182,72,.45); }
+
+.spacer { flex: 1 1 auto; }
+
+/* The dock takes whatever room the header has left; chips that don't fit fold
+   into the More menu (see fitDock in main.ts). Overflow stays visible so the
+   menu can drop below the header. */
+.dock { display: flex; gap: 6px; flex: 1 1 auto; min-width: 0; justify-content: flex-end; flex-wrap: nowrap; }
+.dock .pill { flex: none; white-space: nowrap; }
+.dock .mi-ic { width: 14px; height: 14px; flex: none; color: color-mix(in srgb, var(--hue, var(--ice)) 70%, #5c8a9a); }
+.dock .pill.on .mi-ic { color: var(--hue, var(--ice)); }
+/* A reading wears its instrument's glass: the panel's gradient, blur and edge. */
+.dock > .pill[data-open], .dock .pill.more {
+  border-color: color-mix(in srgb, var(--hue) 34%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--hue) 8%, rgba(14,30,42,.56)),
+    rgba(6,14,21,.64));
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+}
+.dock > .pill[data-open]:hover, .dock .pill.more:hover {
+  border-color: color-mix(in srgb, var(--hue) 62%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--hue) 14%, rgba(14,30,42,.6)),
+    rgba(6,14,21,.68));
+}
+.dock > .pill[data-open].on, .dock .pill.more[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--hue) 80%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--hue) 18%, rgba(14,30,42,.6)),
+    color-mix(in srgb, var(--hue) 6%, rgba(6,14,21,.7)));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--hue) 24%, transparent);
+}
+.dock > .pill[data-open].warn { border-color: var(--gold); }
+.dock > .pill[data-open].crit { border-color: var(--red); }
+.menu-item[data-open] .mi-ic { color: color-mix(in srgb, var(--hue) 70%, #5c8a9a); }
+.menu-item[data-open].on { border-left-color: var(--hue); background: color-mix(in srgb, var(--hue) 10%, transparent); }
+.menu-item[data-open].on .mi-ic { color: var(--hue); }
+/* Readings in the deck are compact on every screen: the icon already says what
+   they are. Their names are spelled out only inside the More menu. */
+.dock > .pill[data-rank] .k { display: none; }
+.dock > .pill[data-rank] { gap: 5px; }
+.more-wrap { position: relative; flex: none; }
+.pill.more { gap: 5px; align-items: center; justify-content: center; min-width: 30px; }
+.more-ic { width: 15px; height: 15px; color: var(--ice-dim); }
+.pill.more[aria-expanded="true"] .more-ic { color: var(--ice); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+.pill.more[aria-expanded="true"] { border-color: var(--ice); background: rgba(111,240,255,.1); }
+.caret-dn { font-size: 10px; color: var(--ice-dim); line-height: 1; }
+.menu {
+  position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 60; min-width: 210px;
+  display: flex; flex-direction: column; gap: 2px; padding: 6px;
+  border: 1px solid rgba(111,240,255,.22);
+  box-shadow: 0 18px 44px rgba(0,0,0,.55);
+  animation: panelIn .18s cubic-bezier(.2,.9,.3,1);
+}
+.menu-head { display: none; }
+.menu-close { display: none; }
+.menu-item {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+  padding: 10px 11px; min-height: 40px; width: 100%; text-align: left; cursor: pointer;
+  background: transparent; border: 1px solid transparent; color: var(--text); font: inherit;
+}
+.menu-item .k { font-family: var(--f-hud); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); }
+.menu-item .v { font-size: 12.5px; color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.menu-item:hover, .menu-item:focus-visible { border-color: var(--line-hot); background: rgba(111,240,255,.07); outline: none; }
+.menu-item.on { border-color: var(--ice); }
+.menu-item.on .k { color: var(--ice); }
+.menu-item.warn .v { color: var(--gold); } .menu-item.crit .v { color: var(--red); }
+.menu-item.static { cursor: default; }
+.menu-item.static:hover { border-color: transparent; background: transparent; }
+.menu-sep { height: 1px; background: var(--line); margin: 4px 2px; }
+.pill {
+  font: inherit; color: inherit; cursor: pointer;
+  transition: border-color .18s, background .18s, box-shadow .18s;
+  display: flex; align-items: baseline; gap: 6px;
+  border: 1px solid var(--line); background: var(--panel);
+  padding: 4px 9px; clip-path: var(--chamfer);
+}
+.pill .k { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); }
+.pill .v { font-size: 12px; color: var(--text-hi); font-variant-numeric: tabular-nums; font-weight: 500; }
+.pill.warn { border-color: var(--gold); } .pill.warn .v { color: var(--gold); }
+.pill.crit { border-color: var(--red); } .pill.crit .v { color: var(--red); }
+.pill:hover { border-color: var(--line-hot); background: var(--panel-hi); }
+.pill:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
+.pill.on { border-color: var(--ice); background: rgba(111,240,255,.1); box-shadow: 0 0 12px rgba(111,240,255,.18); }
+.pill.on .k { color: var(--ice); }
+.pill.static { cursor: default; }
+.pill.static:hover { border-color: var(--line); background: var(--panel); }
+
+/* Every reading in the deck is one height, whatever is inside it. */
+.dock > .pill, .pill.more { height: 30px; align-items: center; padding-top: 0; padding-bottom: 0; }
+
+/* ---------- grid ---------- */
+.hud { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
+.centre { min-height: 0; overflow: hidden; }
+
+.panel {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  clip-path: var(--chamfer); padding: 10px 12px 12px;
+}
+.panel > h2 {
+  margin: 0 0 9px; font-family: var(--f-hud); font-size: 9px; font-weight: 700;
+  letter-spacing: .22em; text-transform: uppercase; color: var(--ice-dim);
+  display: flex; align-items: center; gap: 8px;
+}
+.panel > h2 .tail { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-hot), transparent); }
+.panel > h2 .aux { color: var(--text); font-size: 9px; letter-spacing: .08em; font-family: var(--f-mono); }
+
+/* ---------- readouts ---------- */
+.kv { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 11px; padding: 3px 0; }
+.kv .k { font-family: var(--f-hud); font-weight: 600; font-size: 8.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); white-space: nowrap; }
+.kv .v { color: var(--text-hi); text-align: right; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kv .v.gold { color: var(--gold); } .kv .v.red { color: var(--red); } .kv .v.green { color: var(--green); }
+
+.meter { margin: 6px 0 2px; }
+.meter .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; font-size: 11px; }
+.meter .row .nm { color: var(--text); }
+.meter .row .nu { color: var(--text-hi); font-variant-numeric: tabular-nums; font-weight: 500; }
+.meter .row .nu .u { color: var(--ice-dim); font-size: 9px; margin-left: 2px; }
+.track { height: 4px; background: #071119; border: 1px solid var(--line); overflow: hidden; }
+.fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--ice-dim), var(--ice)); box-shadow: 0 0 7px rgba(111,240,255,.5); transition: width .45s ease; }
+.fill.warn { background: linear-gradient(90deg, #8a5f1c, var(--gold)); box-shadow: 0 0 7px rgba(255,182,72,.45); }
+.fill.crit { background: linear-gradient(90deg, #7a2530, var(--red)); box-shadow: 0 0 7px rgba(255,79,95,.45); }
+
+/* per-core grid: one cell per real logical core */
+.cores { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; margin: 7px 0 4px; }
+.core { height: 22px; background: #071119; border: 1px solid var(--line); position: relative; overflow: hidden; }
+.core i { position: absolute; left: 0; right: 0; bottom: 0; display: block; background: linear-gradient(180deg, var(--ice), var(--ice-dim)); height: 0; transition: height .4s ease; }
+.core.hot i { background: linear-gradient(180deg, var(--gold), #8a5f1c); }
+.core.max i { background: linear-gradient(180deg, var(--red), #7a2530); }
+
+/* =====================================================================
+   THE STAGE — the core in the middle, conversations floating around it
+   ===================================================================== */
+.centre { display: flex; flex-direction: column; }
+/* The core is the source of a single wash of light that flows through the board. */
+/* The tallest any box may be: from the title row down to the space kept clear
+   above JARVIS (--core-clear is published by stage.ts; 44px is his status line
+   and notices). Every box fits above him, so none can cover him even on a
+   screen too narrow to step aside. */
+.stage { --board-h: calc(100% - var(--header-h) - var(--core-clear, 140px) - 44px); }
+.stage {
+  position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
+  background:
+    /* JARVIS's light: fixed at his spot (bottom centre, 72px up) and a fixed
+       size, so like the grid it never slides or stretches as the window resizes */
+    radial-gradient(ellipse 1600px 1080px at 50% calc(100% - 72px), rgba(57,132,157,.19), rgba(26,82,104,.13) 35%, rgba(12,48,66,.08) 65%, transparent 100%),
+    linear-gradient(to top, rgba(17,57,73,.24), rgba(12,42,58,.17) 48%, rgba(7,24,35,.08) 100%),
+    #050b11;
+}
+.masthead {
+  position: absolute; top: 18px; left: 50%; z-index: 2; transform: translateX(-50%);
+  white-space: nowrap; pointer-events: none;
+  font-family: var(--f-hud); font-size: 14px; font-weight: 700; letter-spacing: .24em;
+  color: rgba(177,232,246,.82); text-shadow: 0 0 16px rgba(111,240,255,.25);
+}
+/* a faint floor grid, receding — the room the windows float in */
+.stage::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    linear-gradient(rgba(29,84,104,.16) 1px, transparent 1px) center / 56px 56px,
+    linear-gradient(90deg, rgba(29,84,104,.16) 1px, transparent 1px) center / 56px 56px;
+  mask-image: linear-gradient(to top, #000, rgba(0,0,0,.82) 45%, transparent 100%);
+}
+#graph { position: absolute; inset: 0; z-index: 1; pointer-events: none; display: block; }
+
+/* The status line: one fixed place just above JARVIS. His status word, a
+   passing notice and the bin all sit on it, bottom edge on the line, so
+   nothing that comes and goes ever appears at a different height. A notice
+   or the bin takes the line over while it is showing. */
+.core-label {
+  position: absolute; left: var(--core-x, 50%); top: var(--status-y, 70%); transform: translate(-50%, -100%);
+  z-index: 205; text-align: center; pointer-events: none; white-space: nowrap;
+  transition: opacity .2s var(--ease-soft);
+}
+.stage:has(.toast.in) .core-label, .stage:has(.bin.in) .core-label { opacity: 0; }
+.stage:has(.bin.in) .toast { opacity: 0; }
+.core-state {
+  display: block; font-family: var(--f-hud); font-size: 10px; font-weight: 700;
+  letter-spacing: .32em; text-transform: uppercase; color: var(--ice);
+  text-shadow: 0 0 12px rgba(111,240,255,.45);
+}
+.core-thread {
+  display: block; margin-top: 3px; font-size: 10px; color: var(--ice-dim);
+  max-width: 34ch; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* No stacking context of its own (no z-index), so each window and group
+   stacks against the instrument panels directly — see stack.ts. */
+.windows { position: absolute; inset: 0; pointer-events: none; }
+
+/* ---------- bubbles: one group of threads, hanging off the core ----------
+   Not boxes: soft fields with uneven corners that breathe at rest and glide
+   when they move. Position is a transform, so moving one is a single smooth
+   thing rather than a jump. */
+.bubble {
+  --hue: #6ff0ff;
+  --drift: 13s;
+  --surface-highlight: 0 0 24px color-mix(in srgb, var(--hue) 10%, transparent);
+  position: absolute; left: 0; top: 0; pointer-events: auto;
+  display: flex; flex-direction: column;
+  max-height: var(--board-h); /* never taller than fits above JARVIS (see .stage) */
+  padding: 0 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--hue) 26%, transparent);
+  border-radius: 0;
+  clip-path: var(--chamfer);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.22) inset, var(--surface-depth);
+  animation: bubbleIn .5s var(--ease);
+  transition: transform var(--travel) var(--ease), border-color .35s var(--ease-soft),
+              box-shadow .35s var(--ease-soft), width .3s var(--ease);
+  will-change: transform;
+}
+/* Fades in where it belongs. It must not animate `transform`: that is the
+   bubble's position, and animating it makes bubbles fly in from the corner. */
+@keyframes bubbleIn { from { opacity: 0; filter: blur(7px); } }
+/* the one you're in is simply brighter — the shape never morphs under you */
+.bubble.here {
+  border-color: color-mix(in srgb, var(--hue) 52%, transparent);
+  box-shadow: var(--surface-highlight), var(--surface-depth);
+}
+.bubble.drop {
+  border-color: var(--hue);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hue) 30%, transparent), 0 0 44px color-mix(in srgb, var(--hue) 26%, transparent);
+  transform-origin: center;
+}
+/* no animation switch here either: turning the entrance animation back on
+   when it is let go would replay it as a blink */
+.bubble.dragging { transition: none; }
+/* not yet seated (stage.ts): invisible, and no transition into its first seat */
+.bubble.unplaced { visibility: hidden; transition: none; }
+/* ungrouped threads: no shell, no name — just the windows, each on its own
+   strand from the core. A group only appears when there is one. */
+.bubble.loose {
+  inset: 0; width: auto; height: auto; max-height: none;
+  border: 0; background: none; box-shadow: none; padding: 0;
+  pointer-events: none; animation: none; transform: none !important;
+  /* no stacking context: each loose window stacks on its own (stack.ts) */
+  clip-path: none; will-change: auto;
+}
+.bubble.loose > .bb-head { display: none; }
+.bubble.loose > .bb-list { position: absolute; inset: 0; display: block; overflow: visible; padding: 0; }
+.bubble.loose .chatwin {
+  position: absolute; pointer-events: auto;
+  transition: opacity .35s var(--ease-soft), border-color .3s var(--ease-soft),
+              box-shadow .3s var(--ease-soft), transform .3s var(--ease);
+}
+.bubble.loose .chatwin:not(.sized) { width: var(--thread-w); }
+.bb-head {
+  display: flex; align-items: center; gap: 7px; padding: 8px 4px 7px; margin-bottom: 2px;
+  cursor: grab; user-select: none; touch-action: none;
+}
+.bubble.dragging .bb-head { cursor: grabbing; }
+.bb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hue); box-shadow: 0 0 8px var(--hue); flex: none; }
+.bb-title {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--f-hud); font-weight: 700; font-size: 9.5px; letter-spacing: .24em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--hue) 80%, #fff);
+}
+.bb-count { font-size: 10px; color: var(--ice-dim); font-variant-numeric: tabular-nums; }
+.bb-add, .bb-fold {
+  width: var(--ic-btn); height: var(--ic-btn); flex: none; display: grid; place-items: center;
+  background: transparent; border: 0; border-radius: 8px; color: var(--ice-dim); cursor: pointer; padding: 0;
+  transition: color .18s, background .18s, transform .18s var(--ease);
+}
+.bb-add svg, .bb-fold svg { width: var(--ic); height: var(--ic); }
+.bb-add:hover, .bb-fold:hover { color: var(--hue); background: color-mix(in srgb, var(--hue) 12%, transparent); transform: translateY(-1px); }
+.bb-add:focus-visible, .bb-fold:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
+/* Invisible corner hit targets keep the visual surface clean. */
+.bubble.loose .bb-grip, .bubble.collapsed .bb-grip { display: none; }
+.bubble.sizing { transition: none; }
+.bubble.sized .bb-list { overflow-y: auto; }
+.bb-list {
+  display: flex; flex-direction: column; gap: 6px; min-height: 0;
+  overflow-y: auto; overflow-x: hidden; padding: 1px 2px 2px 1px;
+}
+/* folded: the whole group becomes one orb on its spoke */
+.bb-node { display: none; }
+.bubble.collapsed {
+  padding: 0; border-radius: 50%; width: 116px !important; height: 116px;
+  clip-path: none;
+  background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--hue) 16%, transparent), rgba(5,11,17,.62) 72%);
+  animation: bubbleIn .5s var(--ease), orbBreathe var(--drift) ease-in-out infinite;
+}
+@keyframes orbBreathe { 50% { box-shadow: 0 0 46px color-mix(in srgb, var(--hue) 16%, transparent), 0 24px 60px rgba(0,0,0,.34); } }
+.bubble.collapsed .bb-head, .bubble.collapsed .bb-list { display: none; }
+.bubble.collapsed .bb-node {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  width: 100%; height: 100%; border: 0; background: transparent; color: inherit; cursor: grab; padding: 10px; border-radius: 50%;
+  font: inherit; text-align: center; touch-action: none;
+}
+.bb-node b { font-family: var(--f-hud); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: color-mix(in srgb, var(--hue) 85%, #fff); max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb-node span { font-size: 10px; color: var(--ice-dim); }
+.bb-node:focus-visible { outline: 2px solid var(--hue); outline-offset: 2px; }
+
+/* ---------- thread windows, inside their bubble ---------- */
+.chatwin {
+  --hue: var(--ice);
+  --surface-highlight: 0 0 24px color-mix(in srgb, var(--hue) 10%, transparent);
+  position: relative; pointer-events: auto; flex: none;
+  /* One fixed width whatever the screen (see --thread-w); a size chosen with
+     a corner grip stays inline. */
+  width: var(--thread-w);
+  max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--hue) 45%, var(--line));
+  border-radius: 0;
+  clip-path: var(--chamfer);
+  box-shadow: 0 0 0 1px rgba(111,240,255,.04) inset, var(--surface-depth);
+  opacity: .8;
+  transition: opacity .35s var(--ease-soft), border-color .3s var(--ease-soft),
+              width var(--travel) var(--ease), box-shadow .3s var(--ease-soft), transform .3s var(--ease);
+  animation: winIn .5s var(--ease);
+  overflow: hidden;
+}
+@keyframes winIn { from { opacity: 0; transform: translateY(8px) scale(.97); filter: blur(5px); } }
+.chatwin:hover { opacity: .98; transform: translateY(-1px); }
+.chatwin.on {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--hue) 58%, transparent);
+  box-shadow: var(--surface-highlight), var(--surface-depth);
+}
+/* resized by hand: the corner grip */
+.cw-grip, .bb-grip { position: absolute; width: 18px; height: 18px; touch-action: none; opacity: 0; }
+.cw-grip[data-corner="se"], .bb-grip[data-corner="se"] { right: 0; bottom: 0; cursor: nwse-resize; }
+.cw-grip[data-corner="nw"], .bb-grip[data-corner="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+.cw-grip[data-corner="ne"], .bb-grip[data-corner="ne"] { right: 0; top: 0; cursor: nesw-resize; }
+.cw-grip[data-corner="sw"], .bb-grip[data-corner="sw"] { left: 0; bottom: 0; cursor: nesw-resize; }
+/* the edges between the corners: a thin strip along each side (corners sit on top) */
+.cw-grip[data-corner="n"], .bb-grip[data-corner="n"] { top: 0; left: 18px; right: 18px; width: auto; height: 6px; cursor: ns-resize; }
+.cw-grip[data-corner="s"], .bb-grip[data-corner="s"] { bottom: 0; left: 18px; right: 18px; width: auto; height: 6px; cursor: ns-resize; }
+.cw-grip[data-corner="e"], .bb-grip[data-corner="e"] { right: 0; top: 18px; bottom: 18px; height: auto; width: 6px; cursor: ew-resize; }
+.cw-grip[data-corner="w"], .bb-grip[data-corner="w"] { left: 0; top: 18px; bottom: 18px; height: auto; width: 6px; cursor: ew-resize; }
+/* A window inside a group is placed by the group, so it can only grow from its
+   right edge, bottom edge or bottom-right corner; a left or top one there
+   would move the wrong edge. */
+.bubble:not(.loose) .cw-grip:not([data-corner="se"]):not([data-corner="e"]):not([data-corner="s"]) { display: none; }
+.chatwin.sizing { transition: none; }
+.chatwin.sized .cw-body { overflow-y: auto; }
+.chatwin .cw-body { max-height: min(420px, calc(100vh - 320px)); }
+/* picked up to move to another bubble */
+/* Carried by a transform from where it sits (stage.ts): it is never moved to
+   another parent mid-drag, since that would reload a video playing in it. */
+.chatwin.lifted {
+  /* !important: a loose window's own rule (.bubble.loose .chatwin) eases its
+     transform over .3s and outranks this one, which made a carried window
+     trail behind the pointer. It must follow the pointer exactly. */
+  z-index: 199 !important; transition: none !important; will-change: transform;
+  /* Nothing else changes while it is carried — not its glass, not its entrance
+     animation (switching that off and on again replays the fade-in, which
+     reads as a blink when it is put down). */
+  box-shadow: 0 0 0 1px var(--ice), 0 24px 60px rgba(0,0,0,.6);
+}
+.chatwin.settling { transition: none !important; }
+/* the group it is carried out of stops clipping it for the moment */
+.bubble.carrying { clip-path: none; }
+.bubble.carrying .bb-list { overflow: visible; }
+/* an embedded player must not swallow the pointer while something is carried */
+.stage.carrying iframe { pointer-events: none; }
+.chatwin.lifted .cw-head { cursor: grabbing; }
+/* ---------- the bin: it rises when you pick something up ---------- */
+.bin {
+  position: absolute; left: var(--core-x, 50%); top: var(--status-y, 70%); z-index: 216; pointer-events: none;
+  display: flex; align-items: center; gap: 9px; padding: 11px 18px;
+  border: 1px dashed rgba(255,79,95,.5); border-radius: 999px;
+  background: rgba(20,8,11,.72); backdrop-filter: blur(10px);
+  color: #ff8d98; font-family: var(--f-hud); font-size: 9.5px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase; white-space: nowrap;
+  transform: translate(-50%, calc(-100% + 18px)) scale(.94); opacity: 0;
+  transition: transform .34s var(--ease), opacity .28s var(--ease-soft), background .2s, border-color .2s;
+}
+.bin.in { transform: translate(-50%, -100%) scale(1); opacity: 1; }
+.bin.hot {
+  border-style: solid; border-color: var(--red); color: #fff;
+  background: rgba(120,24,34,.8);
+  transform: translate(-50%, calc(-100% - 4px)) scale(1.08);
+  box-shadow: 0 0 34px rgba(255,79,95,.35);
+}
+.bin svg { width: 17px; height: 17px; }
+
+/* ---------- the context web: what else is about this thread ---------- */
+/* The board stays visible behind a light dim, so the web reads as a layer
+   over your threads rather than a different screen. Its nodes are small
+   versions of the thread windows: the same glass, colour and tag. */
+.web {
+  position: absolute; inset: 0; z-index: 220; cursor: zoom-out;
+  opacity: 0; transition: opacity .26s var(--ease-soft);
+}
+.web.in { opacity: 1; }
+.web-head {
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 2;
+  display: flex; align-items: baseline; gap: 10px; white-space: nowrap; pointer-events: none;
+  max-width: calc(100% - 24px);
+}
+.web-head span {
+  font-family: var(--f-hud); font-size: 10px; font-weight: 700; letter-spacing: .24em;
+  text-transform: uppercase; color: var(--ice);
+}
+.web-head b {
+  font-family: var(--f-hud); font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-hi); overflow: hidden; text-overflow: ellipsis;
+}
+.web-head em { font-style: normal; font-size: 10.5px; color: var(--ice-dim); }
+.web.narrow .web-head { flex-direction: column; align-items: center; gap: 2px; }
+.web.narrow .web-head b { display: none; }
+/* strands and cards drift together with the pointer, so the strands stay
+   fixed to the cards' edges */
+.web-strands {
+  position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+  transform: translate(calc(var(--px, 0) * -12px), calc(var(--py, 0) * -8px));
+  transition: transform .45s var(--ease-soft);
+}
+/* each strand is two strokes of the connected thread's own colour: a wide
+   soft glow and a bright core, thicker the closer the connection */
+.web-strands path {
+  fill: none; stroke: currentColor; stroke-linecap: round;
+  stroke-width: calc(1.4px + var(--near) * 2.2px);
+  stroke-opacity: calc(.45 + var(--near) * .5);
+  filter: drop-shadow(0 0 5px currentColor);
+  stroke-dasharray: 2400; stroke-dashoffset: 2400;
+  animation: strand .9s var(--ease) var(--delay, 0ms) forwards;
+}
+@keyframes strand { to { stroke-dashoffset: 0; } }
+.web-nodes {
+  position: absolute; inset: 0;
+  transform: translate(calc(var(--px, 0) * -12px), calc(var(--py, 0) * -8px));
+  transition: transform .45s var(--ease-soft);
+}
+.web-node {
+  --hue: #6ff0ff; --near: .5; --delay: 0ms;
+  position: absolute; transform: translate(-50%, -50%) scale(.86); opacity: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  width: 232px; padding: 9px 11px 10px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--hue) calc(40% + var(--near) * 45%), transparent);
+  border-radius: 10px;
+  box-shadow: 0 10px 34px rgba(0,0,0,.45), 0 0 calc(10px + var(--near) * 18px) color-mix(in srgb, var(--hue) 22%, transparent);
+  animation: web-bloom .5s var(--ease) var(--delay) forwards;
+  transition: box-shadow .25s, border-color .25s, transform .25s var(--ease);
+}
+@keyframes web-bloom { to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+.web-node:hover {
+  transform: translate(-50%, -50%) scale(1.04); border-color: var(--hue);
+  box-shadow: 0 12px 38px rgba(0,0,0,.5), 0 0 34px color-mix(in srgb, var(--hue) 38%, transparent);
+}
+.web-node header { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.web-node header i {
+  flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--hue);
+  box-shadow: 0 0 8px var(--hue);
+}
+.web-node header b {
+  flex: 1; min-width: 0; font-family: var(--f-hud); font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; font-size: 11.5px; color: var(--text-hi);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.web-node header small { flex: none; font-size: 10px; color: color-mix(in srgb, var(--hue) 75%, #fff); opacity: .85; }
+.web-node p {
+  margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.web-why { display: flex; flex-wrap: wrap; gap: 4px; }
+.web-why span {
+  font-size: 10px; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+  color: color-mix(in srgb, var(--hue) 70%, #fff);
+  border: 1px solid color-mix(in srgb, var(--hue) 35%, transparent);
+  background: color-mix(in srgb, var(--hue) 10%, transparent);
+}
+.web-node.me {
+  --near: 1; cursor: default; width: 268px; z-index: 1;
+  border-color: var(--hue);
+  box-shadow: 0 12px 40px rgba(0,0,0,.5), 0 0 0 3px color-mix(in srgb, var(--hue) 16%, transparent), 0 0 48px color-mix(in srgb, var(--hue) 30%, transparent);
+  animation-delay: 0ms;
+}
+.web-node.me header b { font-size: 12.5px; }
+.web.narrow .web-node { width: min(300px, calc(100% - 32px)); }
+.web-none {
+  position: absolute; transform: translate(-50%, -50%); text-align: center;
+  font-size: 11.5px; color: var(--ice-dim); max-width: 280px;
+}
+
+/* ---------- a clean screen, and a word under the core ---------- */
+.stage-empty {
+  position: absolute; transform: translateX(-50%); z-index: 4; text-align: center;
+  pointer-events: none; max-width: 360px; display: flex; flex-direction: column; gap: 6px;
+  animation: bloom .6s var(--ease) backwards;
+}
+.stage-empty b { font-family: var(--f-hud); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--ice-dim); font-weight: 700; }
+.stage-empty span { font-size: 11.5px; color: #40788c; }
+.toast {
+  position: absolute; left: var(--core-x, 50%); top: var(--status-y, 70%); z-index: 215; pointer-events: none;
+  transform: translate(-50%, calc(-100% + 10px)); opacity: 0;
+  transition: opacity .3s var(--ease-soft), transform .34s var(--ease);
+  max-width: min(560px, 84%); text-align: center;
+  padding: 8px 16px; border-radius: 999px;
+  border: 1px solid rgba(111,240,255,.18);
+  font-size: 11.5px; color: var(--text-hi);
+}
+.toast.in { opacity: 1; transform: translate(-50%, -100%); }
+.confirm-backdrop {
+  position: absolute; inset: 0; z-index: 234;
+}
+.confirm-dialog {
+  position: absolute; left: 50%; top: 50%; z-index: 235; width: min(390px, calc(100% - 32px));
+  transform: translate(-50%, -50%); border: 1px solid rgba(255,79,95,.58);
+  --hue: var(--red);
+  box-shadow: 0 24px 70px rgba(0,0,0,.58); padding: 18px;
+}
+.confirm-dialog h2 { margin: 0 0 8px; color: var(--text-hi); font: 700 12px var(--f-hud); letter-spacing: .14em; text-transform: uppercase; }
+.confirm-dialog p { margin: 0; color: var(--text); font-size: 12px; }
+.confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.confirm-actions .btn { min-width: 92px; }
+
+.cw-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 9px 9px 11px; border-bottom: 1px solid var(--line);
+  background: rgba(6,13,20,.55); cursor: grab; user-select: none; touch-action: none;
+}
+.chatwin.shut .cw-head { border-bottom: 0; }
+.chatwin.shut .cw-body { display: none; }
+.chatwin.shut .cw-chev { transform: rotate(-90deg); }
+.chatwin.shut { opacity: .72; }
+.chatwin.shut:hover { opacity: .95; }
+/* the window a dragged thread would join to make a group */
+.chatwin.drop {
+  opacity: 1; border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(255,182,72,.3), 0 0 34px rgba(255,182,72,.26);
+}
+.cw-dot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--hue) 65%, var(--line-hot)); flex: none; }
+.chatwin.on .cw-dot { background: var(--hue); box-shadow: 0 0 8px var(--hue); }
+.cw-title {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--f-hud); font-weight: 700; font-size: 11.5px; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--text);
+}
+.cw-link { color: var(--ice); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ice) 48%, transparent); text-underline-offset: 2px; }
+.cw-link:hover, .cw-link:focus-visible { color: #dffbff; text-decoration-color: currentColor; }
+.cw-media { display: block; width: 100%; margin: 10px 0 4px; padding: 0; border: 1px solid var(--line); background: rgba(4,12,18,.66); }
+.cw-media img, .cw-media iframe { display: block; width: 100%; max-width: none; border: 0; }
+.cw-media > a { display: block; width: 100%; max-width: none; }
+.cw-media img { max-height: 320px; object-fit: contain; background: #050b11; }
+.cw-media iframe { aspect-ratio: 16 / 9; }
+.cw-media > a:not(:has(img)) { margin-top: 4px; font: 10px var(--f-hud); letter-spacing: .1em; text-transform: uppercase; }
+.cw-ref { color: var(--ice-dim); font: 9px var(--f-mono); letter-spacing: .04em; white-space: nowrap; }
+.chatwin.on .cw-title { color: var(--hue); }
+.cw-count { font-size: 11px; color: var(--ice-dim); font-variant-numeric: tabular-nums; }
+/* Window furniture: drawn icons, big enough to hit and to read. */
+.cw-head button {
+  width: var(--ic-btn); height: var(--ic-btn); flex: none; display: grid; place-items: center;
+  background: transparent; border: 0; border-radius: 7px; color: var(--ice-dim); cursor: pointer; padding: 0;
+  transition: color .18s, background .18s, transform .18s var(--ease);
+}
+.cw-head button svg { width: var(--ic); height: var(--ic); }
+.cw-head button:hover { color: var(--ice); background: rgba(111,240,255,.1); transform: translateY(-1px); }
+.cw-head button:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
+.cw-x:hover { color: var(--gold) !important; background: rgba(255,182,72,.12) !important; }
+.cw-del:hover { color: var(--red) !important; background: rgba(255,79,95,.12) !important; }
+.cw-chev { display: grid; place-items: center; width: var(--ic-btn); height: var(--ic-btn); color: var(--ice-dim); transition: transform .25s var(--ease); }
+.cw-chev svg { width: var(--ic); height: var(--ic); }
+
+.cw-body {
+  overflow-y: auto; padding: 10px 12px 12px; min-height: 36px;
+  display: flex; flex-direction: column; gap: 8px;
+  font-size: 12px; line-height: 1.5;
+}
+.cw-msg { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cw-msg.user { color: var(--gold); padding-left: 9px; border-left: 2px solid rgba(255,182,72,.45); }
+.cw-msg.jarvis { color: var(--text-hi); }
+.cw-msg.sys { color: var(--ice-dim); font-size: 10.5px; }
+.cw-msg.alert { color: var(--red); }
+.cw-msg.tool { color: #7fb8c9; font-size: 10.5px; padding-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* the confirm row for anything that destroys something */
+.cw-confirm { border: 1px solid rgba(255,79,95,.5); background: rgba(255,79,95,.05); padding: 8px 9px; display: flex; flex-direction: column; gap: 7px; }
+
+/* ---------- the Threads list: the whole board as a list ---------- */
+.panel.float[data-panel="threads"] {
+  width: 320px; max-height: min(480px, var(--board-h));
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.panel.float[data-panel="threads"] .tl { min-height: 0; overflow-y: auto; }
+.tl { display: flex; flex-direction: column; gap: 2px; }
+.tl-g {
+  display: flex; align-items: center; gap: 7px; margin-top: 8px; padding: 4px 2px;
+  font-family: var(--f-hud); font-size: 9px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ice-dim); border-bottom: 1px solid var(--line);
+}
+.tl-g:first-child { margin-top: 0; }
+.tl-g i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.tl-g .n { margin-left: auto; font-family: var(--f-mono); letter-spacing: 0; }
+.tl-row {
+  --depth: 0;
+  display: flex; align-items: center; gap: 6px; padding: 6px 4px 6px calc(6px + var(--depth) * 14px);
+  font-size: 11.5px; color: var(--text); cursor: pointer; border-left: 2px solid transparent;
+}
+.tl-row:hover { background: rgba(111,240,255,.06); }
+.tl-row.on { border-left-color: var(--ice); color: var(--text-hi); background: rgba(111,240,255,.08); }
+.tl-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-ref { color: var(--ice-dim); font: 9px var(--f-mono); }
+.tl-row .sub { color: var(--ice-dim); font-size: 10px; }
+.tl-row button { background: transparent; border: 1px solid transparent; color: var(--ice-dim); cursor: pointer; font: inherit; font-size: 10px; padding: 2px 6px; min-height: 0; }
+.tl-row button:hover { color: var(--ice); border-color: var(--line-hot); }
+.tl-row button.del:hover { color: var(--red); border-color: var(--red); }
+.tl-row button:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
+.tl-empty { font-size: 10.5px; color: var(--ice-dim); padding: 6px 4px; }
+.tl-foot { display: flex; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.tl-foot button {
+  flex: 1; background: transparent; border: 1px solid var(--line-hot); color: var(--ice-dim); cursor: pointer;
+  font-family: var(--f-hud); font-size: 9px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  padding: 7px 6px; border-radius: 8px; transition: color .2s, border-color .2s, background .2s;
+}
+.tl-foot button:hover { color: var(--ice); border-color: var(--ice); background: rgba(111,240,255,.07); }
+.tl-foot button.del:hover { color: var(--red); border-color: var(--red); background: rgba(255,79,95,.08); }
+.tl-foot button:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
+
+/* System panels float over the stage as glass: see-through, blurred, closable. */
+.overlays { position: absolute; inset: 0; pointer-events: none; }
+.panel.float {
+  --hue: var(--ice);
+  position: absolute; width: 292px; min-width: 210px; min-height: 90px; max-height: var(--board-h); overflow: auto;
+  pointer-events: auto;
+  border: 1px solid color-mix(in srgb, var(--hue) 52%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hue) 16%, transparent) inset, var(--surface-depth);
+  clip-path: var(--chamfer);
+  container-type: inline-size;
+  animation: panelIn .28s cubic-bezier(.2,.9,.3,1);
+}
+.panel.float:not([data-panel="threads"]) { --surface-highlight: 0 0 38px color-mix(in srgb, var(--hue) 26%, transparent); }
+/* Each instrument has one colour, worn by its panel, by its reading in the
+   deck and by its row in More — so the toggle and the box read as one thing. */
+.panel.float[data-panel="compute"], [data-open="compute"] { --hue: #68f4ff; }
+.panel.float[data-panel="graphics"], [data-open="graphics"] { --hue: #ffbc5b; }
+.panel.float[data-panel="storage"], [data-open="storage"] { --hue: #65efb4; }
+.panel.float[data-panel="perimeter"], [data-open="perimeter"] { --hue: #ad91ff; }
+.panel.float[data-panel="uplink"], [data-open="uplink"] { --hue: #61d8ff; }
+.panel.float[data-panel="environment"], [data-open="environment"] { --hue: #72e6c9; }
+.panel.float > h2 { color: color-mix(in srgb, var(--hue) 74%, #d6f2fa); }
+.panel.float > h2 .tail { background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 58%, transparent), transparent); }
+.panel.float .kv .k, .panel.float .radar-foot .info { color: color-mix(in srgb, var(--hue) 60%, #2e7f96); }
+.panel.float .fill { background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 54%, #12313f), var(--hue)); box-shadow: 0 0 8px color-mix(in srgb, var(--hue) 52%, transparent); }
+.panel.float:hover { box-shadow: var(--surface-highlight), var(--surface-depth); }
+.panel.float .kv { font-size: clamp(10px, 3.2cqw, 16px); }
+.panel.float .kv .k, .panel.float .radar-foot .info { font-size: clamp(8px, 2.45cqw, 12px); }
+.panel.float .host { font-size: clamp(10px, 3.1cqw, 15px); }
+.panel.float .host .ms, .panel.float .host .tag { font-size: clamp(8px, 2.7cqw, 12px); }
+.panel.float .meter { margin-block: clamp(4px, 1.8cqw, 10px); }
+.panel.float .track { height: clamp(2px, .9cqw, 6px); }
+.panel.float[data-panel="perimeter"] { width: 312px; }
+@keyframes panelIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+.panel.float > h2.drag { cursor: grab; user-select: none; touch-action: none; margin: -10px -12px 9px; padding: 9px 8px 8px 12px; border-bottom: 1px solid rgba(111,240,255,.1); }
+.panel.float.dragging > h2.drag { cursor: grabbing; }
+.panel.float.sizing { transition: none; }
+/* the same close button, the same size, as a thread window's */
+.p-x {
+  width: var(--ic-btn); height: var(--ic-btn); flex: none; display: grid; place-items: center;
+  background: transparent; border: 0; border-radius: 7px; color: var(--ice-dim); cursor: pointer;
+  padding: 0; margin-left: 2px; min-height: 0;
+  transition: color .18s, background .18s, transform .18s var(--ease);
+}
+.p-x svg { width: var(--ic); height: var(--ic); }
+.p-x:hover { color: var(--gold); background: rgba(255,182,72,.12); transform: translateY(-1px); }
+.panel.float > h2 .mi-ic { width: var(--ic); height: var(--ic); flex: none; color: var(--hue); margin-right: -1px; }
+.p-x:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
+
+/* The keyboard, when you want it: it rises above the deck, centred on JARVIS. */
+.stage .cmd {
+  position: absolute; left: 50%; bottom: calc(var(--deck-h, 96px) - 4px); z-index: 210;
+  width: min(620px, calc(100% - 40px)); transform: translateX(-50%);
+  border: 1px solid rgba(111,240,255,.35); border-radius: 14px; clip-path: none;
+  padding: 8px 14px;
+  animation: keyIn .32s var(--ease);
+  box-shadow: 0 18px 44px rgba(0,0,0,.5);
+}
+@keyframes keyIn { from { opacity: 0; transform: translate(-50%, 14px) scale(.97); } }
+.cmd[aria-busy="true"] #input { opacity: .55; }
+
+/* ---------- settings switch ---------- */
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; cursor: pointer; }
+.switch-row b { display: block; color: var(--text-hi); font-weight: 600; font-size: 12px; }
+.switch-row small { display: block; color: var(--ice-dim); font-size: 10px; margin-top: 2px; }
+.switch {
+  appearance: none; -webkit-appearance: none; flex: none; cursor: pointer;
+  width: 40px; height: 22px; border-radius: 11px; position: relative;
+  background: #071119; border: 1px solid var(--line-hot); transition: background .18s, border-color .18s;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--ice-dim); transition: transform .18s, background .18s;
+}
+.switch:checked { background: rgba(111,240,255,.18); border-color: var(--ice); }
+.switch:checked::after { transform: translateX(18px); background: var(--ice); box-shadow: 0 0 8px rgba(111,240,255,.6); }
+.switch:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
+
+.chatwin.shut .cw-w, .chatwin.shut .cw-b, .chatwin.shut .cw-del { display: none; }
+
+/* ---------- reactor (unused by the stage; kept for canvas.ts) ---------- */
+.core-bay {
+  display: flex; align-items: center; gap: 16px;
+  border: 1px solid var(--line);
+  background: radial-gradient(circle at 76px 50%, rgba(111,240,255,.09), transparent 62%), linear-gradient(180deg, var(--panel-hi), var(--panel));
+  clip-path: var(--chamfer); padding: 11px 15px;
+}
+#reactor { width: 128px; height: 128px; flex: none; display: block; }
+.bay-read { flex: 1; min-width: 0; }
+.bay-read .unit { font-family: var(--f-hud); font-size: 9px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--ice-dim); }
+.bay-read .headline { font-family: var(--f-hud); font-weight: 700; font-size: 23px; letter-spacing: .04em; color: var(--text-hi); margin: 2px 0 9px; }
+.bay-read .headline em { font-style: normal; color: var(--ice); }
+.bay-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+.bay-cell .k { font-family: var(--f-hud); font-size: 8px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim); }
+.bay-cell .v { font-size: 13px; color: var(--text-hi); font-variant-numeric: tabular-nums; font-weight: 500; }
+.bay-cell .v.gold { color: var(--gold); }
+
+/* ---------- log ---------- */
+.log-wrap { border: 1px solid var(--line); background: linear-gradient(180deg, rgba(10,20,29,.9), rgba(6,13,20,.9)); clip-path: var(--chamfer); min-height: 0; display: flex; flex-direction: column; }
+.log-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-family: var(--f-hud); font-size: 9px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: var(--ice-dim); }
+.log-head .live { color: var(--ice); }
+.log { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 11px 13px 15px; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth; }
+.msg { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; align-items: start; }
+.msg .who { font-family: var(--f-hud); font-size: 8.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; padding-top: 3px; text-align: right; white-space: nowrap; }
+.msg .body { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.msg.jarvis .who { color: var(--ice); } .msg.jarvis .body { color: var(--text-hi); }
+.msg.user .who { color: var(--gold); } .msg.user .body { color: var(--text); }
+.msg.sys .who { color: #1f5164; } .msg.sys .body { color: var(--ice-dim); font-size: 11px; }
+.msg.alert .who, .msg.alert .body { color: var(--red); }
+.caret { display: inline-block; width: 7px; height: 12px; background: var(--ice); vertical-align: -2px; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .15; } }
+
+/* ---------- command bar ---------- */
+.cmd { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line-hot); background: var(--panel); clip-path: var(--chamfer); padding: 8px 10px; }
+.cmd .prompt { font-family: var(--f-hud); font-weight: 700; font-size: 11px; letter-spacing: .18em; color: var(--ice); white-space: nowrap; }
+#input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text-hi); font-family: var(--f-mono); font-size: 13px; }
+#input::placeholder { color: #2a5a6c; }
+
+.btn {
+  font-family: var(--f-hud); font-weight: 600; font-size: 9.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ice-dim); background: transparent;
+  border: 1px solid var(--line-hot); padding: 7px 11px; cursor: pointer; white-space: nowrap;
+  transition: color .18s, border-color .18s, background .18s;
+  min-height: 32px;
+}
+.btn:hover:not(:disabled) { color: var(--ice); border-color: var(--ice); background: rgba(111,240,255,.07); }
+.btn:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
+.btn:disabled { opacity: .32; cursor: not-allowed; }
+.btn.on { color: var(--void); background: var(--ice); border-color: var(--ice); }
+.btn.rec { color: var(--void); background: var(--red); border-color: var(--red); }
+.btn.wide { width: 100%; }
+.btn.primary { color: var(--void); background: var(--ice); border-color: var(--ice); font-weight: 700; }
+.btn.danger:hover:not(:disabled) { color: var(--red); border-color: var(--red); background: rgba(255,79,95,.08); }
+
+.vox { display: flex; align-items: flex-end; gap: 2px; height: 15px; width: 32px; flex: none; }
+.vox i { display: block; width: 3px; height: 3px; background: var(--line-hot); }
+.vox.live i { background: var(--ice); animation: vox .6s ease-in-out infinite alternate; }
+.vox.live i:nth-child(2){animation-delay:.1s} .vox.live i:nth-child(3){animation-delay:.22s}
+.vox.live i:nth-child(4){animation-delay:.07s} .vox.live i:nth-child(5){animation-delay:.16s}
+@keyframes vox { from { height: 3px; } to { height: 15px; } }
+
+/* ---------- radar ---------- */
+#radar { width: 100%; height: auto; aspect-ratio: 1; display: block; cursor: crosshair; }
+.radar-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 7px; gap: 8px; }
+.radar-foot .info { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim); }
+.radar-foot .info b { color: var(--text-hi); font-weight: 600; }
+.hosts { margin-top: 8px; border-top: 1px solid var(--line); max-height: 116px; overflow-y: auto; }
+.host { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; padding: 5px 2px; border-bottom: 1px dashed rgba(18,49,63,.6); font-size: 11px; }
+.host:last-child { border-bottom: 0; }
+.host:hover, .host.lit { background: rgba(111,240,255,.07); }
+.host .ip { color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.host .ms { color: var(--ice-dim); font-variant-numeric: tabular-nums; font-size: 10px; }
+.host .tag { font-size: 9.5px; color: var(--ice-dim); grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.host.gw .ip { color: var(--gold); }
+.host.self .ip { color: var(--green); }
+
+/* ---------- weather ---------- */
+.wx { display: flex; align-items: center; gap: 13px; }
+.wx .glyph { font-size: 34px; line-height: 1; filter: saturate(.7); }
+.wx .now .t { font-family: var(--f-hud); font-weight: 700; font-size: 26px; color: var(--text-hi); }
+.wx .now .d { font-size: 10.5px; color: var(--ice-dim); }
+.wx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin-top: 9px; }
+
+.spark { width: 100%; height: 34px; display: block; margin: 5px 0 2px; }
+
+/* ---------- drawer ---------- */
+.scrim { position: fixed; inset: 0; z-index: 240; opacity: 0; pointer-events: none; transition: opacity .22s; }
+.scrim.open { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 392px; max-width: 94vw; z-index: 241;
+  border-left: 1px solid color-mix(in srgb, var(--ice) 45%, transparent);
+  box-shadow: -24px 0 60px rgba(0,0,0,.45);
+  transform: translateX(100%); transition: transform .26s cubic-bezier(.3,.9,.3,1);
+  display: flex; flex-direction: column; overflow-y: auto; padding: 16px 16px 24px; gap: 12px;
+}
+.drawer.open { transform: translateX(0); }
+.drawer-head { display: flex; align-items: center; gap: 10px; }
+.drawer-head h2 { margin: 0; font-family: var(--f-hud); font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--text-hi); }
+.tabs { display: flex; gap: 4px; }
+.tab { flex: 1; }
+.tab.on { color: var(--void); background: var(--ice); border-color: var(--ice); }
+
+/* ---------- connections ---------- */
+.provider { border: 1px solid var(--line); background: rgba(7,17,25,.7); padding: 11px 12px; margin-bottom: 9px; }
+.provider.ready { border-color: var(--line-hot); }
+.provider.active { border-color: var(--ice); background: rgba(111,240,255,.07); }
+.provider-head { display: flex; align-items: center; gap: 9px; }
+.provider-head .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-hot); flex: none; }
+.provider.ready .dot { background: var(--ice-dim); }
+.provider.active .dot { background: var(--ice); box-shadow: 0 0 8px var(--ice); }
+.provider.bad .dot { background: var(--red); }
+.provider-head .nm { font-family: var(--f-hud); font-weight: 700; font-size: 13px; letter-spacing: .06em; color: var(--text-hi); }
+.provider-head .badge { font-family: var(--f-hud); font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; border: 1px solid var(--green); color: var(--green); padding: 1px 5px; }
+.provider .blurb { font-size: 10.5px; color: var(--ice-dim); margin: 6px 0 8px; line-height: 1.45; }
+.provider .cost { font-size: 10px; color: var(--gold); margin: 0 0 9px; line-height: 1.45; }
+.provider .err { font-size: 10.5px; color: var(--red); margin: 0 0 9px; line-height: 1.45; }
+.steps { margin: 0 0 9px; padding-left: 18px; font-size: 10.5px; color: var(--text); line-height: 1.65; }
+.steps li::marker { color: var(--ice-dim); }
+.steps a { color: var(--ice); }
+.row { display: flex; gap: 6px; align-items: center; }
+.row > .grow { flex: 1; min-width: 0; }
+
+.field {
+  width: 100%; background: #071119; color: var(--text-hi); border: 1px solid var(--line-hot);
+  font-family: var(--f-mono); font-size: 12px; padding: 9px 10px; min-height: var(--tap);
+}
+.field:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
+.field::placeholder { color: #2a5a6c; }
+.keyline { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; margin-bottom: 8px; }
+.keyline .mask { color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.keyline .src { font-size: 9px; color: var(--ice-dim); font-family: var(--f-hud); letter-spacing: .12em; text-transform: uppercase; }
+
+.ctl { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.ctl-k { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); display: flex; justify-content: space-between; }
+.ctl-k .n { color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.ctl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.ctl.off .ctl-k, .ctl.off .ctl-k .n { opacity: .4; }
+.sel {
+  width: 100%; background: #071119; color: var(--text-hi); border: 1px solid var(--line-hot);
+  font-family: var(--f-mono); font-size: 11.5px; padding: 8px 24px 8px 8px; cursor: pointer;
+  appearance: none; -webkit-appearance: none; text-overflow: ellipsis; min-height: 38px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ice-dim) 50%), linear-gradient(135deg, var(--ice-dim) 50%, transparent 50%);
+  background-position: calc(100% - 13px) center, calc(100% - 8px) center;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+}
+.sel:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
+.sel option { background: #071119; color: var(--text-hi); }
+.sl { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; background: #071119; border: 1px solid var(--line); outline: 0; cursor: pointer; }
+.sl::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 18px; background: var(--ice); box-shadow: 0 0 8px rgba(111,240,255,.6); cursor: pointer; }
+.sl::-moz-range-thumb { width: 11px; height: 18px; border: 0; border-radius: 0; background: var(--ice); }
+.sl:disabled { opacity: .3; cursor: not-allowed; }
+.sl:disabled::-webkit-slider-thumb { background: var(--line-hot); box-shadow: none; }
+
+.hint { margin: 8px 0 0; font-size: 10px; color: var(--ice-dim); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 7px; }
+.hint.warn { color: var(--gold); }
+.hint b { color: var(--text-hi); font-weight: 600; }
+.hint kbd { font-family: var(--f-mono); font-size: 9.5px; color: var(--text-hi); border: 1px solid var(--line-hot); padding: 0 4px; background: #071119; }
+
+.quick { display: flex; flex-direction: column; gap: 5px; }
+.quick button { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); background: rgba(7,17,25,.7); padding: 9px 10px; cursor: pointer; text-align: left; width: 100%; color: var(--text); font-family: var(--f-mono); font-size: 11.5px; min-height: var(--tap); }
+.quick button:hover { border-color: var(--ice); color: var(--text-hi); background: rgba(111,240,255,.06); }
+.quick button:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
+.quick .idx { font-family: var(--f-hud); font-size: 8.5px; font-weight: 700; color: var(--ice-dim); border: 1px solid var(--line-hot); padding: 1px 4px; flex: none; }
+
+/* ---------- scrollbars ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #060d14; }
+::-webkit-scrollbar-thumb { background: var(--line-hot); }
+* { scrollbar-width: thin; scrollbar-color: var(--line-hot) #060d14; }
+
+/* =====================================================================
+   COMPACT — phone. The core is the screen; one conversation sheet under it,
+   the other threads as tabs, instruments as a bottom sheet. No page scroll:
+   it behaves like an app, not a document.
+   ===================================================================== */
+body.m-compact .shell { padding: 0; }
+/* the deck keeps its shape on a phone: readings, JARVIS, controls */
+body.m-compact .deck { padding: 0 var(--edge) calc(4px + env(safe-area-inset-bottom)); gap: 6px; }
+body.m-compact .core-seat { width: 120px; }
+body.m-compact .pill.more { height: 30px; padding: 0 9px; }
+body.m-compact .ic { width: 40px; height: 40px; }
+/* Sheets open above JARVIS, never over him: they stop at the top of the core. */
+body.m-compact .menu {
+  position: fixed; left: var(--edge); right: var(--edge); top: auto; bottom: var(--sheet-bottom); z-index: 80;
+  min-width: 0; height: auto; max-height: calc(100dvh - var(--sheet-bottom) - var(--header-h) - 4px); padding: 12px;
+  overflow-y: auto; overscroll-behavior: contain;
+  border-color: rgba(111,240,255,.4);
+  clip-path: var(--chamfer);
+}
+body.m-compact .menu-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: -2px 0 8px; padding: 0 2px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ice); font-family: var(--f-hud); font-size: 10px;
+  font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
+}
+body.m-compact .menu-close {
+  width: 34px; height: 34px; display: grid; place-items: center; padding: 0;
+  border: 1px solid var(--line); background: transparent; color: var(--ice-dim);
+  cursor: pointer;
+}
+body.m-compact .menu-close svg { width: var(--ic); height: var(--ic); }
+body.m-compact .menu-close:hover, body.m-compact .menu-close:focus-visible {
+  color: var(--ice); border-color: var(--ice); outline: none;
+}
+body.m-compact .menu-item { min-height: 52px; }
+
+/* Conversations: on a phone the board becomes one scrolling list between the
+   title and the deck. Every window is full width, groups are sections of the
+   list, and each window folds only when you tap its own title bar — exactly as
+   on the desktop. Nothing folds or shrinks on its own. */
+/* The list uses the whole height, down to the bottom edge. Over the bottom
+   controls it fades to a faint trace, so JARVIS, his status line and the deck
+   buttons always show through; the padding lets the last item scroll up clear
+   of them. (JARVIS is drawn on the canvas beneath the list.) */
+body.m-compact .windows {
+  position: absolute; top: var(--header-h); left: var(--edge); right: var(--edge); bottom: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-bottom: calc(var(--core-clear, 140px) + var(--status-room));
+  pointer-events: auto; overflow-y: auto; overscroll-behavior: contain;
+  --fade-from: calc(100% - var(--core-clear, 140px) - var(--status-room));
+  -webkit-mask-image: linear-gradient(to bottom, #000 var(--fade-from), rgba(0,0,0,.34) calc(var(--fade-from) + 1px), rgba(0,0,0,.1) calc(var(--fade-from) + 48px));
+  mask-image: linear-gradient(to bottom, #000 var(--fade-from), rgba(0,0,0,.34) calc(var(--fade-from) + 1px), rgba(0,0,0,.1) calc(var(--fade-from) + 48px));
+  /* one list under the sheets: a tapped thread never rises over an open sheet */
+  z-index: 3;
+}
+body.m-compact .bubble {
+  position: static; max-height: none; animation: none; flex: none;
+  width: auto !important; transform: none !important; padding: 0 8px 8px;
+}
+body.m-compact .bubble.collapsed { width: auto !important; height: auto; border-radius: 0; padding: 0 8px; animation: none; }
+body.m-compact .bubble.collapsed .bb-head { display: flex; }
+body.m-compact .bubble.collapsed .bb-node { display: none; }
+body.m-compact .bubble .bb-grip { display: none; }
+body.m-compact .bb-head { cursor: pointer; padding: 10px 4px; }
+body.m-compact .bb-list { flex-direction: column; flex-wrap: nowrap; overflow: visible; gap: 8px; max-height: none !important; }
+/* Loose windows are placed freely on the desktop board; on a phone they are
+   simply part of the list. */
+body.m-compact .bubble.loose > .bb-list { position: static; inset: auto; display: flex; }
+body.m-compact .chatwin {
+  position: static !important; left: auto !important; top: auto !important;
+  width: 100% !important; max-width: none; max-height: none; flex: none;
+  opacity: 1; animation: none; margin: 0;
+}
+body.m-compact .chatwin .cw-body { font-size: 13.5px; height: auto !important; max-height: 42vh !important; }
+body.m-compact .chatwin .cw-grip { display: none; }
+body.m-compact .cw-head { cursor: pointer; padding: 10px 12px; }
+
+/* the command line hugs the bottom edge, above the home indicator */
+body.m-compact .stage .cmd { width: calc(100% - 2 * var(--edge)); bottom: calc(var(--deck-h, 96px) - 2px); }
+body.m-compact #input { font-size: 16px; } /* 16px stops iOS zooming on focus */
+
+/* Instruments on a phone are part of the thread list (main.ts moves the
+   panels' container to the top of it): they scroll with the threads instead of
+   covering them, and as many can be open as you like. */
+body.m-compact .overlays {
+  position: static; display: flex; flex-direction: column; gap: 10px; flex: none; pointer-events: auto;
+}
+body.m-compact .overlays:not(:has(> .panel.float:not([hidden]))) { display: none; }
+/* …except the Threads list, which on a phone is a modal sheet like More: it
+   rises from the line where the fade over the bottom controls begins (main.ts
+   lifts it out of the list), and a tap outside it closes it. */
+body.m-compact .panel.float[data-panel="threads"] {
+  position: fixed; left: var(--edge) !important; right: var(--edge); top: auto !important;
+  bottom: var(--sheet-bottom);
+  width: auto !important; height: auto !important;
+  max-height: calc(100dvh - var(--sheet-bottom) - var(--header-h) - 4px);
+  overflow-y: auto; overscroll-behavior: contain; z-index: 80 !important;
+  box-shadow: 0 18px 44px rgba(0,0,0,.55);
+}
+body.m-compact .panel.float {
+  position: relative; left: auto !important; top: auto !important; flex: none;
+  width: auto !important; height: auto !important; max-height: none; overflow: visible;
+  animation: sheetUp .26s cubic-bezier(.2,.9,.3,1);
+}
+body.m-compact .panel.float > h2.drag { cursor: default; }
+@keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } }
+body.m-compact .drawer { width: 100%; max-width: 100%; }
+
+/* Grid and flex children default to min-width:auto, which lets long content
+   push the whole layout wider than the screen. Nothing here may do that. */
+.shell > * { min-width: 0; }
+
+/* ---------- dropdown rows: separated, iconned, obviously tappable ---------- */
+.menu { gap: 0; padding: 4px 6px; }
+.menu-item {
+  display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 12px;
+  border: 0; border-bottom: 1px solid rgba(29,84,104,.45); border-left: 2px solid transparent;
+  padding: 11px 10px 11px 8px;
+}
+.menu-item:last-child { border-bottom: 0; }
+.menu-item:hover, .menu-item:focus-visible { border-color: rgba(29,84,104,.45); border-left-color: var(--ice-dim); background: rgba(111,240,255,.07); }
+.menu-item.on { border-left-color: var(--ice); background: rgba(111,240,255,.09); }
+.menu-item.on .mi-ic { color: var(--ice); }
+.mi-ic { width: 18px; height: 18px; color: var(--ice-dim); }
+.menu-item .v { text-align: right; }
+
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
+  .log { scroll-behavior: auto; }
+}
+
+/* The default colour of a reading and of a More row — zero specificity, so an
+   instrument's own colour ([data-open="…"]) always wins. */
+:where(.pill, .menu-item) { --hue: var(--ice); }
+
+/* The two controls beside JARVIS read as part of him: a faint ring each. */
+.deck .ic.side { border-color: rgba(111,240,255,.16); background: rgba(6,14,21,.5); }
+.deck .ic.side:hover { border-color: rgba(111,240,255,.4); }
+.deck .ic.side.on { border-color: rgba(111,240,255,.5); background: rgba(111,240,255,.1); }
+
+/* While the web is open its own heading is the title; the masthead steps aside. */
+.masthead { transition: opacity .2s var(--ease-soft); }
+.stage:has(.web.in) .masthead { opacity: 0; }
+
+/* On a phone a notice is one line, so it always fits the room kept for it
+   between JARVIS and whatever sheet is open above him. */
+body.m-compact .toast {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: calc(100% - 24px); font-size: 11px; padding: 7px 14px;
+}
+
+/* =====================================================================
+   COMPONENTS — the two materials everything in the console is made of, so
+   every box and every overlay looks and behaves the same. Use the class;
+   never restyle the background or the blur on the element itself.
+   (Last in the file on purpose: a class here wins over an element's own
+   base rule of the same weight, such as .panel.)
+
+   .glass  a surface: thread windows, groups, instrument panels, the web's
+           cards, the More sheets, the configuration drawer, dialogs, the
+           keyboard and notices. Tinted by --hue where the element has one.
+   .veil   what lies behind anything modal: the configuration drawer, a
+           confirmation, the context web. One dim and one blur for all.
+
+   Other shared pieces: .ic (icon button), .btn (text button), .pill (a
+   reading), and --ic-btn / --ic for every title-bar button and glyph.
+   ===================================================================== */
+.glass {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--hue, var(--ice)) 8%, rgba(14,30,42,.56)),
+    rgba(6,14,21,.64));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.veil {
+  background: var(--veil-bg);
+  backdrop-filter: var(--veil-blur);
+  -webkit-backdrop-filter: var(--veil-blur);
+}
+/* Loose threads have no shell of their own, so their host is not a glass box.
+   (The gradient is written per rule, not as a :root variable, so that --hue
+   resolves on each box rather than on :root.) */
+.bubble.loose { background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* On a phone the threads are a list, so there is nothing to tidy. */
+body.m-compact .tl-foot [data-all="tidy"] { display: none; }
+
+/* On a phone an open sheet — either More, or the Threads list — sits over the
+   same blurred veil as every other modal. The deck and the title row stay
+   above it, so the button that opened the sheet can close it; a tap on the
+   veil closes it too (main.ts). */
+.sheet-veil { position: absolute; inset: 0; z-index: 70; display: none; }
+body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden])) .sheet-veil {
+  display: block; animation: veilIn .2s var(--ease-soft);
+}
+@keyframes veilIn { from { opacity: 0; } }
+
+/* On a phone, a thread that is alone on the board uses all the room the list
+   has — down to the line above JARVIS — instead of stopping at 42% of the
+   screen; its conversation scrolls inside it. Folded, it stays a title bar. */
+body.m-compact .stage.one-thread .windows > .bubble.loose:has(.chatwin:not(.shut)) {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+}
+body.m-compact .stage.one-thread .bubble.loose > .bb-list { flex: 1 1 auto; min-height: 0; }
+body.m-compact .stage.one-thread .bubble.loose .chatwin:not(.shut) { flex: 1 1 auto; min-height: 0; }
+body.m-compact .stage.one-thread .bubble.loose .chatwin:not(.shut) .cw-body { flex: 1 1 auto; max-height: none !important; }
+
+/* Phone sheets (More, Threads) come down close to the bottom buttons, leaving
+   the same gap above them as the buttons keep from the bottom edge: the 40px
+   buttons sit 30px up (tops at 70px), so a sheet ends 30px above that, at
+   100px — deck height + 4px. While one is open, JARVIS's status word and
+   notices step aside rather than show through it. */
+body.m-compact .stage { --sheet-bottom: calc(var(--deck-h, 96px) + 4px + env(safe-area-inset-bottom)); }
+body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden])) :is(.core-label, .toast) {
+  opacity: 0;
+}
+
+/* Phone list details:
+   - loose threads have no group frame, so none of a group's inner padding —
+     they line up with the 16px edge like everything else;
+   - a little room at the top, and no hover lift, so a tapped thread's top
+     border is never clipped by the list's edge;
+   - a thread alone on the board fills the list down to its bottom padding —
+     the line where the fade over the bottom controls begins — so the whole
+     card, border and all, stays clear of them; its conversation scrolls
+     inside it. (The padding is the list's, not the thread's.) */
+body.m-compact .bubble.loose { padding: 0; }
+body.m-compact .windows { padding-top: 6px; scroll-padding-top: 6px; }
+body.m-compact .chatwin:hover { transform: none; }
+
+/* Phone: dragging a thread up or down the list by its title bar (stage.ts).
+   It rides above the others, which glide out of its way. */
+body.m-compact .bb-list.reorder > .chatwin { transition: transform .18s var(--ease); }
+body.m-compact .chatwin.reordering {
+  position: relative !important; z-index: 5; transition: none !important;
+  box-shadow: 0 0 0 1px var(--ice), 0 18px 44px rgba(0,0,0,.55);
+}
+body.m-compact .cw-head { touch-action: none; }

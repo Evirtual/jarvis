@@ -1,0 +1,216 @@
+/**
+ * The Connections screen.
+ *
+ * Written for someone who has never heard of an API key. Each provider is a
+ * card that states plainly what it is, what it costs, and what to do next —
+ * with the key page one tap away, live validation, and the model list pulled
+ * from the account rather than guessed, so a retired model can never silently
+ * break the console.
+ */
+
+import type { ConnectionsResponse, ProviderId, ProviderView } from "../shared/types.js";
+import { api } from "./api.js";
+import { $, esc } from "./dom.js";
+
+export class Connections {
+  private root: HTMLElement;
+  private hint: HTMLElement;
+  private data: ConnectionsResponse = { providers: [], active: null };
+  private busy = new Set<ProviderId>();
+  private errors = new Map<ProviderId, string>();
+
+  onChange: ((c: ConnectionsResponse) => void) | null = null;
+
+  constructor() {
+    this.root = $("providers");
+    this.hint = $("connHint");
+    this.root.addEventListener("click", (e) => void this.onClick(e));
+    this.root.addEventListener("change", (e) => void this.onSelect(e));
+    this.root.addEventListener("keydown", (e) => {
+      if ((e as KeyboardEvent).key !== "Enter") return;
+      const input = e.target as HTMLElement;
+      if (input.matches("input[data-key]")) {
+        e.preventDefault();
+        const id = input.getAttribute("data-key") as ProviderId;
+        void this.save(id);
+      }
+    });
+  }
+
+  get active(): ProviderId | null {
+    return this.data.active;
+  }
+
+  get anyReady(): boolean {
+    return this.data.providers.some((p) => p.status.state === "ready");
+  }
+
+  activeName(): string {
+    const p = this.data.providers.find((x) => x.id === this.data.active);
+    return p?.name ?? "no core";
+  }
+
+  /** The model the active service will use. */
+  activeModel(): string | null {
+    const p = this.data.providers.find((x) => x.id === this.data.active);
+    return p?.status.state === "ready" ? p.status.model : null;
+  }
+
+  /** Every service that can answer right now. */
+  readyNames(): string[] {
+    return this.data.providers.filter((p) => p.status.state === "ready").map((p) => p.name);
+  }
+
+  async refresh(revalidate = false): Promise<void> {
+    this.data = await api.connections(revalidate);
+    this.render();
+    this.onChange?.(this.data);
+  }
+
+  private apply(next: ConnectionsResponse): void {
+    this.data = next;
+    this.render();
+    this.onChange?.(next);
+  }
+
+  private async onClick(e: Event): Promise<void> {
+    const el = (e.target as HTMLElement).closest("[data-act]");
+    if (!el) return;
+    const act = el.getAttribute("data-act");
+    const id = el.getAttribute("data-id") as ProviderId;
+    if (!id) return;
+
+    if (act === "save") await this.save(id);
+    if (act === "use") {
+      this.apply(await api.setActive(id));
+    }
+    if (act === "remove") {
+      this.errors.delete(id);
+      this.apply(await api.removeKey(id));
+    }
+    if (act === "recheck") {
+      this.busy.add(id);
+      this.render();
+      await this.refresh(true);
+      this.busy.delete(id);
+      this.render();
+    }
+  }
+
+  private async onSelect(e: Event): Promise<void> {
+    const el = e.target as HTMLSelectElement;
+    const id = el.getAttribute("data-model") as ProviderId | null;
+    if (!id) return;
+    this.apply(await api.selectModel(id, el.value));
+  }
+
+  private async save(id: ProviderId): Promise<void> {
+    const input = this.root.querySelector<HTMLInputElement>(`input[data-key="${id}"]`);
+    const key = input?.value.trim();
+    if (!key) return;
+
+    this.busy.add(id);
+    this.errors.delete(id);
+    this.render();
+    try {
+      this.apply(await api.saveKey(id, key));
+    } catch (err) {
+      this.errors.set(id, err instanceof Error ? err.message : String(err));
+      this.render();
+    } finally {
+      this.busy.delete(id);
+      this.render();
+    }
+  }
+
+  private render(): void {
+    this.root.innerHTML = this.data.providers.map((p) => this.card(p)).join("");
+
+    const ready = this.data.providers.filter((p) => p.status.state === "ready");
+    if (!ready.length) {
+      this.hint.className = "hint warn";
+      this.hint.innerHTML =
+        "No service connected yet, so I can only answer my built-in commands. " +
+        "<b>Gemini</b> is free and needs no card — that is the quickest way to get me talking.";
+    } else {
+      this.hint.className = "hint";
+      this.hint.innerHTML =
+        `Answering through <b>${esc(this.activeName())}</b>. ` +
+        "Keys are stored on this machine only and are never sent to the browser.";
+    }
+  }
+
+  private card(p: ProviderView): string {
+    const busy = this.busy.has(p.id);
+    const isActive = this.data.active === p.id;
+    const st = p.status;
+    const cls = [
+      "provider",
+      st.state === "ready" ? "ready" : "",
+      st.state === "error" ? "bad" : "",
+      isActive ? "active" : "",
+    ].filter(Boolean).join(" ");
+
+    const head =
+      `<div class="provider-head">` +
+      `<span class="dot"></span><span class="nm">${esc(p.name)}</span>` +
+      (p.free ? `<span class="badge">Free tier</span>` : "") +
+      `<span class="spacer" style="flex:1"></span>` +
+      (isActive
+        ? `<span class="src" style="color:var(--ice);font-family:var(--f-hud);font-size:9px;letter-spacing:.12em;text-transform:uppercase">In use</span>`
+        : st.state === "ready"
+          ? `<button class="btn" data-act="use" data-id="${p.id}">Use</button>`
+          : "") +
+      `</div>`;
+
+    if (st.state === "checking") {
+      return `<div class="${cls}">${head}<p class="blurb">Checking the key…</p></div>`;
+    }
+
+    if (st.state === "unconfigured" || st.state === "error") {
+      const err =
+        this.errors.get(p.id) ?? (st.state === "error" ? st.message : null);
+      return (
+        `<div class="${cls}">` +
+        head +
+        `<p class="blurb">${esc(p.blurb)}</p>` +
+        `<p class="cost">${esc(p.cost)}</p>` +
+        (err ? `<p class="err">${esc(err)}</p>` : "") +
+        `<ol class="steps">` +
+        `<li>Open <a href="${p.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${p.free ? " and sign in with a Google account" : ""}.</li>` +
+        `<li>Create a key and copy it. ${esc(p.keyHint)}.</li>` +
+        `<li>Paste it below and press Connect.</li>` +
+        `</ol>` +
+        `<div class="row">` +
+        `<input class="field grow" type="password" data-key="${p.id}" placeholder="${esc(p.keyPrefix)}…" autocomplete="off" spellcheck="false" aria-label="${esc(p.name)} API key">` +
+        `<button class="btn primary" data-act="save" data-id="${p.id}"${busy ? " disabled" : ""}>${busy ? "Checking" : "Connect"}</button>` +
+        `</div>` +
+        (st.state === "error"
+          ? `<div class="row" style="margin-top:8px"><button class="btn danger" data-act="remove" data-id="${p.id}">Forget key</button></div>`
+          : "") +
+        `</div>`
+      );
+    }
+
+    const models = st.models
+      .map((m) => `<option value="${esc(m)}"${m === st.model ? " selected" : ""}>${esc(m)}</option>`)
+      .join("");
+
+    return (
+      `<div class="${cls}">` +
+      head +
+      `<div class="keyline">` +
+      `<span class="mask">${esc(st.maskedKey)}</span>` +
+      `<span class="src">${st.source === "environment" ? "from environment" : "saved here"}</span>` +
+      `</div>` +
+      (st.problem ? `<p class="err">${esc(st.problem)}</p>` : "") +
+      `<div class="ctl"><span class="ctl-k"><span>Model</span><span class="n">${st.models.length} available</span></span>` +
+      `<select class="sel" data-model="${p.id}" aria-label="${esc(p.name)} model">${models}</select></div>` +
+      `<div class="row">` +
+      `<button class="btn" data-act="recheck" data-id="${p.id}"${busy ? " disabled" : ""}>${busy ? "Checking" : "Re-check"}</button>` +
+      `<button class="btn danger" data-act="remove" data-id="${p.id}">Disconnect</button>` +
+      `</div>` +
+      `</div>`
+    );
+  }
+}

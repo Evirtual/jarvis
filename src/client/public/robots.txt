@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+Sitemap: https://jarvis.edgarasneverdauskas.com/sitemap.xml

@@ -1,0 +1,4 @@
+# Text files are stored with LF; images are binary.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

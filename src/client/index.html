@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#04080d">
+<meta name="color-scheme" content="dark">
+<title>J.A.R.V.I.S. Console — a console that talks back</title>
+<meta name="description" content="An Iron Man–style console that talks back: real machine and network readings, a neural voice run locally, and threads of research you run by talking.">
+<link rel="canonical" href="https://jarvis.edgarasneverdauskas.com/">
+<meta name="robots" content="index, follow">
+
+<!-- sharing -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="J.A.R.V.I.S. Console">
+<meta property="og:title" content="J.A.R.V.I.S. Console — a console that talks back">
+<meta property="og:description" content="Real machine and network readings, a neural voice run locally, and threads you run by talking.">
+<meta property="og:url" content="https://jarvis.edgarasneverdauskas.com/">
+<meta property="og:image" content="https://jarvis.edgarasneverdauskas.com/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="JARVIS's core — segmented cyan rings around a glowing gold triangle — beside the words J.A.R.V.I.S., a console that talks back.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="J.A.R.V.I.S. Console — a console that talks back">
+<meta name="twitter:description" content="Real machine and network readings, a neural voice run locally, and threads you run by talking.">
+<meta name="twitter:image" content="https://jarvis.edgarasneverdauskas.com/og-image.jpg">
+
+<!-- icons, and installing it as an app -->
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="application-name" content="JARVIS">
+<meta name="apple-mobile-web-app-title" content="JARVIS">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "J.A.R.V.I.S. Console",
+  "url": "https://jarvis.edgarasneverdauskas.com/",
+  "description": "An Iron Man–style console that talks back: real machine and network readings, a neural voice run locally, and threads of research you run by talking.",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Windows, macOS, Linux; any modern browser, installable on phones",
+  "image": "https://jarvis.edgarasneverdauskas.com/og-image.jpg",
+  "author": { "@type": "Person", "name": "Edgaras Neverdauskas", "url": "https://edgarasneverdauskas.com/" }
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap">
+</head>
+<body class="m-desk">
+
+<div class="ambient"></div>
+<div class="shell">
+
+  <!-- The board fills the screen; JARVIS sits at the bottom and is the control. -->
+  <div class="hud">
+    <main class="centre">
+      <section class="stage" id="stage">
+        <canvas id="graph" aria-label="JARVIS and the conversations around him"></canvas>
+        <div class="masthead" aria-label="JARVIS Console">J.A.R.V.I.S.</div>
+        <!-- The title row: your threads in the top-left corner, configuration
+             in the top-right. Nothing on the board ever covers this row. -->
+        <div class="topbar">
+          <button class="ic" id="pillThreads" data-open="threads" type="button" title="Threads" aria-label="Threads">
+            <span class="ic-count" id="pThreads">—</span>
+          </button>
+          <button class="ic" id="openDrawer" type="button" title="Configuration" aria-label="Configuration">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+
+        <div class="core-label">
+          <span class="core-state" id="logState" hidden></span>
+          <span class="core-thread" id="threadName" hidden>—</span>
+        </div>
+        <div class="toast glass" id="toast" role="status" aria-live="polite"></div>
+        <div class="confirm-backdrop veil" id="confirmBackdrop" aria-hidden="true" hidden></div>
+        <section class="confirm-dialog glass" id="confirmDialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
+          <h2 id="confirmTitle">Confirm action</h2>
+          <p id="confirmText"></p>
+          <div class="confirm-actions"><button class="btn" id="confirmCancel" type="button">Cancel</button><button class="btn danger" id="confirmAccept" type="button">Confirm</button></div>
+        </section>
+
+        <div class="windows" id="windows"></div>
+        <!-- On a phone, the blurred veil behind an open sheet (More, Threads). -->
+        <div class="sheet-veil veil" aria-hidden="true"></div>
+
+        <div class="overlays" id="overlays">
+          <section class="panel float glass" data-panel="threads" hidden>
+            <h2 class="drag">Threads<span class="tail"></span><span class="aux" id="threadsAux">—</span><button class="p-x" type="button" aria-label="Close Threads" title="Close Threads"></button></h2>
+            <div class="tl" id="threadList"></div>
+          </section>
+
+          <section class="panel float glass" data-panel="compute" hidden>
+            <h2 class="drag">Compute<span class="tail"></span><span class="aux" id="cpuCount">—</span><button class="p-x" type="button" aria-label="Close Compute" title="Close Compute"></button></h2>
+            <div class="kv"><span class="k">Processor</span><span class="v" id="cpuModel">—</span></div>
+            <div class="cores" id="cores"></div>
+            <div class="meter">
+              <div class="row"><span class="nm">Aggregate load</span><span class="nu" id="cpuAvgN">—<span class="u">%</span></span></div>
+              <div class="track"><div class="fill" id="cpuAvg"></div></div>
+            </div>
+            <div class="meter">
+              <div class="row"><span class="nm">Memory</span><span class="nu" id="memN">—</span></div>
+              <div class="track"><div class="fill" id="memBar"></div></div>
+            </div>
+          </section>
+
+          <section class="panel float glass" data-panel="graphics" hidden>
+            <h2 class="drag">Graphics<span class="tail"></span><span class="aux" id="gpuTemp">—</span><button class="p-x" type="button" aria-label="Close Graphics" title="Close Graphics"></button></h2>
+            <div class="kv"><span class="k">Adapter</span><span class="v" id="gpuName">—</span></div>
+            <div class="meter">
+              <div class="row"><span class="nm">Utilisation</span><span class="nu" id="gpuUtilN">—<span class="u">%</span></span></div>
+              <div class="track"><div class="fill" id="gpuUtil"></div></div>
+            </div>
+            <div class="meter">
+              <div class="row"><span class="nm">VRAM</span><span class="nu" id="gpuVramN">—</span></div>
+              <div class="track"><div class="fill" id="gpuVram"></div></div>
+            </div>
+            <div class="kv"><span class="k">Power draw</span><span class="v gold" id="gpuPwr">—</span></div>
+            <div class="kv"><span class="k">Core clock</span><span class="v" id="gpuClock">—</span></div>
+            <div class="kv"><span class="k">Fan</span><span class="v" id="gpuFan">—</span></div>
+          </section>
+
+          <section class="panel float glass" data-panel="storage" hidden>
+            <h2 class="drag">Storage<span class="tail"></span><button class="p-x" type="button" aria-label="Close Storage" title="Close Storage"></button></h2>
+            <div id="disks"></div>
+          </section>
+          <section class="panel float glass" data-panel="perimeter" hidden>
+            <h2 class="drag">Perimeter<span class="tail"></span><span class="aux" id="scanAge">—</span><button class="p-x" type="button" aria-label="Close Perimeter" title="Close Perimeter"></button></h2>
+            <canvas id="radar" width="520" height="520" aria-label="Live map of devices on the local network"></canvas>
+            <div class="radar-foot">
+              <span class="info">Hosts <b id="hostCount">0</b></span>
+              <span class="info" id="subnetLbl">—</span>
+              <button class="btn" id="sweepBtn" type="button">Sweep</button>
+            </div>
+            <div class="hosts" id="hosts"></div>
+          </section>
+
+          <section class="panel float glass" data-panel="uplink" hidden>
+            <h2 class="drag">Uplink<span class="tail"></span><span class="aux" id="wifiSig">—</span><button class="p-x" type="button" aria-label="Close Uplink" title="Close Uplink"></button></h2>
+            <div class="kv"><span class="k">Network</span><span class="v" id="ssid">—</span></div>
+            <div class="kv"><span class="k">Radio</span><span class="v" id="radio">—</span></div>
+            <svg class="spark" id="spark" viewBox="0 0 260 34" preserveAspectRatio="none" aria-label="Network throughput, last 60 seconds"></svg>
+            <div class="kv"><span class="k">Down / Up</span><span class="v" id="rate">—</span></div>
+            <div class="kv"><span class="k">Gateway</span><span class="v" id="gw">—</span></div>
+            <div class="kv"><span class="k">Resolvers</span><span class="v" id="dns">—</span></div>
+            <div class="kv"><span class="k">Public IP</span><span class="v" id="pubip">—</span></div>
+            <div class="kv"><span class="k">Carrier</span><span class="v" id="isp">—</span></div>
+            <div class="kv"><span class="k">Latency</span><span class="v" id="anchors">—</span></div>
+          </section>
+
+          <section class="panel float glass" data-panel="environment" hidden>
+            <h2 class="drag">Environment<span class="tail"></span><span class="aux" id="wxPlace">—</span><button class="p-x" type="button" aria-label="Close Environment" title="Close Environment"></button></h2>
+            <div class="wx">
+              <span class="glyph" id="wxIcon">—</span>
+              <div class="now">
+                <div class="t" id="wxTemp">—</div>
+                <div class="d" id="wxText">awaiting uplink</div>
+              </div>
+            </div>
+            <div class="wx-grid">
+              <div class="kv"><span class="k">Feels</span><span class="v" id="wxFeels">—</span></div>
+              <div class="kv"><span class="k">Humidity</span><span class="v" id="wxHum">—</span></div>
+              <div class="kv"><span class="k">Wind</span><span class="v" id="wxWind">—</span></div>
+              <div class="kv"><span class="k">Pressure</span><span class="v" id="wxPress">—</span></div>
+              <div class="kv"><span class="k">Sunrise</span><span class="v" id="wxRise">—</span></div>
+              <div class="kv"><span class="k">Sunset</span><span class="v" id="wxSet">—</span></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Typing is there when you want it; it rises over the deck. -->
+        <form class="cmd glass" id="cmdForm" autocomplete="off" hidden>
+          <span class="prompt" id="prompt">SIR&nbsp;&rsaquo;</span>
+          <input id="input" type="text" enterkeyhint="send" autocomplete="off" aria-label="Talk to JARVIS — press Enter to send">
+        </form>
+
+        <!-- The deck: JARVIS in the middle with the two things you do most right
+             beside him — a new thread on his left, typing on his right — and
+             the readings split either side: this machine on the left, the
+             world around it on the right. He stays where he is. -->
+        <footer class="deck" id="deck">
+          <nav class="dock dock-l" id="dockL" data-side="l" aria-label="This machine">
+            <div class="more-wrap" hidden>
+              <button class="pill more" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="dockMenuL">
+                <svg class="more-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>
+                <span class="sr-only">Systems readings</span>
+              </button>
+              <div class="menu glass" id="dockMenuL" role="menu" data-title="Systems" hidden></div>
+            </div>
+            <button class="pill" id="pillCpu" data-open="compute" data-rank="1" type="button"><span class="k">CPU</span><span class="v" id="pCpu">—</span></button>
+            <button class="pill" id="pillGpu" data-open="graphics" data-rank="2" type="button"><span class="k">GPU</span><span class="v" id="pGpu">—</span></button>
+            <button class="pill" id="pillDisk" data-open="storage" data-rank="5" type="button"><span class="k">Disk</span><span class="v" id="pDisk">—</span></button>
+          </nav>
+
+          <button class="ic side" id="newThread" type="button" title="New thread" aria-label="New thread">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+              <rect x="3.5" y="4.5" width="17" height="13" rx="3"/><path d="M12 8.5v5M9.5 11h5M8 20.5l2.5-3"/>
+            </svg>
+          </button>
+
+          <!-- JARVIS himself is drawn on the canvas behind this gap. -->
+          <div class="core-seat" aria-hidden="true"></div>
+
+          <button class="ic side" id="keyBtn" type="button" title="Type instead" aria-label="Type instead">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+              <rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6 9.5h.01M9.5 9.5h.01M13 9.5h.01M16.5 9.5h.01M6 12.8h.01M9.5 12.8h.01M13 12.8h.01M16.5 12.8h.01M8 15.6h8"/>
+            </svg>
+          </button>
+
+          <nav class="dock dock-r" id="dockR" data-side="r" aria-label="Surroundings">
+            <button class="pill" id="pillNet" data-open="uplink" data-rank="3" type="button"><span class="k">Net</span><span class="v" id="pNet">—</span></button>
+            <button class="pill" id="pillLan" data-open="perimeter" data-rank="6" type="button"><span class="k">LAN</span><span class="v" id="pLan">—</span></button>
+            <button class="pill" id="pillWx" data-open="environment" data-rank="4" type="button"><span class="k">Sky</span><span class="v" id="pWx">—</span></button>
+            <div class="more-wrap" hidden>
+              <button class="pill more" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="dockMenuR">
+                <svg class="more-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg>
+                <span class="sr-only">Surroundings readings</span>
+              </button>
+              <div class="menu glass" id="dockMenuR" role="menu" data-title="Surroundings" hidden></div>
+            </div>
+          </nav>
+        </footer>
+      </section>
+    </main>
+
+  </div>
+
+</div>
+
+<!-- ================= CONFIG DRAWER ================= -->
+<div class="scrim veil" id="scrim"></div>
+<aside class="drawer glass" id="drawer" aria-label="Console configuration">
+  <div class="drawer-head">
+    <h2>Configuration</h2><span class="spacer"></span>
+    <button class="btn" id="closeDrawer" type="button">Close</button>
+  </div>
+
+  <div class="tabs">
+    <button class="btn tab on" data-tab="connections" type="button">Connections</button>
+    <button class="btn tab" data-tab="voice" type="button">Voice</button>
+    <button class="btn tab" data-tab="quick" type="button">Quick</button>
+  </div>
+
+  <section class="panel" data-pane="connections">
+    <h2>Reasoning Cores<span class="tail"></span></h2>
+    <div id="providers"></div>
+    <p class="hint" id="connHint">Connect a service to have me answer freely. Keys are stored on this machine and never sent to the browser.</p>
+  </section>
+
+  <section class="panel" data-pane="voice" hidden>
+    <h2>Vocal Processor<span class="tail"></span></h2>
+    <label class="switch-row">
+      <span><b>Tap JARVIS to speak</b><small>On: tapping him listens. Off: tapping him opens the keyboard. Either way, typing any letter opens it.</small></span>
+      <input type="checkbox" id="tapSpeaks" class="switch" checked>
+    </label>
+    <label class="switch-row">
+      <span><b>Spoken replies</b><small>Read every answer aloud. Say “mute” or “unmute” any time.</small></span>
+      <input type="checkbox" id="voiceOut" class="switch" checked>
+    </label>
+    <div class="ctl">
+      <span class="ctl-k"><span>Address me as</span></span>
+      <select class="sel" id="addressSel" aria-label="How JARVIS addresses you"><option value="sir">Sir</option><option value="madam">Ma'am</option></select>
+    </div>
+    <div class="ctl">
+      <span class="ctl-k"><span>Synthesis voice</span></span>
+      <select class="sel" id="voiceSel" aria-label="Synthesis voice"><option>Scanning…</option></select>
+    </div>
+    <div class="ctl-row">
+      <div class="ctl">
+        <span class="ctl-k"><span>Timbre</span><span class="n" id="pitchN">0.78</span></span>
+        <input class="sl" id="pitchSl" type="range" min="0.4" max="1.2" step="0.02" value="0.78" aria-label="Voice pitch">
+      </div>
+      <div class="ctl">
+        <span class="ctl-k"><span>Cadence</span><span class="n" id="rateN">0.96</span></span>
+        <input class="sl" id="rateSl" type="range" min="0.7" max="1.3" step="0.02" value="0.96" aria-label="Speech rate">
+      </div>
+    </div>
+    <button class="btn wide" id="testVoice" type="button">Test voice</button>
+    <p class="hint" id="voiceNote">Scanning installed voices…</p>
+  </section>
+
+  <section class="panel" data-pane="quick" hidden>
+    <h2>Quick Queries<span class="tail"></span></h2>
+    <div class="quick" id="quick">
+      <button data-cmd="status" type="button"><span class="idx">01</span>System status</button>
+      <button data-cmd="scan" type="button"><span class="idx">02</span>Sweep the network</button>
+      <button data-cmd="weather" type="button"><span class="idx">03</span>Weather report</button>
+      <button data-cmd="uplink" type="button"><span class="idx">04</span>Uplink report</button>
+      <button data-cmd="power" type="button"><span class="idx">05</span>Power &amp; thermals</button>
+      <button data-cmd="devices" type="button"><span class="idx">06</span>What's on the network</button>
+    </div>
+    <p class="hint">Type <kbd>help</kbd> for everything I answer to directly. Any letter opens the keyboard, <kbd>Esc</kbd> closes it or stops me talking.</p>
+  </section>
+</aside>
+
+<script type="module" src="./main.ts"></script>
+</body>
+</html>
