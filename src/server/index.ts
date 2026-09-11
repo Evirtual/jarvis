@@ -52,6 +52,7 @@ import {
   prepareTurns,
   validate,
 } from "./providers.js";
+import { exchangeOpenRouterCode } from "../shared/providers.js";
 import { DEFAULT_VOICE, DTYPE, hasVoice, kokoro, loadKokoro, synthesize, voices } from "./kokoro.js";
 import { gateway, snapshot, startSampler } from "./system.js";
 import { runScan, scanState } from "./scan.js";
@@ -296,6 +297,31 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     // a different model may be usable; out of credit is account-wide and stays
     if (lastProblem.get(id)?.includes("can't use that model")) lastProblem.delete(id);
     json(res, 200, await connections());
+    return;
+  }
+
+  /* OpenRouter's one-click sign-in: the page sends back the code, and the key
+     is fetched and kept here — like every key on the PC, it never reaches the
+     browser. */
+  if (p === "/api/connections/openrouter/oauth" && req.method === "POST") {
+    const body = await readJson<{ code?: string; verifier?: string; method?: string }>(req);
+    if (!body?.code || !body.verifier) {
+      json(res, 400, { error: "missing_code", message: "The sign-in didn't come back complete. Press Connect again." });
+      return;
+    }
+    try {
+      const key = await exchangeOpenRouterCode(body.code, body.verifier, body.method === "plain" ? "plain" : "S256");
+      const v = await validate("openrouter", key, true);
+      if (!v.ok) {
+        json(res, 400, { error: "invalid_key", message: v.message });
+        return;
+      }
+      await setKey("openrouter", key);
+      if (!getModel("openrouter") && v.models[0]) await setModel("openrouter", v.models[0]);
+      json(res, 200, await connections());
+    } catch (err) {
+      json(res, 400, { error: "oauth_failed", message: err instanceof Error ? err.message : String(err) });
+    }
     return;
   }
 

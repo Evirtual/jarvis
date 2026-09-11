@@ -318,7 +318,7 @@ export async function ask_(t: string): Promise<void> {
   if (localCommand(t)) return;
   if (conn.anyReady) await askCore(t, thread);
   else {
-    jarvis("That needs a reasoning core, sir, and none is connected. Paste a key right here in the chat, or open Config — Gemini is free.");
+    jarvis("That needs a reasoning core, sir, and none is connected. Open Config and connect OpenRouter in one click — it has free models — or paste a key right here in the chat.");
     setDrawer(true, "connections");
   }
 }

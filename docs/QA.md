@@ -548,3 +548,18 @@ several frame counters at once ("301 fps") — one at a time now.
 | --- | --- |
 | PC: Perimeter open at load, sweep → radar drawn, 13 hosts spread round the dish | Pass (confirmed in Brave) |
 | Web: sweep → 8 services, only 200/204 or timing-only requests, no new console errors | Pass |
+
+### 2026-09-12 — OpenRouter, and Disconnect for environment keys
+
+New: OpenRouter as a fourth service, first in Connections — **Connect with
+OpenRouter** (OAuth PKCE) needs no key; free models by default (`openrouter/free`);
+no web search, and JARVIS is told so. 67. Disconnect on a key from the
+environment (`OPENAI_API_KEY`) did nothing — the key came straight back; now it
+is ignored until a key is connected again, and the card names the variable.
+
+| Area | Result |
+| --- | --- |
+| OpenRouter from a web page: CORS on /chat/completions and /auth/keys | Pass (`*`) |
+| Sign-in route with an invalid code: friendly "press Connect to try again"; without the console header: 403 | Pass |
+| "switch to OpenRouter", "use open router" | Pass (unit test) |
+| A real sign-in and a free answer | Needs the user's own OpenRouter account |

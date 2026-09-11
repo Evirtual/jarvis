@@ -42,7 +42,7 @@ export async function transcribe(audio: Buffer, mime: string): Promise<{ text: s
   // "use the Lewis voice" comes back as "Louis" and the command misses.
   const prompt =
     "JARVIS, sir. Voices: George, Fable, Lewis, Daniel, Emma, Alice, Isabella, Lily, Michael. " +
-    "Services: ChatGPT, Claude, Gemini. Commands: new thread, close thread, drive mode, desktop mode, sweep the network, status, uplink.";
+    "Services: OpenRouter, ChatGPT, Claude, Gemini. Commands: new thread, close thread, drive mode, desktop mode, sweep the network, status, uplink.";
   const res = await client.audio.transcriptions.create({ file, model, language: "en", prompt });
   return { text: (res.text ?? "").trim(), model };
 }

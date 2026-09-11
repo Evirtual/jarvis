@@ -66,6 +66,9 @@ const serverApi = {
     postJson<ConnectionsResponse>(`/api/connections/${id}/model`, { model }),
   setActive: (provider: ProviderId) =>
     postJson<ConnectionsResponse>("/api/connections/active", { provider }),
+  /** Finish OpenRouter's one-click sign-in: the server turns the code into a key and keeps it. */
+  connectOpenRouter: (code: string, verifier: string, method: "S256" | "plain") =>
+    postJson<ConnectionsResponse>("/api/connections/openrouter/oauth", { code, verifier, method }),
 
   /** Recorded speech in, text out — transcribed server-side. */
   transcribe: async (audio: Blob): Promise<string> => {

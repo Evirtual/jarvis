@@ -12,9 +12,10 @@ import type { ConnectionsResponse, ProviderId, ProviderView } from "../shared/ty
 import { api } from "./api.js";
 import { $, esc } from "./dom.js";
 import { SERVERLESS } from "./server.js";
+import { startOpenRouter } from "./oauth.js";
 
 /** Where a key "from the environment" came from, named so it can be found. */
-const ENV_VARS: Record<ProviderId, string> = { openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY" };
+const ENV_VARS: Record<ProviderId, string> = { openrouter: "OPENROUTER_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY" };
 
 export class Connections {
   private root: HTMLElement;
@@ -85,6 +86,7 @@ export class Connections {
     if (!id) return;
 
     if (act === "save") await this.save(id);
+    if (act === "oauth") { this.busy.add(id); this.render(); await startOpenRouter(); return; }
     if (act === "use") {
       this.apply(await api.setActive(id));
     }
@@ -135,7 +137,7 @@ export class Connections {
       this.hint.className = "hint warn";
       this.hint.innerHTML =
         "No service connected yet, so I can only answer my built-in commands. " +
-        "<b>Gemini</b> is free and needs no card — that is the quickest way to get me talking.";
+        "<b>OpenRouter</b> connects in one click and has free models — that is the quickest way to get me talking.";
     } else {
       this.hint.className = "hint";
       this.hint.innerHTML =
@@ -182,7 +184,12 @@ export class Connections {
         `<p class="blurb">${esc(p.blurb)}</p>` +
         `<p class="cost">${esc(p.cost)}</p>` +
         (err ? `<p class="err">${esc(err)}</p>` : "") +
-        `<ol class="steps">` +
+        (p.id === "openrouter"
+          ? // one click: sign in (or make a free account) at OpenRouter and come straight back
+            `<button class="btn primary wide" data-act="oauth" data-id="openrouter"${busy ? " disabled" : ""}>${busy ? "Opening OpenRouter…" : "Connect with OpenRouter"}</button>` +
+            `<p class="hint">Opens OpenRouter to sign in — or make a free account, no card — and comes straight back, connected. Or paste a key:</p>`
+          : "") +
+        `<ol class="steps"${p.id === "openrouter" ? " hidden" : ""}>` +
         `<li>Open <a href="${p.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${p.free ? " and sign in with a Google account" : ""}.</li>` +
         `<li>Create a key and copy it. ${esc(p.keyHint)}.</li>` +
         `<li>Paste it below and press Connect.</li>` +

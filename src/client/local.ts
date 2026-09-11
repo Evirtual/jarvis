@@ -52,7 +52,7 @@ const HELP = [
   "  new thread … · branch off … (a subthread) · close this chat (put away) · restore … · go back to …",
   "  connect A with B (puts them in one bubble) · move A into Travel · new group called … · collapse Research",
   "  show the radar · open the weather · show the threads · close all panels",
-  "  switch to Gemini · use the Lewis voice · speak faster · mute / unmute",
+  "  switch to OpenRouter / Gemini · use the Lewis voice · speak faster · mute / unmute",
   "  paste an API key here and I'll connect it — it never reaches a model",
   "Anything else goes to the connected service, with live readings and web search.",
 ].join("\n");

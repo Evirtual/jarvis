@@ -15,6 +15,16 @@
 import type { AskEvent, ProviderId, ProviderMeta, Turn } from "./types.js";
 
 export const PROVIDERS: Record<ProviderId, ProviderMeta> = {
+  openrouter: {
+    id: "openrouter",
+    name: "OpenRouter",
+    blurb: "Hundreds of models through one account — free ones included. Connects in one click.",
+    keyUrl: "https://openrouter.ai/settings/keys",
+    keyHint: "Starts with sk-or-",
+    keyPrefix: "sk-or-",
+    cost: "Free models: no card needed — 50 questions a day, 1,000 once you've ever bought $10 of credit. Other models are billed per token from your OpenRouter credit.",
+    free: true,
+  },
   openai: {
     id: "openai",
     name: "ChatGPT",
@@ -68,7 +78,7 @@ export const PERSONA = [
   "Actions: new_thread (optional title=\"…\", ask=\"…\" to pose a question in the new window, branch=\"yes\" to make it a subthread of the current thread or parent=\"thread title\" of another, group=\"group title\" to put it in a group, made if needed); several new_thread directives may be given, and each ask is answered in its own window, in turn;",
   "new_group title=\"…\" threads=\"title; title\" to gather two or more threads into a bubble; move_thread thread=\"…\" group=\"…\"; rename_group group=\"…\" title=\"…\"; collapse_group group=\"…|all\"; expand_group group=\"…|all\"; archive_all to put every thread away; tidy_board to rearrange every window and group neatly without closing anything;",
   "link_threads a=\"thread title\" b=\"thread title\" why=\"two or three words\" to connect two threads — connected threads are put in the same group; switch_thread title=\"…\"; close_thread title=\"…\" (puts it away, recoverable); restore_thread title=\"…\"; rename_thread title=\"…\"; clear_thread (the user is asked to confirm). You cannot delete threads.",
-  "switch_core provider=\"chatgpt|claude|gemini\"; set_voice name=\"George|Fable|Lewis|Daniel|Emma|Alice|Isabella|Lily|Michael\"; set_speed value=\"0.7-1.3\"; mute; unmute; open_config tab=\"connections|voice\"; sweep_network (only when asked);",
+  "switch_core provider=\"openrouter|chatgpt|claude|gemini\"; set_voice name=\"George|Fable|Lewis|Daniel|Emma|Alice|Isabella|Lily|Michael\"; set_speed value=\"0.7-1.3\"; mute; unmute; open_config tab=\"connections|voice\"; sweep_network (only when asked);",
   "show_panel name=\"compute|graphics|storage|perimeter|uplink|environment\"; hide_panel name=\"…|all\".",
   "Only use a directive when the user asked for that action. If you open a new thread with ask, do not answer the question yourself — acknowledge in a few words; it will be answered in the new window. If a thread name is ambiguous, ask which one instead of guessing.",
   "When you set up research as several new threads, give every one of them its own ask, so each window starts on its question straight away; a new research thread without an ask sits empty.",
@@ -322,7 +332,110 @@ const geminiAdapter: ProviderAdapter = {
   },
 };
 
+/* ------------------------------------------------------------------ *
+ * OpenRouter — one account, many models, free ones among them
+ * ------------------------------------------------------------------ */
+
+const OPENROUTER = "https://openrouter.ai/api/v1";
+
+interface OpenRouterModel {
+  id: string;
+  created?: number;
+  pricing?: { prompt?: string; completion?: string };
+  architecture?: { output_modalities?: string[] };
+}
+
+const isFree = (m: OpenRouterModel): boolean =>
+  m.id === "openrouter/free" || m.id.endsWith(":free") || (Number(m.pricing?.prompt) === 0 && Number(m.pricing?.completion) === 0);
+
+/**
+ * OpenRouter's web search is billed per request, so free connections have
+ * none — and JARVIS is told so, to say plainly when a question needs today's
+ * news rather than guess at it.
+ */
+function withoutSearch(persona: string): string {
+  return persona.replace(
+    /You have a web search tool.[^.]*?announcing it./,
+    "You have no web search on this connection: when a question depends on current information — news, prices, scores, anything recent — say plainly that you can't look it up from here, rather than guessing.",
+  );
+}
+
+const openrouterAdapter: ProviderAdapter = {
+  async listModels(key) {
+    // The model list is public, so ask about the key itself first: that's what proves it works.
+    const k = await fetch(`${OPENROUTER}/key`, { headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15000) });
+    if (!k.ok) throw Object.assign(new Error(`OpenRouter returned ${k.status}: ${(await k.text()).slice(0, 180)}`), { status: k.status });
+    const r = await fetch(`${OPENROUTER}/models`, { signal: AbortSignal.timeout(15000) });
+    if (!r.ok) throw new Error(`OpenRouter returned ${r.status} listing models`);
+    const all = ((await r.json()) as { data?: OpenRouterModel[] }).data ?? [];
+    const chat = all.filter((m) => (m.architecture?.output_modalities ?? ["text"]).includes("text") && !/safety|guard|embed|lyria/i.test(m.id));
+    const newest = (a: OpenRouterModel, b: OpenRouterModel): number => (b.created ?? 0) - (a.created ?? 0);
+    // Free first — the free router at the very top, since it picks whichever
+    // free model is up — then the newest paid ones, for when there's credit.
+    const free = chat.filter(isFree).sort(newest).map((m) => m.id);
+    const router = free.includes("openrouter/free") ? ["openrouter/free"] : [];
+    const paid = chat.filter((m) => !isFree(m)).sort(newest).slice(0, 60).map((m) => m.id);
+    return [...router, ...free.filter((id) => id !== "openrouter/free"), ...paid];
+  },
+  async stream(key, model, turns, emit, signal, persona = PERSONA) {
+    const r = await fetch(`${OPENROUTER}/chat/completions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${key}`,
+        "content-type": "application/json",
+        // how OpenRouter names the app on the user's own activity page
+        "HTTP-Referer": "https://github.com/Evirtual/jarvis",
+        "X-Title": "J.A.R.V.I.S. Console",
+      },
+      body: JSON.stringify({ model, stream: true, max_tokens: 1024, messages: [{ role: "system", content: withoutSearch(persona) }, ...turns] }),
+      signal,
+    });
+    if (!r.ok || !r.body) {
+      const text = await r.text().catch(() => "");
+      throw Object.assign(new Error(`OpenRouter returned ${r.status}: ${text.slice(0, 200)}`), { status: r.status });
+    }
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data:")) continue; // ": OPENROUTER PROCESSING" keep-alives and the like
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        let obj: { error?: { message?: string; code?: number }; choices?: { delta?: { content?: string } }[] };
+        try { obj = JSON.parse(payload) as typeof obj; } catch { continue; }
+        if (obj.error) throw Object.assign(new Error(`OpenRouter: ${obj.error.message ?? "error"}`), { status: obj.error.code });
+        const delta = obj.choices?.[0]?.delta?.content;
+        if (delta) emit({ t: "text", delta });
+      }
+    }
+  },
+};
+
+/**
+ * OpenRouter's one-click sign-in (OAuth with PKCE): the code it sends back,
+ * with the verifier that started it, becomes an API key.
+ */
+export async function exchangeOpenRouterCode(code: string, verifier: string, method: "S256" | "plain"): Promise<string> {
+  const r = await fetch(`${OPENROUTER}/auth/keys`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ code, code_verifier: verifier, code_challenge_method: method }),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!r.ok) throw new Error(`OpenRouter sign-in didn't complete (${r.status}). Press Connect to try again.`);
+  const body = (await r.json()) as { key?: string };
+  if (!body.key) throw new Error("OpenRouter sign-in returned no key. Press Connect to try again.");
+  return body.key;
+}
+
 const ADAPTERS: Record<ProviderId, ProviderAdapter> = {
+  openrouter: openrouterAdapter,
   openai: openaiAdapter,
   anthropic: anthropicAdapter,
   gemini: geminiAdapter,
@@ -338,6 +451,14 @@ export function humanise(id: ProviderId, err: unknown): string {
   const status = (err as { status?: number } | null)?.status;
   const name = PROVIDERS[id].name;
 
+  if (id === "openrouter") {
+    if (status === 402 || /insufficient credits|payment required/i.test(raw)) {
+      return "That OpenRouter model needs credit, and the account has none — pick a free one (their names end in “free”), or add credit on OpenRouter.";
+    }
+    if (status === 429 || /rate.?limit/i.test(raw)) {
+      return "OpenRouter's free models are at their limit — 20 questions a minute and 50 a day (1,000 once the account has ever bought $10 of credit). Try again shortly, or pick a paid model.";
+    }
+  }
   if (status === 401 || /401|unauthor|invalid[_ ]api[_ ]key|API key not valid/i.test(raw)) {
     return `That key was rejected by ${name}. Check you copied all of it.`;
   }

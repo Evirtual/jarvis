@@ -22,6 +22,7 @@ export const ROOT = path.resolve(HERE, "..", "..");
 const CONFIG_PATH = path.join(ROOT, "config.json");
 
 const ENV_VAR: Record<ProviderId, string> = {
+  openrouter: "OPENROUTER_API_KEY",
   openai: "OPENAI_API_KEY",
   anthropic: "ANTHROPIC_API_KEY",
   gemini: "GEMINI_API_KEY",

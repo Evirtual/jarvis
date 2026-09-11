@@ -198,30 +198,37 @@ what it costs, and what to do — with the key page one tap away.
 
 | Service | Cost |
 | --- | --- |
+| **OpenRouter** | **Free models, no card, one click.** Press **Connect with OpenRouter**, sign in (or make a free account) and you're sent back connected — no key to copy. It starts on `openrouter/free`, which picks whichever free model is up. 50 questions a day, 20 a minute (1,000 a day once the account has ever bought $10 of credit); hundreds of paid models too, from OpenRouter credit. No web search on it — JARVIS says so rather than guessing. |
 | **Gemini** | **Free tier, no credit card.** Flash models, ~1,500 requests a day. Google may use free-tier data to improve their models. |
 | ChatGPT | Pay per token. Separate from a ChatGPT Plus subscription. |
 | Claude | Pay per token. Separate from a Claude Pro subscription. |
 
-Paste a key, press Connect, and it is validated immediately — then you pick the
+OpenRouter's one click is OAuth with PKCE: the code OpenRouter sends back is
+turned into a key by the server (on the PC) or by the page (in the web version),
+so there is never a key to find or paste. For the others, paste a key, press
+Connect, and it is validated immediately — then you pick the
 model from **your account's real list**, so a retired model can never silently
 break the console. Keys are stored in `config.json` on this machine, `chmod 600`,
 and are never sent to the browser; the screen only ever shows a masked tail.
 
-An existing `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` in the
-environment is picked up automatically and labelled *from environment*.
+An existing `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` or
+`GEMINI_API_KEY` in the environment is picked up automatically and labelled with
+the variable's name. **Disconnect** on such a key makes JARVIS ignore it from then
+on (remembered in `config.json`) — the variable itself is left alone for other
+programs — until a key is connected again.
 
 If a service stops answering, JARVIS says why in plain words: a rejected key, a
 model this account can't use, or an account that is **out of credit** — which is
 account-wide, so picking a different model of the same service won't help (add
-credit on its billing page, or switch to Gemini's free tier). The provider's own
+credit on its billing page, or switch to OpenRouter's or Gemini's free models). The provider's own
 error is written to the server console for diagnosis; keys never appear in it.
 The service's card in Connections shows the same problem under its name — a key
 can list models perfectly well on an account that can't answer — until the next
 answer gets through.
 
 > **On subscriptions.** A ChatGPT Plus or Claude Pro plan does not include API
-> access — they are separate products. Gemini's free tier is the honest answer if
-> you want AI without per-token billing.
+> access — they are separate products. OpenRouter's free models and Gemini's free
+> tier are the honest answer if you want AI without per-token billing.
 
 ## The voice
 

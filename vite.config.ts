@@ -49,7 +49,7 @@ const SERVERLESS_CSP = [
   "frame-src https://www.youtube-nocookie.com https://player.vimeo.com",
   "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com" +
     " https://api.open-meteo.com https://get.geojs.io https://ipwho.is https://cloudflare-dns.com https://www.google.com https://www.anthropic.com" +
-    " https://huggingface.co https://*.huggingface.co https://*.hf.co https://cdn.jsdelivr.net",
+    " https://openrouter.ai https://huggingface.co https://*.huggingface.co https://*.hf.co https://cdn.jsdelivr.net",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

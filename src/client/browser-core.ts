@@ -12,7 +12,7 @@ import type {
   AskRequest, AskStatus, ConnectionsResponse, ProviderId, ProviderStatus, ProviderView, SpeakRequest, StatusResponse,
 } from "../shared/types.js";
 import { PROVIDER_IDS } from "../shared/types.js";
-import { PROVIDERS, adapterFor, humanise, personaFor, prepareTurns } from "../shared/providers.js";
+import { PROVIDERS, adapterFor, exchangeOpenRouterCode, humanise, personaFor, prepareTurns } from "../shared/providers.js";
 import { recall, store } from "./dom.js";
 import { neuralError, neuralState, neuralVoices, speakNeural } from "./browser-voice.js";
 
@@ -127,6 +127,11 @@ async function selectModel(id: ProviderId, model: string): Promise<ConnectionsRe
   return connections();
 }
 
+/** Finish OpenRouter's one-click sign-in: here the key is fetched by the page itself, and kept on the device. */
+async function connectOpenRouter(code: string, verifier: string, method: "S256" | "plain"): Promise<ConnectionsResponse> {
+  return saveKey("openrouter", await exchangeOpenRouterCode(code, verifier, method));
+}
+
 async function setActive(id: ProviderId): Promise<ConnectionsResponse> {
   saved.active = id;
   persist();
@@ -186,7 +191,7 @@ async function transcribe(audio: Blob): Promise<string> {
   // Bias the transcriber toward words this console actually uses.
   const prompt =
     "JARVIS, sir. Voices: George, Fable, Lewis, Daniel, Emma, Alice, Isabella, Lily, Michael. " +
-    "Services: ChatGPT, Claude, Gemini. Commands: new thread, close thread, status, uplink, locate me.";
+    "Services: OpenRouter, ChatGPT, Claude, Gemini. Commands: new thread, close thread, status, uplink, locate me.";
   const res = await client.audio.transcriptions.create({ file: new File([audio], `speech.${ext}`, { type }), model: transcriber, language: "en", prompt });
   return (res.text ?? "").trim();
 }
@@ -209,4 +214,4 @@ async function status(): Promise<StatusResponse> {
 
 const speak = (body: SpeakRequest): Promise<Blob> => speakNeural(body.text, body.voice, body.speed);
 
-export const browserCore = { connections, saveKey, removeKey, selectModel, setActive, ask, transcribe, status, speak };
+export const browserCore = { connections, saveKey, removeKey, selectModel, setActive, connectOpenRouter, ask, transcribe, status, speak };

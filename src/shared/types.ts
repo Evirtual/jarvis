@@ -9,7 +9,8 @@
  * Providers
  * ------------------------------------------------------------------ */
 
-export const PROVIDER_IDS = ["openai", "anthropic", "gemini"] as const;
+// OpenRouter first: its free models are the quickest way in for someone new
+export const PROVIDER_IDS = ["openrouter", "openai", "anthropic", "gemini"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export interface ProviderMeta {

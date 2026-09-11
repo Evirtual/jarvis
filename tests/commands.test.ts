@@ -51,6 +51,8 @@ test("switching needs a thread that exists; the core name wins over a thread nam
   assert.deepEqual(intentOf("select the Cambodia thread", ctx()), { name: "switch_thread", title: "cambodia" });
   assert.equal(intentOf("go back to Mars", ctx()), null);
   assert.deepEqual(intentOf("switch to Gemini", ctx()), { name: "switch_core", provider: "gemini" });
+  assert.deepEqual(intentOf("switch to OpenRouter", ctx()), { name: "switch_core", provider: "openrouter" });
+  assert.deepEqual(intentOf("use open router", ctx()), { name: "switch_core", provider: "openrouter" });
 });
 
 test("connecting and moving threads, and folding groups", () => {
