@@ -317,12 +317,13 @@ export class Stage {
   }
 
   /**
-   * Tidy the board: every thread is folded to its title bar — all but the one
-   * you're in, while it fits — and everything is seated in rows centred on
-   * the board: the biggest in the middle of the middle row, the rest outward
-   * from it, left and right in turn; further rows go above and below it in
-   * turn, so the board grows evenly from the centre. It all stays above
-   * JARVIS; the instrument panels float over the board and are not in the way.
+   * Tidy the board: every thread is folded to its title bar, and everything
+   * is stacked in one column down
+   * the middle of the board: the biggest in the middle, the rest above and
+   * below it in turn. When one column is too tall for the screen, two go to
+   * a row, then three, each row centred the same way — the biggest in the
+   * middle of the middle row. It all stays above JARVIS; the instrument
+   * panels float over the board and are not in the way.
    *
    * Nothing is resized, unless there are so many that they don't fit side by
    * side — then only their widths come down, and only as far as they must.
@@ -337,13 +338,13 @@ export class Stage {
     const B = this.bounds, gap = 14;
     const W = B.right - B.left;
     const room = Math.min(B.bottom, this.coreFloor) - B.top;
-    const THREAD_MIN_W = 280;
+    const THREAD_MIN_W = 260; // a folded title bar still shows its name and buttons
 
     type Item = { w: number; h: number; minW: number; weight: number; at: number; fit: (w: number) => void; place: (x: number, y: number) => void };
     /** Fold, give back what an earlier tidy took, and measure what's left. */
-    const measure = (keepOpen: string | null): Item[] => {
+    const measure = (): Item[] => {
       for (const t of this.ws.live) {
-        if (t.id !== keepOpen && this.ws.isOpen(t)) this.ws.setOpen(t.id, false);
+        if (this.ws.isOpen(t)) this.ws.setOpen(t.id, false);
         delete t.fit;
       }
       for (const g of this.ws.groups) delete g.fit;
@@ -373,44 +374,51 @@ export class Stage {
       return items.sort((a, b) => b.w * b.h - a.w * a.h || b.weight - a.weight || b.at - a.at);
     };
 
-    /** Rows for these widths: filled in turn, then evened out so the last isn't a straggler. */
-    const rowsFor = (ws: number[]): number[][] => {
-      const fill = (cap: number): number[][] => {
-        const rows: number[][] = [[]];
-        let used = 0;
-        ws.forEach((w, i) => {
-          const row = rows[rows.length - 1]!;
-          const need = row.length ? used + gap + w : w;
-          if (row.length && need > cap) { rows.push([i]); used = w; } else { row.push(i); used = need; }
-        });
-        return rows;
-      };
-      const count = fill(W).length;
-      let lo = Math.max(...ws), hi = W;
-      while (hi - lo > 4) { const mid = (lo + hi) / 2; if (fill(mid).length > count) lo = mid; else hi = mid; }
-      return fill(hi);
+    /** `cols` to a row, as evenly as rows allow — the fuller rows first, as they sit in the middle. */
+    const rowsOf = (n: number, cols: number): number[][] => {
+      const count = Math.ceil(n / cols), base = Math.floor(n / count), extra = n % count;
+      const rows: number[][] = [];
+      let i = 0;
+      for (let r = 0; r < count; r++) { const k = base + (r < extra ? 1 : 0); rows.push(Array.from({ length: k }, () => i++)); }
+      return rows;
     };
     const tall = (items: Item[], rows: number[][]): number =>
       rows.reduce((sum, r) => sum + Math.max(...r.map((i) => items[i]!.h)), 0) + gap * (rows.length - 1);
+    const wide = (widths: number[], rows: number[][]): number =>
+      Math.max(...rows.map((r) => r.reduce((sum, i) => sum + widths[i]!, 0) + gap * (r.length - 1)));
 
-    /** The widest windows that fit: as they are if possible, narrower only as far as needed. Null if nothing fits. */
+    /**
+     * One centred column if it fits; two to a row if not, then three… — the
+     * fewest that fit the height. Widths stay as they are unless a row is too
+     * wide for the screen, and then come down only as far as that row needs.
+     * Null if nothing fits.
+     */
     const plan = (items: Item[]): { widths: number[]; rows: number[][] } | null => {
-      for (let sx = 1; sx >= 0.3; sx -= 0.05) {
-        const widths = items.map((it) => Math.round(Math.max(it.minW, Math.min(it.w, it.w * sx))));
-        const rows = rowsFor(widths);
-        if (tall(items, rows) <= room) return { widths, rows };
-        if (widths.every((w, i) => w === items[i]!.minW)) break;
+      for (let cols = 1; cols <= items.length; cols++) {
+        const rows = rowsOf(items.length, cols);
+        if (tall(items, rows) > room) continue;
+        for (let sx = 1; sx >= 0.3; sx -= 0.02) {
+          const widths = items.map((it) => Math.round(Math.max(it.minW, Math.min(it.w, it.w * sx))));
+          if (wide(widths, rows) <= W) return { widths, rows };
+          if (widths.every((w, i) => w === items[i]!.minW)) break;
+        }
+        return null; // too narrow for this many side by side; more to a row won't help
       }
       return null;
     };
+    /** Whatever fits across at the narrowest, for when nothing fits the height. */
+    const fallback = (items: Item[]): { widths: number[]; rows: number[][] } => {
+      const widths = items.map((it) => it.minW);
+      let cols = items.length;
+      while (cols > 1 && wide(widths, rowsOf(items.length, cols)) > W) cols--;
+      return { widths, rows: rowsOf(items.length, cols) };
+    };
 
-    const active = this.ws.activeId || null;
-    let items = measure(active);
-    let p = plan(items);
-    // The one you're in doesn't fit open: it folds like the rest.
-    if (!p && active && this.ws.live.some((t) => t.id === active && this.ws.isOpen(t))) { items = measure(null); p = plan(items); }
-    // Still too many: the narrowest they go, from the top, and the board scrolls.
-    if (!p) { const widths = items.map((it) => it.minW); p = { widths, rows: rowsFor(widths) }; }
+    const items = measure();
+    const planned = plan(items);
+    // Too many for the screen: the narrowest they go, and any that would land
+    // on JARVIS or another window take the nearest free seat instead.
+    const p = planned ?? fallback(items);
     const { widths } = p;
     items.forEach((it, i) => { if (widths[i]! < it.w) it.fit(widths[i]!); });
 
@@ -429,6 +437,7 @@ export class Stage {
     const total = stacked.reduce((sum, r) => sum + r.h, 0) + gap * (stacked.length - 1);
     let y = B.top + Math.max(0, (room - total) / 2);
     const mx = (B.left + B.right) / 2;
+    const placed: Rect[] = [];
     for (const r of stacked) {
       const width = r.line.reduce((sum, i) => sum + widths[i]!, 0) + gap * (r.line.length - 1);
       let x = mx - width / 2;
@@ -437,7 +446,13 @@ export class Stage {
         // middle one is centred on its own line.
         const h = items[i]!.h;
         const dy = r.at === "above" ? r.h - h : r.at === "below" ? 0 : (r.h - h) / 2;
-        items[i]!.place(Math.round(x), Math.round(y + dy));
+        let at: Rect = { x: Math.round(x), y: Math.round(y + dy), w: widths[i]!, h };
+        if (!planned) {
+          const shown = this.shown(at);
+          if (shown.x !== at.x || shown.y !== at.y || placed.some((o) => overlapArea(at, o, gap / 2) > 0)) at = this.seat(at.w, at.h, placed);
+        }
+        placed.push(at);
+        items[i]!.place(at.x, at.y);
         x += widths[i]! + gap;
       }
       y += r.h + gap;

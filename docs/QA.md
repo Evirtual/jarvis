@@ -461,18 +461,16 @@ own; now only the group is, and its threads take its width and share its height
 the group. 51. the service worker was no longer registered after the client was
 split into modules, so the console had stopped being installable; restored.
 52. Tidy up piled everything from the top-left and treated the instrument
-panels as obstacles. It now folds every thread but the one you're in and seats
-everything in rows from the centre — the biggest in the middle, the rest
-outward left and right, further rows above and below in turn — clear of JARVIS
-and ignoring the panels. Nothing is resized unless they can't fit side by side;
-then only widths come down (to 280px at least), and the next tidy on a bigger
-screen gives them back.
+panels as obstacles. It now folds every thread and stacks everything in one
+column down the middle — the biggest in the middle, the rest above and below
+in turn — clear of JARVIS and ignoring the panels. Only when one column is too
+tall for the screen do two (then three) go to a row, each row centred the same
+way. Nothing is resized unless a row is too wide; then only widths come down
+(to 260px at least), and the next tidy on a bigger screen gives them back.
 
 | Area | Result |
 | --- | --- |
-| Tidy at 780×940 with six open threads and a group: five fold, the active stays open, group in the middle, no overlaps, nothing resized | Pass |
-| Tidy at 780×600: widths down to 352px, two per row, all above JARVIS, no overlaps | Pass |
-| Tidy again at 1600×900: widths back to 440px, no overlaps | Pass |
+| Tidy, every row measured for symmetry (left gap = right gap) at 1920×1080, 1440×900, 1280×720, 1000×900, 780×940: one column, widths kept; 780×600: 1-2-2-2 at 326/394px; 900×500: 2-3-2 at 260/309px — all within 1px of symmetric, no overlaps, all above JARVIS, all folded | Pass |
 | Group resized wider/shorter/taller: threads follow the width; shorter scrolls inside; taller grows until nothing scrolls, then stops | Pass |
 | Closed drawer has no shadow | Pass |
 | Pages-style build (`JARVIS_BASE=/jarvis/`): assets, manifest and service worker all under `/jarvis/` | Pass |
