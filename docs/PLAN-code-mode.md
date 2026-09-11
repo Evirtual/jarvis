@@ -125,9 +125,22 @@ type CodeEvent =
    answers; diffs and command output rendered; stop.
 4. **Sessions:** follow-ups in the same session, resume one later, and a list of
    past sessions per project.
-5. **Safety pass.** Branch per session, dirty-tree warning, read-only list, the
+5. **Usage, as in the Claude Code app** — a Usage popover in code mode, laid out
+   like the app's, so the two can be compared:
+   - **Context window** of the current session: tokens used / the model's window
+     (e.g. 854.2k / 1M, 85%), the auto-compact point (97%), and a **Compact
+     session** button (Claude Code's own compact command). From the `usage` Claude
+     Code reports with every turn — reliable.
+   - **Plan usage limits (Max)**: the 5-hour limit and the weekly limits (all
+     models, per model), each with % used and when it resets — *if* Claude Code
+     reports them in headless mode (check its stream-json output for rate-limit
+     events first thing, once the CLI is installed). If it doesn't, show exact
+     tokens per session and per day instead, and say plainly that the plan
+     percentages live in the Claude app. Never estimate a percentage.
+   - **Per task**: tokens used, on each code thread when it finishes.
+6. **Safety pass.** Branch per session, dirty-tree warning, read-only list, the
    tunnel/access rule, and tests for the approval gate with fake adapters.
-6. **Docs and QA.** README section, a code-mode section in `docs/QA.md`.
+7. **Docs and QA.** README section, a code-mode section in `docs/QA.md`.
 
 ## Decisions to make first
 
