@@ -278,7 +278,10 @@ export function startSampler(): void {
   };
 
   void pump(gpuSample, "gpu", 2000);
-  void pump(windowsSample, "win", 4000);
+  // The PowerShell probe takes about two seconds of a spawned shell each time.
+  // Wi-Fi signal, battery, disks and the gateway change over minutes, not
+  // seconds, so it runs every 20 s rather than keeping a shell alive half the time.
+  void pump(windowsSample, "win", 20_000);
 }
 
 export function gateway(): string | null {

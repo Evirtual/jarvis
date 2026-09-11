@@ -182,6 +182,21 @@ async function connections(revalidate = false): Promise<ConnectionsResponse> {
   return { providers, active };
 }
 
+/** The machine's readings right now, as the console shows them. */
+function telemetryNow(): TelemetryResponse {
+  return {
+    at: snapshot.at,
+    host: snapshot.host,
+    cpu: snapshot.cpu,
+    mem: snapshot.mem,
+    gpu: snapshot.gpu,
+    net: snapshot.win?.net ?? null,
+    battery: snapshot.win?.battery ?? null,
+    disks: snapshot.win?.disks ?? [],
+    anchors: world.anchors,
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * Routing
  * ------------------------------------------------------------------ */
@@ -296,18 +311,38 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
 
   /* ---- telemetry ---- */
   if (p === "/api/telemetry") {
-    const body: TelemetryResponse = {
-      at: snapshot.at,
-      host: snapshot.host,
-      cpu: snapshot.cpu,
-      mem: snapshot.mem,
-      gpu: snapshot.gpu,
-      net: snapshot.win?.net ?? null,
-      battery: snapshot.win?.battery ?? null,
-      disks: snapshot.win?.disks ?? [],
-      anchors: world.anchors,
+    json(res, 200, telemetryNow());
+    return;
+  }
+
+  /* ---- everything live, pushed ----
+     One open connection instead of the console asking every second: readings,
+     the sweep's state and the world each arrive only when they have changed
+     (each is compared to what this connection was last sent). The console
+     closes it while its tab is hidden and reopens it when looked at again. */
+  if (p === "/api/events") {
+    res.writeHead(200, {
+      "content-type": "text/event-stream",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+      connection: "keep-alive",
+    });
+    const sent = new Map<string, string>();
+    const push = (event: string, value: unknown): void => {
+      const body = JSON.stringify(value);
+      if (sent.get(event) === body) return;
+      sent.set(event, body);
+      res.write(`event: ${event}\ndata: ${body}\n\n`);
     };
-    json(res, 200, body);
+    const tick = (): void => {
+      push("telemetry", telemetryNow());
+      push("scan", { ...scanState, gateway: scanState.gateway ?? gateway() });
+      push("world", world);
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    const beat = setInterval(() => res.write(": keep-alive\n\n"), 25_000);
+    req.on("close", () => { clearInterval(timer); clearInterval(beat); });
     return;
   }
 

@@ -80,12 +80,6 @@
           <span class="core-thread" id="threadName" hidden>—</span>
         </div>
         <div class="toast glass" id="toast" role="status" aria-live="polite"></div>
-        <div class="confirm-backdrop veil" id="confirmBackdrop" aria-hidden="true" hidden></div>
-        <section class="confirm-dialog glass" id="confirmDialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
-          <h2 id="confirmTitle">Confirm action</h2>
-          <p id="confirmText"></p>
-          <div class="confirm-actions"><button class="btn" id="confirmCancel" type="button">Cancel</button><button class="btn danger" id="confirmAccept" type="button">Confirm</button></div>
-        </section>
 
         <div class="windows" id="windows"></div>
         <!-- On a phone, the blurred veil behind an open sheet (More, Threads). -->
@@ -235,6 +229,14 @@
 </div>
 
 <!-- ================= CONFIG DRAWER ================= -->
+<!-- A confirmation stands above everything, the configuration drawer included. -->
+<div class="confirm-backdrop veil" id="confirmBackdrop" aria-hidden="true" hidden></div>
+<section class="confirm-dialog glass" id="confirmDialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
+  <h2 id="confirmTitle">Confirm action</h2>
+  <p id="confirmText"></p>
+  <div class="confirm-actions"><button class="btn" id="confirmCancel" type="button">Cancel</button><button class="btn danger" id="confirmAccept" type="button">Confirm</button></div>
+</section>
+
 <div class="scrim veil" id="scrim"></div>
 <aside class="drawer glass" id="drawer" aria-label="Console configuration">
   <div class="drawer-head">

@@ -647,11 +647,12 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
   font-size: 11.5px; color: var(--text-hi);
 }
 .toast.in { opacity: 1; transform: translate(-50%, -100%); }
+/* Above everything — the drawer included — so an approval is never hidden. */
 .confirm-backdrop {
-  position: absolute; inset: 0; z-index: 234;
+  position: fixed; inset: 0; z-index: 250;
 }
 .confirm-dialog {
-  position: absolute; left: 50%; top: 50%; z-index: 235; width: min(390px, calc(100% - 32px));
+  position: fixed; left: 50%; top: 50%; z-index: 251; width: min(390px, calc(100% - 32px));
   transform: translate(-50%, -50%); border: 1px solid rgba(255,79,95,.58);
   --hue: var(--red);
   box-shadow: 0 24px 70px rgba(0,0,0,.58); padding: 18px;

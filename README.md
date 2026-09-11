@@ -283,7 +283,7 @@ sends.
 | Per-core CPU load | `os.cpus()` tick deltas |
 | Memory | `os.totalmem/freemem` |
 | GPU util, temp, VRAM, watts, clock | `nvidia-smi` |
-| Wi-Fi SSID/signal/radio, throughput, disks, gateway, DNS | one PowerShell probe |
+| Wi-Fi SSID/signal/radio, throughput, disks, gateway, DNS | one PowerShell probe, every 20 s |
 | Battery | the same probe — shown as the arc around JARVIS, red when low and unplugged |
 | Perimeter radar | real ICMP sweep of your /24 — bearing is a stable hash of the address, **radius is genuine round-trip time** |
 | Device identity | ARP table + MAC OUI lookup, with randomised privacy MACs labelled as such |
@@ -356,7 +356,21 @@ the types are broken.
 | `src/shared/types.ts` | The client/server contract — both sides import it, so the API can't drift |
 | `src/client/workspace.ts` | Threads, groups, colours and their lifecycle, as pure data (plus migrations) |
 | `src/client/commands.ts` | What can be said or written as a directive, and what the model may not do |
-| `src/client/stage.ts` | The board: JARVIS, windows, bubbles, the web, the bin, media in threads |
+| `src/client/main.ts` | Boot only: imports the modules below in order and starts them |
+| `src/client/state.ts` | The singletons every module shares (stage, workspace, panels, voice, connections) |
+| `src/client/deck.ts` | The deck and title row: readings, More sheets, the phone/desktop switch |
+| `src/client/readings.ts` | Painting the live readings, and receiving them over one pushed stream |
+| `src/client/say.ts` | How JARVIS speaks to you: notices, lines in a window, his status word, busy |
+| `src/client/ask.ts` | The command line, the queue, what the core is told, the streamed answer |
+| `src/client/actions.ts` | Carrying out every action, by you or by the core's directives |
+| `src/client/confirm.ts` | Anything destructive waits for a yes — by button or by word |
+| `src/client/local.ts` | Questions answered from live readings, never from a model |
+| `src/client/threads.ts` | The Threads list, what the stage reports back, the links between threads |
+| `src/client/voice-ui.ts` | JARVIS as the microphone, the keyboard, Esc, the voice controls |
+| `src/client/drawer.ts` | The configuration drawer and its tabs |
+| `src/client/stage.ts` | The board: JARVIS, windows, bubbles, the bin, media in threads |
+| `src/client/web.ts` | The context web, as its own component with a small host interface |
+| `src/client/core-draw.ts` | JARVIS drawn: the aurora, rings, plasma, spectrum and battery arc — pure drawing |
 | `src/client/panels.ts` | The instrument panels: placement, dragging, resizing |
 | `src/client/stack.ts` | One stacking order for windows, groups and panels — last touched on top |
 | `src/client/icons.ts` | Every drawn icon, once: title-bar buttons and the instrument pictures |
@@ -381,7 +395,15 @@ delete or confirm). **What they don't:** anything in a browser — the canvas,
 dragging, resizing, stacking, layout, media embedding and the voice pipeline are
 checked by hand against [`docs/QA.md`](docs/QA.md).
 
-Vanilla TypeScript, no UI framework — the board is canvas plus ~1 Hz DOM writes,
+**How the readings arrive.** The console holds one `/api/events` stream open
+(server-sent events) and the server pushes a reading only when it has changed —
+no polling. The stream closes a few seconds after the tab is hidden and reopens
+the moment it is looked at, so a background tab costs nothing; a panel's body is
+painted only while it is open, and the radar is drawn only while Perimeter is.
+JARVIS himself draws at 30 fps at rest and 60 while anything moves.
+
+Vanilla TypeScript, no UI framework — the board is canvas plus DOM writes when a
+reading changes,
 and a re-render layer would add weight without buying anything.
 
 ## Notes

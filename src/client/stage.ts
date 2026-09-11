@@ -25,7 +25,9 @@
  */
 
 import { recall, store } from "./dom.js";
+import { CORE_R, DESIGN_R, drawAurora, drawCore } from "./core-draw.js";
 import { ICON } from "./icons.js";
+import { ContextWeb } from "./web.js";
 import { forget, raise, stackKey, track } from "./stack.js";
 import { averageHues, GENERAL_ID, Workspace, migrate, THREAD_HUES, threadRef, type Group, type Thread } from "./workspace.js";
 
@@ -34,8 +36,6 @@ export type Activity = "idle" | "listening" | "speaking" | "thinking";
 
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 /** How big JARVIS is on screen, and the size the core was drawn at. */
-const CORE_R = 52;
-const DESIGN_R = 74;
 const CORE_BOTTOM_GAP = 20;
 /** The deck at the bottom: readings, JARVIS, controls. */
 const DECK_H = 96;
@@ -48,8 +48,8 @@ const CORE_STATUS_ROOM = 44;
 const STORE_KEY = "jarvis.workspace";
 const MIN_W = 210, MIN_H = 90;
 
-/** What the web shows about another thread. */
-export interface Related { id: string; score: number; why: string[] }
+import type { Related } from "./web.js";
+export type { Related } from "./web.js";
 
 interface Card {
   el: HTMLElement;
@@ -112,8 +112,7 @@ export class Stage {
   relatedFor: ((id: string) => Related[]) | null = null;
 
   private bin: HTMLElement;
-  private web: HTMLElement;
-  private webFor: string | null = null;
+  private web: ContextWeb;
   private pulse = 0;
   private placeQueued = false;
   private groupDrag: { id: string; dx: number; dy: number; pid: number; sx: number; sy: number; moved: boolean; node: boolean } | null = null;
@@ -175,29 +174,14 @@ export class Stage {
       `<path d="M4 7h16M9.5 7V4.8h5V7M6.5 7l1 12.2h9l1-12.2M10 10.5v6M14 10.5v6"/></svg><span>Drop to delete</span>`;
     root.append(this.bin);
 
-    this.web = document.createElement("div");
-    this.web.className = "web veil";
-    this.web.hidden = true;
-    this.web.innerHTML =
-      `<div class="web-head"><span>Context web</span><b></b><em>tap a thread to go to it · anywhere else to close</em></div>` +
-      `<svg class="web-strands" aria-hidden="true"></svg><div class="web-nodes"></div>`;
-    // Depth without 3D: the nodes and the strands behind them move at
-    // different rates as the pointer wanders, so the web has a near and a far.
-    this.web.addEventListener("pointermove", (e) => {
-      if (reduceMotion) return;
-      const r = this.web.getBoundingClientRect();
-      this.web.style.setProperty("--px", (((e.clientX - r.left) / r.width - 0.5) * 2).toFixed(3));
-      this.web.style.setProperty("--py", (((e.clientY - r.top) / r.height - 0.5) * 2).toFixed(3));
+    this.web = new ContextWeb({
+      root,
+      thread: (id) => this.ws.thread(id),
+      hueOf: (t) => { const c = t.color ?? this.hueOf(this.ws.groupOf(t)); return /^#[0-9a-f]{6}$/i.test(c) ? c : THREAD_HUES[0]; },
+      related: (id) => this.relatedFor?.(id) ?? [],
+      board: () => ({ top: HEADER_H + 8, bottom: this.h - DECK_H - 24 }),
+      pick: (id) => { this.focus(id); this.reveal(id); },
     });
-    this.web.addEventListener("pointerdown", (e) => {
-      const node = (e.target as HTMLElement).closest<HTMLElement>(".web-node");
-      if (!node) { this.closeWeb(); return; }
-      const id = node.dataset.id!;
-      this.closeWeb();
-      this.focus(id);
-      this.reveal(id); // on a phone, scroll the list to it
-    });
-    root.append(this.web);
 
     this.ws = new Workspace(this.load());
     this.resize();
@@ -218,7 +202,15 @@ export class Stage {
     });
 
     this.renderAll();
-    const frame = (t: number): void => { this.draw(t); requestAnimationFrame(frame); };
+    // Every frame while something moves; every other frame at rest — the
+    // breathing is slow, and half the drawing is half the battery on a phone.
+    let skip = false;
+    const frame = (t: number): void => {
+      const resting = this.activity === "idle" && this.pulse <= 0 && !this.cardDrag && !this.groupDrag && !this.sizeDrag && !this.phoneDrag;
+      skip = resting && !skip;
+      if (!skip) this.draw(t);
+      requestAnimationFrame(frame);
+    };
     requestAnimationFrame(frame);
   }
 
@@ -628,7 +620,7 @@ export class Stage {
     this.root.classList.toggle("clear", this.ws.empty);
     // one thread on the board: on a phone it may use all the room there is (styles.css)
     this.root.classList.toggle("one-thread", this.ws.live.length === 1);
-    if (this.webFor && !this.ws.thread(this.webFor)) this.closeWeb();
+    if (this.web.openFor && !this.ws.thread(this.web.openFor)) this.closeWeb();
     this.place();
 
     // A thread that has just appeared: on a phone, take the list up to it.
@@ -988,134 +980,10 @@ export class Stage {
 
   /* ---------------- the web: what else is about this ---------------- */
 
-  /**
-   * Everything that shares this thread's context, blooming out around it.
-   * Strong connections sit close and bright, passing ones far and faint; the
-   * whole thing drifts with the pointer, so it reads as depth rather than a
-   * diagram.
-   */
-  openWeb(id: string): void {
-    const me = this.ws.thread(id);
-    if (!me || !this.relatedFor) return;
-    const W = this.root.clientWidth, H = this.root.clientHeight;
-    const narrow = W < 860;
-    const board = { top: HEADER_H + 8, bottom: H - DECK_H - 24 };
-    // a phone lists what fits under the thread; a wide screen takes four a side
-    const fits = narrow ? Math.max(1, Math.floor((board.bottom - board.top - 150) / 118)) : 8;
-    const related = this.relatedFor(id).slice(0, Math.min(fits, narrow ? 4 : 8));
-    const nodes = this.web.querySelector(".web-nodes") as HTMLElement;
-    const svg = this.web.querySelector("svg") as SVGSVGElement;
-    this.webFor = id;
-    (this.web.querySelector(".web-head b") as HTMLElement).textContent = me.title;
-    // shown (still transparent) before anything is placed, so cards can be measured
-    this.web.hidden = false;
-    this.web.classList.toggle("empty", related.length === 0);
-    this.web.classList.toggle("narrow", narrow);
+  openWeb(id: string): void { this.web.open(id); }
+  closeWeb(): boolean { return this.web.close(); }
+  get webOpen(): boolean { return this.web.isOpen; }
 
-    const top = Math.max(...related.map((r) => r.score), 1);
-    nodes.replaceChildren();
-    const strands: string[] = [];
-    const hueOfThread = (t: Thread): string => {
-      const c = t.color ?? this.hueOf(this.ws.groupOf(t));
-      return /^#[0-9a-f]{6}$/i.test(c) ? c : THREAD_HUES[0];
-    };
-
-    // Each node is a small version of the thread's own window: same glass,
-    // same colour, same tag, with what it last said and what it shares.
-    const node = (t: Thread, why: string[] | null): HTMLElement => {
-      const el = document.createElement("div");
-      el.className = `web-node glass${why ? "" : " me"}`;
-      el.dataset.id = t.id;
-      el.style.setProperty("--hue", hueOfThread(t));
-      el.innerHTML = `<header><i></i><b></b><small></small></header><p></p><div class="web-why"></div>`;
-      (el.querySelector("b") as HTMLElement).textContent = t.title;
-      (el.querySelector("small") as HTMLElement).textContent = `#${threadRef(t)}`;
-      const lastA = [...t.turns].reverse().find((x) => x.role === "assistant")?.content ?? t.turns[t.turns.length - 1]?.content ?? "";
-      (el.querySelector("p") as HTMLElement).textContent = lastA.replace(/\[\[media:[^\]]*\]\]/g, "").replace(/\s+/g, " ").trim() || "Nothing said yet.";
-      const chips = el.querySelector(".web-why") as HTMLElement;
-      for (const w of why ?? ["this thread"]) {
-        const s = document.createElement("span");
-        s.textContent = w;
-        chips.append(s);
-      }
-      nodes.append(el);
-      return el;
-    };
-
-    // Where the thread you opened sits and where each connection goes: like a
-    // mind map on a wide screen (four a side, strongest nearest the middle
-    // row), and a list hanging off it on a phone. Nothing overlaps either way.
-    const place = (el: HTMLElement, x: number, y: number): { x: number; y: number; hw: number; hh: number } => {
-      const hw = el.offsetWidth / 2, hh = el.offsetHeight / 2;
-      const px = Math.round(Math.max(hw + 12, Math.min(W - hw - 12, x)));
-      const py = Math.round(Math.max(board.top + hh, Math.min(board.bottom - hh, y)));
-      el.style.left = `${px}px`;
-      el.style.top = `${py}px`;
-      return { x: px, y: py, hw, hh };
-    };
-    const c = place(node(me, null), W / 2, narrow ? board.top + 60 : (board.top + board.bottom) / 2);
-
-    const sides = { left: [] as number[], right: [] as number[] };
-    related.forEach((_, i) => (i % 2 ? sides.right : sides.left).push(i));
-    const middleOut = (k: number): number[] =>
-      Array.from({ length: k }, (_, j) => j).sort((a, b) => Math.abs(a - (k - 1) / 2) - Math.abs(b - (k - 1) / 2) || a - b);
-
-    related.forEach((r, i) => {
-      const t = this.ws.thread(r.id);
-      if (!t) return;
-      const strength = Math.min(1, r.score / top);
-      const el = node(t, r.why.slice(0, 3));
-      el.style.setProperty("--near", strength.toFixed(2));
-      el.style.setProperty("--delay", `${(90 + i * 55).toFixed(0)}ms`);
-      const hue = hueOfThread(t);
-      let d: string;
-      if (narrow) {
-        const top0 = c.y + c.hh + 22;
-        const step = (board.bottom - top0) / Math.max(related.length, 1);
-        const p = place(el, W / 2 + 10, top0 + step * (i + 0.5));
-        // a rail down the left of the thread you opened, branching to each card
-        const sx = c.x - c.hw + 18, sy = c.y + c.hh, ex = p.x - p.hw, ey = p.y;
-        d = `M${sx} ${sy} C${sx} ${ey} ${sx} ${ey} ${ex} ${ey}`;
-      } else {
-        const side = i % 2 ? 1 : -1;
-        const list = i % 2 ? sides.right : sides.left;
-        const slot = middleOut(list.length)[list.indexOf(i)] ?? 0;
-        const step = Math.min(176, (board.bottom - board.top) / list.length);
-        const reach = Math.min(W / 2 - 150, 250 + c.hw);
-        const p = place(el, c.x + side * (reach - strength * 24), c.y + (slot - (list.length - 1) / 2) * step);
-        // an S-curve from the side of the thread you opened to the card
-        const sx = c.x + side * c.hw, sy = c.y + (slot - (list.length - 1) / 2) * 14, ex = p.x - side * p.hw, ey = p.y;
-        const mx = (sx + ex) / 2;
-        d = `M${sx} ${sy} C${mx} ${sy} ${mx} ${ey} ${ex} ${ey}`;
-      }
-      // the strand wears the connected thread's colour; brighter and thicker when closer
-      strands.push(
-        `<g style="color:${hue};--near:${strength.toFixed(2)};--delay:${(i * 55).toFixed(0)}ms"><path d="${d}"/></g>`,
-      );
-    });
-
-    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-    svg.innerHTML = strands.join("");
-    if (!related.length) {
-      const none = document.createElement("div");
-      none.className = "web-none";
-      none.textContent = "Nothing else on the board shares this thread's context yet.";
-      none.style.left = `${c.x}px`;
-      none.style.top = `${c.y + c.hh + 40}px`;
-      nodes.append(none);
-    }
-    requestAnimationFrame(() => this.web.classList.add("in"));
-  }
-
-  closeWeb(): boolean {
-    if (this.web.hidden) return false;
-    this.web.classList.remove("in");
-    this.webFor = null;
-    window.setTimeout(() => { if (!this.web.classList.contains("in")) this.web.hidden = true; }, reduceMotion ? 0 : 200);
-    return true;
-  }
-
-  get webOpen(): boolean { return !this.web.hidden; }
 
   /** On a phone, bring the window in front into view in the list. */
   reveal(id = this.ws.activeId): void {
@@ -1482,147 +1350,22 @@ export class Stage {
     const idle = this.activity === "idle";
     const spin = reduceMotion ? 0 : idle ? 0.12 : this.activity === "thinking" ? 1 : 0.55 + amp * 1.6;
 
-    this.drawAurora(ctx, t, cx, cy, amp);
+    const fields = this.ws.visibleGroups.slice(0, 4).map((g) => {
+      const box = this.boxes.get(g.id);
+      return { hue: this.hueOf(g), hx: box ? box.x + box.w / 2 : cx, hy: box ? box.y + box.h / 2 : cy };
+    });
+    drawAurora(ctx, t, cx, cy, amp, fields);
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(CORE_R / DESIGN_R, CORE_R / DESIGN_R);
-    this.drawCore(ctx, t * spin, t, amp, idle);
+    drawCore(ctx, t * spin, t, amp, idle, {
+      activity: this.activity, cpuLoad: this.cpuLoad, gpuLoad: this.gpuLoad, battery: this.battery, onAc: this.onAc, pulse: this.pulse,
+    });
     ctx.restore();
     if (this.pulse > 0) this.pulse -= 0.02;
   }
 
-  /**
-   * Slow fields of colour drifting behind everything, tinted by the groups on
-   * the board. They are what stops the screen feeling like a set of boxes.
-   */
-  private drawAurora(ctx: CanvasRenderingContext2D, t: number, cx: number, cy: number, amp: number): void {
-    const groups = this.ws.visibleGroups.slice(0, 4);
-    const time = reduceMotion ? 0 : t / 1000;
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    groups.forEach((g, i) => {
-      const box = this.boxes.get(g.id);
-      const hx = box ? box.x + box.w / 2 : cx;
-      const hy = box ? box.y + box.h / 2 : cy;
-      // drift between the core and the bubble, slowly, each on its own path
-      const wob = Math.sin(time * 0.21 + i * 1.7) * 26, wob2 = Math.cos(time * 0.17 + i * 2.3) * 22;
-      const x = cx + (hx - cx) * 0.55 + wob;
-      const y = cy + (hy - cy) * 0.55 + wob2;
-      const r = 170 + Math.sin(time * 0.13 + i) * 26 + amp * 30;
-      const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-      grad.addColorStop(0, withAlpha(this.hueOf(g), 0.055));
-      grad.addColorStop(0.55, withAlpha(this.hueOf(g), 0.02));
-      grad.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.restore();
-  }
 
-  private drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, amp: number, idle: boolean): void {
-    // tick ring
-    ctx.save();
-    for (let i = 0; i < 72; i++) {
-      const major = i % 6 === 0;
-      ctx.rotate((Math.PI * 2) / 72);
-      ctx.beginPath();
-      ctx.moveTo(0, -DESIGN_R);
-      ctx.lineTo(0, major ? -DESIGN_R + 8 : -DESIGN_R + 4);
-      ctx.strokeStyle = major ? "#2e7f96" : "#12313f";
-      ctx.lineWidth = major ? 1.3 : 1;
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    const ring = (radius: number, rot: number, segs: number, gap: number, colour: string, w: number): void => {
-      ctx.save();
-      ctx.rotate(rot);
-      ctx.lineWidth = w;
-      ctx.strokeStyle = colour;
-      const span = (Math.PI * 2) / segs;
-      for (let s = 0; s < segs; s++) {
-        ctx.beginPath();
-        ctx.arc(0, 0, radius, s * span, s * span + span - gap);
-        ctx.stroke();
-      }
-      ctx.restore();
-    };
-    ring(60, sp / (2600 - this.cpuLoad * 1600), 6, 0.3, "#2e7f96", 2);
-    ring(50, -sp / (1700 - this.cpuLoad * 1000), 4, 0.55, "#6ff0ff", 1.5);
-    ring(40, sp / 3400, 12, 0.12, "#1d5468", 1);
-
-    // the plasma at the centre: a soft body that swells with sound and breathes at rest
-    const breath = reduceMotion ? 0 : Math.sin(t / 2200) * 2.5;
-    const glowR = 32 + this.cpuLoad * 6 + amp * 22 + this.pulse * 6 + breath;
-    const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, glowR);
-    glow.addColorStop(0, "rgba(214,242,250,.95)");
-    glow.addColorStop(0.22, `rgba(111,240,255,${(0.4 + this.cpuLoad * 0.2 + amp * 0.5).toFixed(2)})`);
-    glow.addColorStop(0.6, "rgba(46,127,150,.2)");
-    glow.addColorStop(1, "rgba(4,8,13,0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(0, 0, glowR, 0, Math.PI * 2);
-    ctx.fill();
-
-    // live spectrum — only when there is genuinely sound
-    if (amp > 0.01) {
-      const bars = 64;
-      for (let i = 0; i < bars; i++) {
-        const a = (i / bars) * Math.PI * 2;
-        const wob = 0.55 + 0.45 * Math.sin(i * 1.7 + t / 90);
-        const len = 4 + amp * 26 * wob;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a) * 26, Math.sin(a) * 26);
-        ctx.lineTo(Math.cos(a) * (26 + len), Math.sin(a) * (26 + len));
-        ctx.strokeStyle = this.activity === "listening"
-          ? `rgba(255,120,130,${(0.2 + amp * 0.5).toFixed(2)})`
-          : `rgba(111,240,255,${(0.18 + amp * 0.5).toFixed(2)})`;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-    }
-
-    if (this.activity === "thinking" && !reduceMotion) {
-      ctx.save();
-      ctx.rotate((t / 320) % (Math.PI * 2));
-      ctx.beginPath();
-      ctx.arc(0, 0, DESIGN_R - 6, 0, 0.9);
-      ctx.strokeStyle = "#ffb648";
-      ctx.lineWidth = 2.2;
-      ctx.shadowColor = "rgba(255,182,72,.7)";
-      ctx.shadowBlur = 10;
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    ctx.save();
-    ctx.rotate(Math.sin(t / 5200) * 0.08);
-    ctx.beginPath();
-    for (let k = 0; k < 3; k++) {
-      const a = -Math.PI / 2 + k * ((Math.PI * 2) / 3);
-      ctx.lineTo(Math.cos(a) * 19, Math.sin(a) * 19);
-    }
-    ctx.closePath();
-    ctx.strokeStyle = "#ffb648";
-    ctx.lineWidth = 1.9;
-    ctx.shadowColor = "rgba(255,182,72,.9)";
-    ctx.shadowBlur = 5 + this.gpuLoad * 22 + amp * 14;
-    ctx.stroke();
-    ctx.restore();
-
-    // outer arc = real battery charge
-    const low = !this.onAc && this.battery < 20;
-    ctx.save();
-    ctx.rotate(-Math.PI / 2);
-    ctx.beginPath();
-    ctx.arc(0, 0, DESIGN_R + 6, 0, Math.PI * 2 * (this.battery / 100));
-    ctx.strokeStyle = low ? "#ff4f5f" : idle ? "#1d5468" : "#6ff0ff";
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
-    ctx.restore();
-  }
 }
 
 export function line(kind: "user" | "jarvis" | "sys", text: string): HTMLElement {
@@ -1738,11 +1481,5 @@ function overlapArea(a: Rect, b: Rect, margin: number): number {
   const w = Math.min(a.x + a.w, b.x + b.w + margin) - Math.max(a.x, b.x - margin);
   const h = Math.min(a.y + a.h, b.y + b.h + margin) - Math.max(a.y, b.y - margin);
   return w > 0 && h > 0 ? w * h : 0;
-}
-
-/** "#6ff0ff" at 40% → "rgba(111,240,255,.4)". */
-function withAlpha(hex: string, a: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a.toFixed(2)})`;
 }
 

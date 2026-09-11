@@ -1,0 +1,219 @@
+/**
+ * Voice and keyboard: JARVIS as the microphone, the keyboard a keystroke
+ * away, Esc, and the voice controls in Configuration.
+ */
+
+import type { ProviderId, ScanResponse, TelemetryResponse, VoiceOption, WorldResponse } from "../shared/types.js";
+import { api } from "./api.js";
+import {
+  NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type Action, type ConfigTab, type ParseContext, type ProviderWord,
+} from "./commands.js";
+import { addressed, getAddress, setAddress, type Address } from "./address.js";
+import { ICON, instrumentIcon as icon } from "./icons.js";
+import { $, esc, fmtRate, gib, gib0, hhmm, recall, setMeter, setPill, store } from "./dom.js";
+import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
+import { type PanelName } from "./panels.js";
+import { line, type Thread } from "./stage.js";
+import { clip, editDistance } from "./text.js";
+import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
+import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
+import { announce, busy, paintCoreState, sys } from "./say.js";
+import { answerConfirm, pendingConfirm } from "./confirm.js";
+import { T } from "./readings.js";
+import { submit } from "./ask.js";
+import { closeMenus, menuOpen } from "./deck.js";
+import { setDrawer } from "./drawer.js";
+
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  // Whatever is on top goes first, in the order they stack on screen: the
+  // confirmation (Esc means "no") over everything, then the configuration
+  // drawer, the deck's menus, the web, the keyboard, the front panel.
+  if (pendingConfirm) { const note = answerConfirm(false); if (note) announce(note); return; }
+  if ($("drawer").classList.contains("open")) { setDrawer(false); return; }
+  if (menuOpen()) { closeMenus(); return; }
+  if (graph.closeWeb()) return;
+  if (typing_) { showKeyboard(false); return; }
+  if (panels.closeTop()) return;
+  voice.stop();
+});
+
+/* ===================================================================== *
+ * Voice wiring
+ * ===================================================================== */
+
+// Feed the core from the real waveform every frame.
+// Started on the next frame, once every module has loaded.
+requestAnimationFrame(function pumpGlobe(): void {
+  graph.amplitude = voice.amplitude;
+  graph.activity = busy ? "thinking" : voice.listening ? "listening" : voice.speaking ? "speaking" : "idle";
+  hud.amplitude = graph.amplitude;
+  hud.activity = graph.activity;
+  // Read through a call: this loop is scheduled, not immediate, but control-flow
+  // analysis sees the IIFE run while T is still null and would narrow to never.
+  const cur = T;
+  if (cur) {
+    graph.cpuLoad = (cur.cpu?.avg ?? 0) / 100;
+    graph.gpuLoad = (cur.gpu?.utilPct ?? 0) / 100;
+    graph.battery = cur.battery?.pct ?? 100;
+    graph.onAc = cur.battery?.onAc ?? true;
+  }
+  requestAnimationFrame(pumpGlobe);
+});
+
+voice.onNotice = sys;
+voice.onState = (): void => {
+  paintCoreState();
+  const note = $("voiceNote");
+  const d = voice.describe();
+  note.className = d.warn ? "hint warn" : "hint";
+  note.textContent = d.text;
+  renderVoiceSelect();
+};
+voice.onRecognised = (text, final): void => {
+  if (typing_) { input.value = text; return; }
+  if (final && text) setTimeout(() => submit(text), 120);
+};
+
+/* ---------------------------------------------------------------------
+ * Voice first. JARVIS is the button: tap him and he listens. The keyboard
+ * is always a keystroke away, and can be made the default tap instead.
+ * --------------------------------------------------------------------- */
+
+export let typing_ = false;
+export let tapSpeaks = recall("jarvis.tapSpeaks") !== "0";
+
+export function showKeyboard(on: boolean): void {
+  typing_ = on;
+  $("cmdForm").hidden = !on;
+  $("keyBtn").classList.toggle("on", on);
+  if (on) {
+    voice.stop();
+    input.value = "";
+    input.focus();
+  } else {
+    input.value = "";
+    input.blur();
+  }
+}
+
+export function setTapSpeaks(on: boolean): void {
+  tapSpeaks = on;
+  store("jarvis.tapSpeaks", on ? "1" : "0");
+  $<HTMLInputElement>("tapSpeaks").checked = on;
+  $("keyBtn").title = on ? "Type instead" : "Typing is the default — tap JARVIS to type";
+}
+
+// Tap JARVIS: listen (or open the keyboard, if that's your default). A tap
+// while he's speaking cuts him off instead.
+graph.onCoreTap = (): void => {
+  voice.markUserActed();
+  if (voice.speaking && !voice.listening) { voice.stop(); return; }
+  if (!tapSpeaks) { showKeyboard(!typing_); return; }
+  if (typing_ && !input.value) showKeyboard(false);
+  voice.toggleListen();
+};
+
+$("keyBtn").addEventListener("click", () => showKeyboard(!typing_));
+$<HTMLInputElement>("tapSpeaks").addEventListener("change", (e) => setTapSpeaks((e.target as HTMLInputElement).checked));
+setTapSpeaks(tapSpeaks);
+
+// Any letter opens the keyboard and goes into it, so typing never needs a target.
+document.addEventListener("keydown", (e) => {
+  if (typing_ || e.metaKey || e.ctrlKey || e.altKey) return;
+  const el = document.activeElement as HTMLElement | null;
+  if (el && /^(input|textarea|select)$/i.test(el.tagName)) return;
+  if (e.key.length !== 1 || e.key === " ") return;
+  showKeyboard(true);
+  input.value = e.key === "/" ? "" : e.key;
+  e.preventDefault();
+});
+
+// Spoken replies are on unless you turn them off, and the choice is remembered.
+/* How JARVIS addresses you — sir by default, ma'am if you'd rather. */
+const addressSel = $<HTMLSelectElement>("addressSel");
+export function applyAddress(a: Address): void {
+  setAddress(a);
+  addressSel.value = a;
+  $("prompt").textContent = addressed("SIR ›");
+}
+applyAddress(getAddress());
+addressSel.addEventListener("change", () => {
+  applyAddress(addressSel.value === "madam" ? "madam" : "sir");
+  voice.markUserActed();
+  announce("Very good, sir.");
+});
+
+const voiceOut = $<HTMLInputElement>("voiceOut");
+export function setVoiceOut(on: boolean): void {
+  voice.enabled = on;
+  voiceOut.checked = on;
+  store("jarvis.voiceOn", on ? "1" : "0");
+  if (!on) voice.stop();
+}
+setVoiceOut(recall("jarvis.voiceOn") !== "0");
+voiceOut.addEventListener("change", () => setVoiceOut(voiceOut.checked));
+
+const voiceSel = $<HTMLSelectElement>("voiceSel");
+export function renderVoiceSelect(): void {
+  const want = voice.selectionValue;
+  if (voiceSel.dataset.built === "1" && voiceSel.value === want) return;
+  voiceSel.replaceChildren();
+  if (voice.voiceOptions.length) {
+    const g = document.createElement("optgroup");
+    g.label = "Neural · Kokoro-82M (local)";
+    for (const v of voice.voiceOptions) {
+      const o = document.createElement("option");
+      o.value = `k:${v.id}`;
+      o.textContent = `${v.name}  ·  ${v.note}`;
+      g.append(o);
+    }
+    voiceSel.append(g);
+  }
+  if (voice.systemVoices.length) {
+    const g = document.createElement("optgroup");
+    g.label = "System voices (browser)";
+    for (const v of voice.systemVoices) {
+      const o = document.createElement("option");
+      o.value = `s:${v.name}`;
+      o.textContent = voice.labelFor(v);
+      g.append(o);
+    }
+    voiceSel.append(g);
+  }
+  voiceSel.value = want;
+  voiceSel.dataset.built = "1";
+}
+voiceSel.addEventListener("change", () => {
+  if (!voice.select(voiceSel.value)) return;
+  voice.markUserActed();
+  voice.stop();
+  voice.speak("Voice profile set, sir.");
+});
+
+const pitchSl = $<HTMLInputElement>("pitchSl");
+const rateSl = $<HTMLInputElement>("rateSl");
+pitchSl.value = String(voice.pitchValue);
+rateSl.value = String(voice.rateValue);
+$("pitchN").textContent = voice.pitchValue.toFixed(2);
+$("rateN").textContent = voice.rateValue.toFixed(2);
+pitchSl.addEventListener("input", () => {
+  voice.setPitch(Number(pitchSl.value));
+  $("pitchN").textContent = voice.pitchValue.toFixed(2);
+});
+rateSl.addEventListener("input", () => {
+  voice.setRate(Number(rateSl.value));
+  $("rateN").textContent = voice.rateValue.toFixed(2);
+});
+$("testVoice").addEventListener("click", () => {
+  voice.markUserActed();
+  voice.stop();
+  voice.speak("All systems are online and operating within normal parameters, sir.");
+});
+
+if (window.speechSynthesis) {
+  window.speechSynthesis.addEventListener("voiceschanged", () => {
+    voice.refreshSystemList();
+    renderVoiceSelect();
+  });
+}

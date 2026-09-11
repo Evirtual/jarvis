@@ -426,6 +426,25 @@ turns of 4,000 characters — a long research thread would have failed with
 "Could not reach ChatGPT"; `/api/ask` now allows 1 MB. 48. plain `http://`
 links were made clickable despite the README's https-only promise.
 
+### 2026-09-11 — architecture pass (no behaviour change intended)
+
+What changed: `main.ts` (1,900 lines) split into twelve modules; the web and
+the core's drawing moved out of `stage.ts`; readings now arrive on one pushed
+`/api/events` stream instead of 55 requests a minute, and stop while the tab is
+hidden; the PowerShell probe runs every 20 s instead of every 4 s (it takes ~2 s
+each time); panel bodies are painted only while open; the radar only while
+Perimeter is open; the core at 30 fps at rest; the deck refits only when a
+reading's text changed (the 1 s interval is gone); a confirmation now stands
+above the configuration drawer; a message over 4,000 characters is announced as
+cut rather than cut silently.
+
+| Area | Result |
+| --- | --- |
+| Regression: new threads, rename, connect → group, the web (open, tap a card, Esc), the core drawing, panel painted on open, confirm by voice, tidy, put all away, restore, delete everything | Pass, no errors |
+| Stream: one `/api/events` connection, no `/api/telemetry` polling, sweep announced from the stream, a closed panel's body untouched, filled on open | Pass |
+| Confirmation above the open drawer; Esc answers it first | Pass |
+| Brave: a tab loaded in the background opens no stream at all | As designed |
+
 **Limits of automated testing noticed:** a browser tab in the background runs no
 animation frames (so drags and transitions freeze in a hidden tab) and receives
 no synthetic mouse or key input; and automated "typing" inserts text without key

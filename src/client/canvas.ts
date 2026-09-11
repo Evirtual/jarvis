@@ -34,6 +34,8 @@ export class Hud {
   hoverIp: string | null = null;
   telemetry: TelemetryResponse | null = null;
   onHover: (() => void) | null = null;
+  /** Whether the radar can be seen at all — the Perimeter panel is open. Nothing is drawn otherwise. */
+  visible = false;
 
   /** Live audio level, 0-1 — the globe breathes with this, not with a timer. */
   amplitude = 0;
@@ -88,7 +90,7 @@ export class Hud {
 
     const frame = (t: number): void => {
       if (this.rctx) this.drawReactor(t);
-      this.drawRadar();
+      if (this.visible) this.drawRadar();
       if (!reduceMotion) requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
