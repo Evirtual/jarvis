@@ -93,14 +93,14 @@
 
           <section class="panel float glass" data-panel="compute" hidden>
             <h2 class="drag">Compute<span class="tail"></span><span class="aux" id="cpuCount">—</span><button class="p-x" type="button" aria-label="Close Compute" title="Close Compute"></button></h2>
-            <div class="kv"><span class="k">Processor</span><span class="v" id="cpuModel">—</span></div>
-            <div class="cores" id="cores"></div>
+            <div class="kv"><span class="k" data-web="Device">Processor</span><span class="v" id="cpuModel">—</span></div>
+            <div class="cores" id="cores" data-pc></div>
             <div class="meter">
-              <div class="row"><span class="nm">Aggregate load</span><span class="nu" id="cpuAvgN">—<span class="u">%</span></span></div>
+              <div class="row"><span class="nm" data-web="Load, estimated">Aggregate load</span><span class="nu" id="cpuAvgN">—<span class="u">%</span></span></div>
               <div class="track"><div class="fill" id="cpuAvg"></div></div>
             </div>
             <div class="meter">
-              <div class="row"><span class="nm">Memory</span><span class="nu" id="memN">—</span></div>
+              <div class="row"><span class="nm" data-web="App memory">Memory</span><span class="nu" id="memN">—</span></div>
               <div class="track"><div class="fill" id="memBar"></div></div>
             </div>
           </section>
@@ -109,16 +109,16 @@
             <h2 class="drag">Graphics<span class="tail"></span><span class="aux" id="gpuTemp">—</span><button class="p-x" type="button" aria-label="Close Graphics" title="Close Graphics"></button></h2>
             <div class="kv"><span class="k">Adapter</span><span class="v" id="gpuName">—</span></div>
             <div class="meter">
-              <div class="row"><span class="nm">Utilisation</span><span class="nu" id="gpuUtilN">—<span class="u">%</span></span></div>
+              <div class="row"><span class="nm" data-web="Frame rate">Utilisation</span><span class="nu" id="gpuUtilN">—<span class="u">%</span></span></div>
               <div class="track"><div class="fill" id="gpuUtil"></div></div>
             </div>
-            <div class="meter">
+            <div class="meter" data-pc>
               <div class="row"><span class="nm">VRAM</span><span class="nu" id="gpuVramN">—</span></div>
               <div class="track"><div class="fill" id="gpuVram"></div></div>
             </div>
-            <div class="kv"><span class="k">Power draw</span><span class="v gold" id="gpuPwr">—</span></div>
-            <div class="kv"><span class="k">Core clock</span><span class="v" id="gpuClock">—</span></div>
-            <div class="kv"><span class="k">Fan</span><span class="v" id="gpuFan">—</span></div>
+            <div class="kv"><span class="k" data-web="Screen">Power draw</span><span class="v gold" id="gpuPwr">—</span></div>
+            <div class="kv"><span class="k" data-web="Colour">Core clock</span><span class="v" id="gpuClock">—</span></div>
+            <div class="kv"><span class="k" data-web="Renders with">Fan</span><span class="v" id="gpuFan">—</span></div>
           </section>
 
           <section class="panel float glass" data-panel="storage" hidden>
@@ -127,9 +127,9 @@
           </section>
           <section class="panel float glass" data-panel="perimeter" hidden>
             <h2 class="drag">Perimeter<span class="tail"></span><span class="aux" id="scanAge">—</span><button class="p-x" type="button" aria-label="Close Perimeter" title="Close Perimeter"></button></h2>
-            <canvas id="radar" width="520" height="520" aria-label="Live map of devices on the local network"></canvas>
+            <canvas id="radar" width="520" height="520" aria-label="Live map of devices on the local network" data-web-label="The services JARVIS relies on, placed by round trip"></canvas>
             <div class="radar-foot">
-              <span class="info">Hosts <b id="hostCount">0</b></span>
+              <span class="info"><span data-web="Services">Hosts</span> <b id="hostCount">0</b></span>
               <span class="info" id="subnetLbl">—</span>
               <button class="btn" id="sweepBtn" type="button">Sweep</button>
             </div>
@@ -138,12 +138,12 @@
 
           <section class="panel float glass" data-panel="uplink" hidden>
             <h2 class="drag">Uplink<span class="tail"></span><span class="aux" id="wifiSig">—</span><button class="p-x" type="button" aria-label="Close Uplink" title="Close Uplink"></button></h2>
-            <div class="kv"><span class="k">Network</span><span class="v" id="ssid">—</span></div>
-            <div class="kv"><span class="k">Radio</span><span class="v" id="radio">—</span></div>
-            <svg class="spark" id="spark" viewBox="0 0 260 34" preserveAspectRatio="none" aria-label="Network throughput, last 60 seconds"></svg>
-            <div class="kv"><span class="k">Down / Up</span><span class="v" id="rate">—</span></div>
-            <div class="kv"><span class="k">Gateway</span><span class="v" id="gw">—</span></div>
-            <div class="kv"><span class="k">Resolvers</span><span class="v" id="dns">—</span></div>
+            <div class="kv"><span class="k" data-web="Connection">Network</span><span class="v" id="ssid">—</span></div>
+            <div class="kv"><span class="k" data-web="Estimate">Radio</span><span class="v" id="radio">—</span></div>
+            <svg class="spark" id="spark" viewBox="0 0 260 34" preserveAspectRatio="none" aria-label="Network throughput, last 60 seconds" data-web-label="Round trip to the internet, last minute"></svg>
+            <div class="kv"><span class="k" data-web="Round trip">Down / Up</span><span class="v" id="rate">—</span></div>
+            <div class="kv"><span class="k" data-web="Status">Gateway</span><span class="v" id="gw">—</span></div>
+            <div class="kv"><span class="k" data-web="Data saver">Resolvers</span><span class="v" id="dns">—</span></div>
             <div class="kv"><span class="k">Public IP</span><span class="v" id="pubip">—</span></div>
             <div class="kv"><span class="k">Carrier</span><span class="v" id="isp">—</span></div>
             <div class="kv"><span class="k">Latency</span><span class="v" id="anchors">—</span></div>
@@ -165,6 +165,10 @@
               <div class="kv"><span class="k">Pressure</span><span class="v" id="wxPress">—</span></div>
               <div class="kv"><span class="k">Sunrise</span><span class="v" id="wxRise">—</span></div>
               <div class="kv"><span class="k">Sunset</span><span class="v" id="wxSet">—</span></div>
+            </div>
+            <div class="radar-foot" data-web-only>
+              <span class="info" id="locBy">Located by IP address</span>
+              <button class="btn" id="locateBtn" type="button">Use GPS</button>
             </div>
           </section>
         </div>
@@ -190,7 +194,7 @@
             </div>
             <button class="pill" id="pillCpu" data-open="compute" data-rank="1" type="button"><span class="k">CPU</span><span class="v" id="pCpu">—</span></button>
             <button class="pill" id="pillGpu" data-open="graphics" data-rank="2" type="button"><span class="k">GPU</span><span class="v" id="pGpu">—</span></button>
-            <button class="pill" id="pillDisk" data-open="storage" data-rank="5" type="button"><span class="k">Disk</span><span class="v" id="pDisk">—</span></button>
+            <button class="pill" id="pillDisk" data-open="storage" data-rank="5" type="button"><span class="k" data-web="App">Disk</span><span class="v" id="pDisk">—</span></button>
           </nav>
 
           <button class="ic side" id="newThread" type="button" title="New thread" aria-label="New thread">
@@ -210,7 +214,7 @@
 
           <nav class="dock dock-r" id="dockR" data-side="r" aria-label="Surroundings">
             <button class="pill" id="pillNet" data-open="uplink" data-rank="3" type="button"><span class="k">Net</span><span class="v" id="pNet">—</span></button>
-            <button class="pill" id="pillLan" data-open="perimeter" data-rank="6" type="button"><span class="k">LAN</span><span class="v" id="pLan">—</span></button>
+            <button class="pill" id="pillLan" data-open="perimeter" data-rank="6" type="button"><span class="k" data-web="Reach">LAN</span><span class="v" id="pLan">—</span></button>
             <button class="pill" id="pillWx" data-open="environment" data-rank="4" type="button"><span class="k">Sky</span><span class="v" id="pWx">—</span></button>
             <div class="more-wrap" hidden>
               <button class="pill more" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="dockMenuR">
@@ -253,7 +257,7 @@
   <section class="panel" data-pane="connections">
     <h2>Reasoning Cores<span class="tail"></span></h2>
     <div id="providers"></div>
-    <p class="hint" id="connHint">Connect a service to have me answer freely. Keys are stored on this machine and never sent to the browser.</p>
+    <p class="hint" id="connHint" data-web="Connect a service to have me answer freely. Keys are kept in this browser on this device, and go only to the service they belong to.">Connect a service to have me answer freely. Keys are stored on this machine and never sent to the browser.</p>
   </section>
 
   <section class="panel" data-pane="voice" hidden>

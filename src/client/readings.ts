@@ -17,8 +17,9 @@ import { clip, editDistance } from "./text.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
 import { paintCoreState, sys } from "./say.js";
-import { CROSS_ORIGIN, apiUrl } from "./server.js";
 import { fitDockIfChanged } from "./deck.js";
+import { SERVERLESS } from "./server.js";
+import { locate, startSensors, sweepServices } from "./sensors.js";
 
 /* ===================================================================== *
  * Painting the HUD
@@ -75,6 +76,7 @@ function drawSpark(): void {
 export function paintTelemetry(): void {
   if (!T) return;
   hud.telemetry = T;
+  if (T.web) { paintWeb(T); fitDockIfChanged(); return; }
   // The readings in the deck are always painted; a panel's body only while
   // it is open (and again the moment it opens — see deck.ts).
   const open = { compute: panels.isOpen("compute"), graphics: panels.isOpen("graphics"), storage: panels.isOpen("storage"), uplink: panels.isOpen("uplink") };
@@ -180,6 +182,116 @@ export function paintTelemetry(): void {
   fitDockIfChanged();
 }
 
+const fmtBytes = (b: number | null | undefined): string =>
+  b == null ? "—" : b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : b >= 1e3 ? `${Math.round(b / 1e3)} KB` : `${b} B`;
+
+/** The same instruments, from what the browser measures (see sensors.ts). */
+function paintWeb(t: TelemetryResponse): void {
+  const w = t.web!;
+  const open = { compute: panels.isOpen("compute"), graphics: panels.isOpen("graphics"), storage: panels.isOpen("storage"), uplink: panels.isOpen("uplink") };
+
+  // compute
+  if (w.load != null) {
+    $("pCpu").textContent = `${w.load}%`;
+    setPill($("pillCpu"), w.load >= 75, w.load >= 92);
+  }
+  if (open.compute) {
+    $("cpuModel").textContent = w.platform;
+    $("cpuModel").title = w.platform;
+    $("cpuCount").textContent = [w.cores ? `${w.cores} cores` : null, w.pressure].filter(Boolean).join(" · ") || "—";
+    $("cpuAvgN").innerHTML = w.load != null ? `${w.load}<span class="u">%</span>` : "—";
+    setMeter($("cpuAvg"), w.load);
+    if (w.heapUsed != null && w.heapLimit) {
+      $("memN").innerHTML = `${Math.round(w.heapUsed / 1e6)} / ${Math.round(w.heapLimit / 1e6)}<span class="u">MB</span>` +
+        (w.deviceMemGb ? ` <span class="u">· device ${w.deviceMemGb} GB</span>` : "");
+      setMeter($("memBar"), (w.heapUsed / w.heapLimit) * 100);
+    } else {
+      $("memN").innerHTML = w.deviceMemGb ? `device ${w.deviceMemGb}<span class="u">GB</span>` : "—";
+    }
+  }
+
+  // graphics: frames held, against what the display can show
+  if (w.fps != null) {
+    $("pGpu").textContent = `${w.fps} fps`;
+    const ratio = w.refreshHz ? w.fps / w.refreshHz : 1;
+    setPill($("pillGpu"), ratio < 0.75, ratio < 0.4);
+  }
+  if (open.graphics) {
+    $("gpuName").textContent = w.renderer ?? "Not named by this browser";
+    $("gpuName").title = w.renderer ?? "";
+    $("gpuTemp").textContent = w.refreshHz ? `${w.refreshHz} Hz` : "—";
+    $("gpuUtilN").innerHTML = w.fps != null ? `${w.fps}<span class="u">fps</span>` : "—";
+    const fill = $("gpuUtil");
+    const pct = w.fps != null && w.refreshHz ? Math.min(100, (w.fps / w.refreshHz) * 100) : 0;
+    fill.style.width = `${pct}%`;
+    fill.classList.toggle("warn", pct < 75 && pct >= 40);
+    fill.classList.toggle("crit", pct < 40);
+    $("gpuPwr").textContent = w.screen;
+    $("gpuClock").textContent = `${w.hdr ? "HDR" : "SDR"} · ${w.gamut}`;
+    $("gpuFan").textContent = w.graphicsApi ?? "—";
+  }
+
+  // storage: what this app keeps on the device
+  if (w.storageUsed != null || w.boardBytes) {
+    // what the browser counts (files, caches) plus the board's own saves, which it leaves out
+    $("pDisk").textContent = fmtBytes((w.storageUsed ?? 0) + w.boardBytes);
+    const full = w.storageQuota ? ((w.storageUsed ?? 0) / w.storageQuota) * 100 : 0;
+    setPill($("pillDisk"), full >= 75, full >= 90);
+  }
+  if (open.storage) {
+    const LOCAL_LIMIT = 5 * 1024 * 1024; // what browsers allow a site's local storage
+    const rows: [string, number | null, number | null][] = [
+      ["Files and caches", w.storageUsed, w.storageQuota],
+      ["Board, threads and settings", w.boardBytes, LOCAL_LIMIT],
+    ];
+    $("disks").innerHTML = rows.map(([name, used, total]) => {
+      const pct = used != null && total ? (used / total) * 100 : 0;
+      const cls = pct >= 90 ? " crit" : pct >= 75 ? " warn" : "";
+      return `<div class="meter"><div class="row"><span class="nm">${esc(name)}</span>` +
+        `<span class="nu">${fmtBytes(used)} / ${fmtBytes(total)}</span></div>` +
+        `<div class="track"><div class="fill${cls}" style="width:${Math.max(pct, used ? 0.5 : 0).toFixed(1)}%"></div></div></div>`;
+    }).join("") +
+      `<div class="kv"><span class="k">Kept when space is short</span><span class="v">${w.persisted == null ? "—" : w.persisted ? "yes" : "no — the browser may clear it"}</span></div>`;
+  }
+
+  // uplink: the connection as the browser sees it, and the measured round trip
+  $("pNet").textContent = !w.online ? "offline" : w.rttMs != null ? `${w.rttMs} ms` : "—";
+  setPill($("pillNet"), !w.online || (w.rttMs ?? 0) >= 300, !w.online);
+  if (w.rttMs != null && t.at !== lastRttAt) {
+    lastRttAt = t.at;
+    sparkRx.push(w.rttMs);
+    sparkTx.push(0);
+    while (sparkRx.length > SPARK_N) { sparkRx.shift(); sparkTx.shift(); }
+  }
+  if (open.uplink) {
+    const c = w.connection;
+    const kind = c?.type && c.type !== "unknown" ? c.type.replace("wifi", "Wi-Fi").replace("cellular", "mobile data") : null;
+    $("ssid").textContent = !w.online ? "Offline" : kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : "Online";
+    // the browser's own speed estimate: a class ("4G" means fast, on any connection) and a rounded downlink
+    $("radio").textContent = c
+      ? [c.downlinkMbps != null ? `~${c.downlinkMbps} Mbps` : null, c.effective ? `${c.effective.toUpperCase()} class` : null].filter(Boolean).join(" · ") || "—"
+      : "not offered by this browser";
+    $("wifiSig").textContent = w.rttMs != null ? `${w.rttMs} ms` : "—";
+    $("rate").textContent = w.rttMs != null ? `${w.rttMs} ms` : "—";
+    $("gw").textContent = w.online ? "online" : "offline";
+    $("dns").textContent = c ? (c.saveData ? "on" : "off") : "—";
+    drawSpark();
+    if (t.anchors.length) {
+      $("anchors").textContent = t.anchors.map((a) => `${a.label === "This page's host" ? "Host" : a.label} ${a.ms == null ? "—" : `${a.ms}ms`}`).join(" · ");
+    }
+  }
+
+  // environment: how it knows where you are
+  const loc = w.location;
+  $("locBy").textContent = loc ? `Located by GPS · ±${loc.accuracyM} m`
+    : w.locationState === "asking" ? "Locating…"
+      : w.locationState === "denied" ? "Located by IP address · GPS not allowed"
+        : w.locationState === "unavailable" ? "Located by IP address · GPS unavailable"
+          : "Located by IP address";
+  ($("locateBtn") as HTMLButtonElement).hidden = !!loc || w.locationState === "asking";
+}
+let lastRttAt = 0;
+
 export function paintWorld(): void {
   if (W.uplink) {
     $("pubip").textContent = W.uplink.ip;
@@ -207,7 +319,9 @@ export function paintWorld(): void {
 export function paintHosts(): void {
   const wrap = $("hosts");
   if (!S.hosts.length) {
-    wrap.innerHTML = '<div class="host"><span class="tag">No sweep yet — press Sweep, or say “scan the network”.</span></div>';
+    wrap.innerHTML = SERVERLESS
+      ? '<div class="host"><span class="tag">Not swept yet — press Sweep to measure the round trip to every service I rely on.</span></div>'
+      : '<div class="host"><span class="tag">No sweep yet — press Sweep, or say “scan the network”.</span></div>';
     return;
   }
   wrap.innerHTML = S.hosts
@@ -215,7 +329,7 @@ export function paintHosts(): void {
       const cls = ["host", h.gateway ? "gw" : "", h.self ? "self" : "", hud.hoverIp === h.ip ? "lit" : ""]
         .filter(Boolean).join(" ");
       const label = [h.hostname, h.vendor].filter(Boolean).join(" · ") || h.mac || "unidentified";
-      const role = h.gateway ? "router · " : h.self ? "this console · " : "";
+      const role = SERVERLESS ? "" : h.gateway ? "router · " : h.self ? "this console · " : "";
       return (
         `<div class="${cls}" data-ip="${esc(h.ip)}">` +
         `<span class="ip">${esc(h.ip)}</span><span class="ms">${Math.round(h.rttMs)} ms</span>` +
@@ -260,7 +374,7 @@ function applyScan(next: ScanResponse): void {
   paintScanAge();
   if (sweepPending && wasRunning && !S.running) {
     sweepPending = false;
-    sys(`Sweep complete — ${S.hosts.length} hosts responding.`);
+    sys(SERVERLESS ? `Sweep complete — ${S.hosts.length} services answering.` : `Sweep complete — ${S.hosts.length} hosts responding.`);
   }
 }
 
@@ -270,7 +384,7 @@ function paintScanAge(): void {
 
 function openStream(): void {
   if (events || document.hidden) return;
-  events = new EventSource(apiUrl("/api/events"), { withCredentials: CROSS_ORIGIN });
+  events = new EventSource("/api/events");
   events.addEventListener("telemetry", (e) => applyTelemetry(JSON.parse((e as MessageEvent<string>).data) as TelemetryResponse));
   events.addEventListener("scan", (e) => applyScan(JSON.parse((e as MessageEvent<string>).data) as ScanResponse));
   events.addEventListener("world", (e) => applyWorld(JSON.parse((e as MessageEvent<string>).data) as WorldResponse));
@@ -284,6 +398,13 @@ function closeStream(): void {
 
 /** Start receiving. Paused while the tab is hidden, resumed the moment it is looked at. */
 export function startReadings(): void {
+  if (SERVERLESS) {
+    // No server: the browser measures, and pauses itself while out of sight.
+    applyScan(S);
+    startSensors(applyTelemetry, applyWorld, applyScan);
+    $("locateBtn").addEventListener("click", locate);
+    return;
+  }
   openStream();
   // A glance at another tab shouldn't drop the stream: close only after the
   // tab has been out of sight for a few seconds; reopen the moment it is back.
@@ -299,6 +420,7 @@ export function startReadings(): void {
 
 /** Start a sweep — only ever on request; its results arrive on the stream. */
 export async function pollScan(run = false): Promise<void> {
+  if (SERVERLESS) { if (run) await sweepServices(applyScan); return; }
   try {
     applyScan(await api.scan(run));
   } catch { /* ignored */ }

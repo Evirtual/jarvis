@@ -28,6 +28,7 @@ import "./confirm.js";
 import "./actions.js";
 import "./ask.js";
 import "./drawer.js";
+import { SERVERLESS } from "./server.js";
 
 /* ===================================================================== *
  * Boot
@@ -37,6 +38,13 @@ import "./drawer.js";
 // public/sw.js); browsers only offer it on https or localhost.
 if ("serviceWorker" in navigator && window.isSecureContext) {
   void navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => { /* not installable here; everything still works */ });
+}
+
+// Published as a web page: the browser measures, and says what it measures.
+if (SERVERLESS) {
+  document.documentElement.classList.add("serverless");
+  for (const el of document.querySelectorAll<HTMLElement>("[data-web]")) el.textContent = el.dataset.web!;
+  for (const el of document.querySelectorAll<HTMLElement>("[data-web-label]")) el.setAttribute("aria-label", el.dataset.webLabel!);
 }
 
 applyMode();
@@ -62,10 +70,10 @@ async function pollStatus(): Promise<void> {
     if (!announced) {
       announced = true;
       if (st.kokoro === "ready") sys("Neural voice online — Kokoro-82M, local.");
-      else sys("Neural voice unavailable — using browser voices.");
+      else sys(SERVERLESS ? "Speaking with this device's own voices." : "Neural voice unavailable — using browser voices.");
     }
   } catch {
-    sys("Console server unreachable.");
+    if (!SERVERLESS) sys("Console server unreachable.");
   }
 }
 

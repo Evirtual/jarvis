@@ -206,6 +206,61 @@ export interface TelemetryResponse {
   battery: BatteryReading | null;
   disks: DiskReading[];
   anchors: Anchor[];
+  /** Set when the console runs on its own in a browser: what the browser can measure instead. */
+  web?: WebReadings;
+}
+
+/** Where the device is, when the user has asked to be located. */
+export interface LocationReading {
+  lat: number;
+  lon: number;
+  accuracyM: number;
+  altitudeM: number | null;
+  speedMps: number | null;
+  heading: number | null;
+  at: number;
+}
+
+/**
+ * What a browser can genuinely measure of the device it runs on — the
+ * console's readings when it runs on its own, published as a web page. No
+ * browser can read CPU temperatures, a disk, or the devices on the network, so
+ * each of those instruments measures the nearest thing a browser can.
+ */
+export interface WebReadings {
+  /** "Windows · Brave", "iPhone · Safari". */
+  platform: string;
+  cores: number | null;
+  /** 0-100: how much slower a fixed task runs now than at its quickest. */
+  load: number | null;
+  /** The browser's own CPU pressure state, where it offers one. */
+  pressure: "nominal" | "fair" | "serious" | "critical" | null;
+  /** Approximate device memory, as the browser rounds it. */
+  deviceMemGb: number | null;
+  /** This page's JavaScript memory, where the browser reports it. */
+  heapUsed: number | null;
+  heapLimit: number | null;
+  /** The graphics adapter as the browser names it. */
+  renderer: string | null;
+  graphicsApi: string | null;
+  fps: number | null;
+  refreshHz: number | null;
+  screen: string;
+  hdr: boolean;
+  gamut: string;
+  /** Storage this app uses, and what the browser allows it. */
+  storageUsed: number | null;
+  storageQuota: number | null;
+  persisted: boolean | null;
+  /** The console's own saves — the board, its threads — in local storage. */
+  boardBytes: number;
+  online: boolean;
+  /** The browser's view of the connection, where it offers one (Chromium). */
+  connection: { type: string | null; effective: string | null; downlinkMbps: number | null; saveData: boolean } | null;
+  /** Measured round trip to the internet, the median of the anchors. */
+  rttMs: number | null;
+  location: LocationReading | null;
+  locationState: "off" | "asking" | "on" | "denied" | "unavailable";
 }
 
 /* ------------------------------------------------------------------ *

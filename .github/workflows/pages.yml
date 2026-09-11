@@ -1,16 +1,14 @@
 name: Pages
 
-# Publishes the console's client to GitHub Pages on every push to main. The
-# page is only the screen: everything live — readings, answers, the voice —
-# comes from the console server on your own machine, whose https address is
-# the JARVIS_SERVER repository variable (see README, "Running it somewhere
-# else"). Without it the page installs and opens, and reports the server
-# unreachable.
+# Publishes the console to GitHub Pages on every push to main — the serverless
+# build: no console server behind it. The browser talks to OpenAI, Anthropic
+# or Google directly with the key the user connects (kept in their own
+# browser), and measures what a browser can of the device it runs on.
 #
-# Repository variables:
-#   JARVIS_SERVER    https://jarvis.example.com   the console server, behind a tunnel
-#   JARVIS_SITE_URL  https://jarvis.example.com   set once a custom domain serves the page;
-#                                                 until then it is served under /<repo>/
+# Repository variable (optional):
+#   JARVIS_SITE_URL  https://jarvis.example.com  set once a custom domain serves
+#                                                the page; until then it is
+#                                                served under /<repo>/
 on:
   push:
     branches: [main]
@@ -38,17 +36,17 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Build the client
+      - name: Build the serverless client
         env:
           JARVIS_SITE_URL: ${{ vars.JARVIS_SITE_URL }}
-          VITE_JARVIS_SERVER: ${{ vars.JARVIS_SERVER }}
+          VITE_JARVIS_SERVERLESS: "1"
         run: |
           if [[ -n "$JARVIS_SITE_URL" ]]; then
             export JARVIS_BASE="/"
           else
             export JARVIS_BASE="/${{ github.event.repository.name }}/"
           fi
-          echo "base=$JARVIS_BASE server=${VITE_JARVIS_SERVER:-(none)}"
+          echo "base=$JARVIS_BASE"
           npm run build:client
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4

@@ -474,3 +474,31 @@ way. Nothing is resized unless a row is too wide; then only widths come down
 | Group resized wider/shorter/taller: threads follow the width; shorter scrolls inside; taller grows until nothing scrolls, then stops | Pass |
 | Closed drawer has no shadow | Pass |
 | Pages-style build (`JARVIS_BASE=/jarvis/`): assets, manifest and service worker all under `/jarvis/` | Pass |
+
+### 2026-09-12 — the web version, serverless
+
+The console now also runs as a web page with no server
+(`VITE_JARVIS_SERVERLESS=1`, published by `pages.yml`). The provider code moved
+to `src/shared/providers.ts` and is used by both; the browser's back end is
+`browser-core.ts`, its instruments `sensors.ts`.
+
+Fixes found while testing it: 53. the page root's class `web` collided with the
+context web's own `.web` (which starts invisible and fades in), so the whole
+web page faded to black a second after loading — renamed `serverless`.
+54. the load estimate read NaN under a browser's coarse clock — it now counts
+work done in a 20 ms window in a background worker instead of timing a short
+task. 55. a sample with no frames (a covered window) read as 0 fps in red — now
+skipped. 56. storage read 0 B because the browser's estimate leaves out local
+storage — the board's own saves are added.
+
+| Area | Result |
+| --- | --- |
+| Six readings in the browser: load %, fps against refresh, app storage, round trip, services answering, weather | Pass — 3% · 60 fps · 4 KB · 58 ms · 8 · ☁ 25° |
+| Perimeter: sweep of the services JARVIS relies on, plotted on the radar by round trip | Pass — 8 answering, Gemini 77 ms, ChatGPT 276 ms, Claude 328 ms |
+| Connections from the browser: an invalid placeholder key for each of ChatGPT, Claude and Gemini is refused by the provider itself with the usual message, and not stored | Pass (proves each provider accepts calls from the page) |
+| Spoken answers from browser readings: status, power, devices, uplink, weather | Pass |
+| Content Security Policy on the web build only; fonts, readings, sweep and providers all work under it, no violations | Pass |
+| PC version unchanged after the move: Kokoro, the connected OpenAI key, weather, CPU/GPU/Disk/LAN readings, CORS refusal | Pass |
+
+Not testable here: a real conversation from the web version (needs the user's
+own key pasted on their device), GPS on a phone, battery on Android.

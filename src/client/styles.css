@@ -1264,3 +1264,8 @@ body.m-compact .chatwin.reordering {
   box-shadow: 0 0 0 1px var(--ice), 0 18px 44px rgba(0,0,0,.55);
 }
 body.m-compact .cw-head { touch-action: none; }
+
+/* Published as a web page there is no server: the browser measures what it
+   can, and an instrument it can't read at all is not shown (see sensors.ts). */
+html.serverless [data-pc] { display: none !important; }
+html:not(.serverless) [data-web-only] { display: none !important; }

@@ -121,8 +121,10 @@ export class Hud {
     ctx.clearRect(0, 0, this.RS, this.RS);
 
     const T = this.telemetry;
-    const cpuLoad = T?.cpu ? T.cpu.avg / 100 : 0;
-    const gpuLoad = T?.gpu?.utilPct != null ? T.gpu.utilPct / 100 : 0;
+    // in a browser: its load estimate, and how far the frame rate falls short of the display
+    const w = T?.web;
+    const cpuLoad = T?.cpu ? T.cpu.avg / 100 : w?.load != null ? w.load / 100 : 0;
+    const gpuLoad = T?.gpu?.utilPct != null ? T.gpu.utilPct / 100 : w?.fps != null && w.refreshHz ? Math.max(0, 1 - w.fps / w.refreshHz) : 0;
     const boost = Math.max(0, this.pulse);
     const amp = Math.max(0, Math.min(1, this.amplitude));
 

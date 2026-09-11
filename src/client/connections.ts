@@ -11,6 +11,7 @@
 import type { ConnectionsResponse, ProviderId, ProviderView } from "../shared/types.js";
 import { api } from "./api.js";
 import { $, esc } from "./dom.js";
+import { SERVERLESS } from "./server.js";
 
 export class Connections {
   private root: HTMLElement;
@@ -136,7 +137,9 @@ export class Connections {
       this.hint.className = "hint";
       this.hint.innerHTML =
         `Answering through <b>${esc(this.activeName())}</b>. ` +
-        "Keys are stored on this machine only and are never sent to the browser.";
+        (SERVERLESS
+          ? "Keys are kept in this browser on this device, and go only to the service they belong to."
+          : "Keys are stored on this machine only and are never sent to the browser.");
     }
   }
 

@@ -38,11 +38,20 @@ export function contextBlock(): string {
   if (T?.gpu) bits.push(`GPU ${T.gpu.name} at ${T.gpu.utilPct}%, ${T.gpu.tempC}C, ${T.gpu.powerW}W`);
   if (T?.battery) bits.push(`battery ${T.battery.pct}% ${T.battery.onAc ? "on mains" : "on cell"}`);
   if (T?.net?.wifi) bits.push(`Wi-Fi ${T.net.wifi.ssid} at ${T.net.wifi.signal}% signal`);
-  if (S.hosts.length) bits.push(`${S.hosts.length} devices on ${S.subnet}`);
+  const w = T?.web;
+  if (w) {
+    // In a browser: what it can measure of the device, said for what it is.
+    bits.push(`device ${w.platform}${w.cores ? `, ${w.cores} cores` : ""}, load about ${w.load ?? 0}% (estimated)`);
+    if (w.fps != null) bits.push(`${w.fps} fps${w.refreshHz ? ` of ${w.refreshHz} Hz` : ""}`);
+    bits.push(w.online ? `online${w.rttMs != null ? `, ${w.rttMs} ms round trip` : ""}` : "offline");
+    if (w.location) bits.push(`GPS fix ±${w.location.accuracyM} m`);
+  }
+  if (S.hosts.length) bits.push(w ? `${S.hosts.length} services reachable` : `${S.hosts.length} devices on ${S.subnet}`);
   if (W.uplink) bits.push(`located ${W.uplink.city}, ${W.uplink.country} via ${W.uplink.isp}`);
   if (W.weather?.tempC != null) bits.push(`weather ${W.weather.text} ${Math.round(W.weather.tempC)}C`);
   if (!bits.length) return "";
-  return `[Live readings from the machine you run on, use only if relevant: ${bits.join("; ")}. Do not recite these unless asked.]`;
+  const where = w ? "the browser on the user's device you run in" : "the machine you run on";
+  return `[Live readings from ${where}, use only if relevant: ${bits.join("; ")}. Do not recite these unless asked.]`;
 }
 
 /**

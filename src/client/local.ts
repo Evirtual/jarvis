@@ -18,6 +18,7 @@ import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
 import { addMsg, jarvis } from "./say.js";
 import { S, T, W } from "./readings.js";
+import { SERVERLESS } from "./server.js";
 
 /* ===================================================================== *
  * Local commands — answered from live readings, never invented
@@ -29,12 +30,23 @@ export const partOfDay = (): string => {
 };
 
 const HELP = [
-  "status — CPU, memory, GPU, thermals, right now",
-  "power — battery, mains, GPU draw",
-  "scan — sweep the local network (only when you ask)",
-  "devices — what the last sweep found",
-  "uplink — Wi-Fi, gateway, public IP, carrier, latency",
-  "weather — real conditions where this machine is",
+  ...(SERVERLESS
+    ? [
+        "status — this device: load, memory, frame rate, storage, right now",
+        "power — battery and charging, where the browser shares them",
+        "scan — measure the round trip to every service I rely on",
+        "devices — what the last sweep found",
+        "uplink — connection, public IP, provider, latency",
+        "weather — real conditions where you are (Environment → Use GPS for more precision)",
+      ]
+    : [
+        "status — CPU, memory, GPU, thermals, right now",
+        "power — battery, mains, GPU draw",
+        "scan — sweep the local network (only when you ask)",
+        "devices — what the last sweep found",
+        "uplink — Wi-Fi, gateway, public IP, carrier, latency",
+        "weather — real conditions where this machine is",
+      ]),
   "time · date — the obvious",
   "Operate the console in plain words, alone or mid-sentence:",
   "  new thread … · branch off … (a subthread) · close this chat (put away) · restore … · go back to …",
@@ -71,6 +83,15 @@ export function localCommand(raw: string): boolean {
   }
   if (short && /\b(?:status|diagnostics?|systems? check|how are (?:you|the systems))\b/.test(q)) {
     hud.flash();
+    if (T?.web) {
+      const w = T.web;
+      const bits = [`This device is at ${w.load ?? 0} percent load${w.cores ? ` across ${w.cores} cores` : ""}`];
+      if (w.fps != null) bits.push(`holding ${w.fps} frames a second${w.refreshHz ? ` on a ${w.refreshHz} hertz display` : ""}`);
+      const kept = (w.storageUsed ?? 0) + w.boardBytes;
+      bits.push(`and I keep ${kept < 1e6 ? "under a megabyte" : `${Math.round(kept / 1e6)} megabytes`} on it`);
+      jarvis(`${bits.join(", ")}. ${(w.load ?? 0) > 80 ? "Rather busy, sir." : "All well within tolerance, sir."}`);
+      return true;
+    }
     if (!T?.cpu || !T.mem) { jarvis("Telemetry hasn't attached yet, sir. Give me a moment."); return true; }
     const bits = [
       `Processor is at ${T.cpu.avg} percent across ${T.cpu.cores.length} cores`,
@@ -86,12 +107,18 @@ export function localCommand(raw: string): boolean {
     hud.flash();
     let l = T?.battery
       ? `Battery is at ${T.battery.pct} percent, ${T.battery.onAc ? "running on mains" : "on the cell"}`
-      : "No battery here, sir — running on mains";
+      : T?.web ? "This browser doesn't share the battery with me, sir" : "No battery here, sir — running on mains";
     if (T?.gpu) l += `. The graphics card is at ${T.gpu.tempC} degrees drawing ${T.gpu.powerW} watts`;
     jarvis(`${l}.`);
     return true;
   }
   if (short && /\b(?:devices|hosts|neighbou?rs|(?:who|what)(?:'s| is) on (?:the|my) (?:network|wifi))\b/.test(q)) {
+    if (SERVERLESS) {
+      if (!S.hosts.length) { jarvis("A browser can't see the devices on your network, sir — but say scan and I'll measure the round trip to every service I rely on."); return true; }
+      const far = S.hosts.filter((h) => !h.gateway).slice(0, 4).map((h) => `${h.hostname} in ${Math.round(h.rttMs)} milliseconds`);
+      jarvis(`${S.hosts.length} services answering, sir — ${far.join(", ")}.`);
+      return true;
+    }
     if (!S.hosts.length) { jarvis("I haven't swept the network, sir — I only do that when asked. Say scan and I'll have a look."); return true; }
     const named = S.hosts.filter((h) => h.vendor && h.vendor !== "Randomised MAC");
     jarvis(
@@ -110,10 +137,18 @@ export function localCommand(raw: string): boolean {
   if (short && /\b(?:uplink|wi-?fi|my ip|ip address|isp|am i online|connection status|internet (?:status|connection|speed))\b/.test(q)) {
     const l: string[] = [];
     if (T?.net?.wifi) l.push(`Connected to ${T.net.wifi.ssid} on ${T.net.wifi.radio}, signal ${T.net.wifi.signal} percent`);
+    const c = T?.web?.connection;
+    if (T?.web && !T.web.online) l.push("We're offline");
+    else if (c?.type && c.type !== "unknown") {
+      const kind = c.type === "wifi" ? "Wi-Fi" : c.type === "cellular" ? "mobile data" : c.type;
+      l.push(`On ${kind}${c.effective ? `, ${c.effective.toUpperCase()} class` : ""}`);
+    }
     if (W.uplink) l.push(`public address ${W.uplink.ip} via ${W.uplink.isp} in ${W.uplink.city}`);
     const cf = T?.anchors.find((a) => /cloud/i.test(a.label));
-    if (cf?.ms != null) l.push(`round trip to the wider internet is ${cf.ms} milliseconds`);
-    jarvis(l.length ? `${l.join(", ")}, sir.` : "I've no uplink readings yet, sir.");
+    const rtt = T?.web ? T.web.rttMs : cf?.ms;
+    if (rtt != null) l.push(`round trip to the wider internet is ${rtt} milliseconds`);
+    const said = l.join(", ");
+    jarvis(l.length ? `${said.charAt(0).toUpperCase()}${said.slice(1)}, sir.` : "I've no uplink readings yet, sir.");
     return true;
   }
   // Only the weather *here, now* is local; anywhere else, or a forecast, is a

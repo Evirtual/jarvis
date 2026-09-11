@@ -1,4 +1,7 @@
-/** Typed wrappers over the console's own API. */
+/**
+ * Typed wrappers over the console's own API — the server's on the PC; in the
+ * published web page, the same calls answered in the browser (browser-core.ts).
+ */
 
 import type {
   AskEvent,
@@ -12,10 +15,11 @@ import type {
   TelemetryResponse,
   WorldResponse,
 } from "../shared/types.js";
-import { CREDENTIALS, apiUrl } from "./server.js";
+import { browserCore } from "./browser-core.js";
+import { SERVERLESS } from "./server.js";
 
 async function getJson<T>(url: string): Promise<T> {
-  const r = await fetch(apiUrl(url), { credentials: CREDENTIALS });
+  const r = await fetch(url);
   if (!r.ok) throw new Error(`${url} -> ${r.status}`);
   return (await r.json()) as T;
 }
@@ -24,9 +28,8 @@ async function getJson<T>(url: string): Promise<T> {
 const CONSOLE = { "x-jarvis": "1" } as const;
 
 async function postJson<T>(url: string, body: unknown, method = "POST"): Promise<T> {
-  const r = await fetch(apiUrl(url), {
+  const r = await fetch(url, {
     method,
-    credentials: CREDENTIALS,
     headers: { "content-type": "application/json", ...CONSOLE },
     body: body === undefined ? null : JSON.stringify(body),
   });
@@ -47,7 +50,7 @@ async function postJson<T>(url: string, body: unknown, method = "POST"): Promise
   return parsed as T;
 }
 
-export const api = {
+const serverApi = {
   status: () => getJson<StatusResponse>("/api/status"),
   telemetry: () => getJson<TelemetryResponse>("/api/telemetry"),
   world: () => getJson<WorldResponse>("/api/world"),
@@ -66,9 +69,8 @@ export const api = {
 
   /** Recorded speech in, text out — transcribed server-side. */
   transcribe: async (audio: Blob): Promise<string> => {
-    const r = await fetch(apiUrl("/api/transcribe"), {
+    const r = await fetch("/api/transcribe", {
       method: "POST",
-      credentials: CREDENTIALS,
       headers: { "content-type": audio.type || "audio/webm", ...CONSOLE },
       body: audio,
     });
@@ -78,9 +80,8 @@ export const api = {
   },
 
   speak: async (body: SpeakRequest): Promise<Blob> => {
-    const r = await fetch(apiUrl("/api/speak"), {
+    const r = await fetch("/api/speak", {
       method: "POST",
-      credentials: CREDENTIALS,
       headers: { "content-type": "application/json", ...CONSOLE },
       body: JSON.stringify(body),
     });
@@ -98,9 +99,8 @@ export const api = {
     onStatus: (s: AskStatus) => void,
     signal?: AbortSignal,
   ): Promise<string> => {
-    const r = await fetch(apiUrl("/api/ask"), {
+    const r = await fetch("/api/ask", {
       method: "POST",
-      credentials: CREDENTIALS,
       headers: { "content-type": "application/json", ...CONSOLE },
       body: JSON.stringify(body),
       ...(signal ? { signal } : {}),
@@ -155,3 +155,5 @@ export const api = {
   },
 
 };
+
+export const api = SERVERLESS ? { ...serverApi, ...browserCore } : serverApi;

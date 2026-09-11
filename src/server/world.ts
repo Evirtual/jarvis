@@ -15,6 +15,7 @@ import { execFile } from "node:child_process";
 import { setDefaultResultOrder } from "node:dns";
 
 import type { Anchor, WorldResponse } from "../shared/types.js";
+import { weatherAt } from "../shared/weather.js";
 
 // Some networks resolve these hosts to an unreachable IPv6 address first, which
 // surfaces as a 10 s connect timeout. Prefer A records.
@@ -47,25 +48,6 @@ interface GeoResponse {
   lon: number;
   timezone: string;
 }
-
-interface MeteoResponse {
-  current?: Record<string, number>;
-  daily?: { sunrise?: string[]; sunset?: string[] };
-}
-
-/** WMO weather codes to what a butler would actually call it. */
-const WMO: Record<number, [string, string]> = {
-  0: ["Clear", "☀"], 1: ["Mainly clear", "☀"], 2: ["Partly cloudy", "⛅"], 3: ["Overcast", "☁"],
-  45: ["Fog", "🌫"], 48: ["Rime fog", "🌫"],
-  51: ["Light drizzle", "🌦"], 53: ["Drizzle", "🌦"], 55: ["Heavy drizzle", "🌦"],
-  56: ["Freezing drizzle", "🌧"], 57: ["Freezing drizzle", "🌧"],
-  61: ["Light rain", "🌦"], 63: ["Rain", "🌧"], 65: ["Heavy rain", "🌧"],
-  66: ["Freezing rain", "🌧"], 67: ["Freezing rain", "🌧"],
-  71: ["Light snow", "🌨"], 73: ["Snow", "🌨"], 75: ["Heavy snow", "🌨"], 77: ["Snow grains", "🌨"],
-  80: ["Rain showers", "🌦"], 81: ["Rain showers", "🌧"], 82: ["Violent showers", "⛈"],
-  85: ["Snow showers", "🌨"], 86: ["Snow showers", "🌨"],
-  95: ["Thunderstorm", "⛈"], 96: ["Thunderstorm, hail", "⛈"], 99: ["Thunderstorm, hail", "⛈"],
-};
 
 export const world: WorldResponse & { anchors: Anchor[] } = {
   uplink: null,
@@ -117,28 +99,7 @@ export async function refreshWorld(): Promise<WorldResponse> {
       timezone: geo.timezone,
     };
 
-    const w = await getJson<MeteoResponse>(
-      "https://api.open-meteo.com/v1/forecast" +
-        `?latitude=${geo.lat}&longitude=${geo.lon}` +
-        "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code," +
-        "wind_speed_10m,surface_pressure,is_day" +
-        "&daily=sunrise,sunset&timezone=auto",
-    );
-
-    const c = w.current ?? {};
-    const [text, icon] = WMO[c.weather_code ?? -1] ?? ["Unknown", "•"];
-    world.weather = {
-      tempC: c.temperature_2m ?? null,
-      feelsC: c.apparent_temperature ?? null,
-      humidity: c.relative_humidity_2m ?? null,
-      windKph: c.wind_speed_10m ?? null,
-      pressure: c.surface_pressure ?? null,
-      isDay: c.is_day === 1,
-      text,
-      icon,
-      sunrise: w.daily?.sunrise?.[0] ?? null,
-      sunset: w.daily?.sunset?.[0] ?? null,
-    };
+    world.weather = await weatherAt(geo.lat, geo.lon);
 
     world.error = null;
     world.at = Date.now();

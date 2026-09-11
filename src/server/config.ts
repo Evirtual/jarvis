@@ -36,8 +36,6 @@ interface StoredConfig {
   providers: Partial<Record<ProviderId, StoredProvider>>;
   active: ProviderId | null;
   voice?: string;
-  /** One other origin the console's page may be served from (GitHub Pages, say). */
-  allowOrigin?: string;
 }
 
 let cache: StoredConfig = { providers: {}, active: null };
@@ -63,7 +61,6 @@ export function loadConfig(): StoredConfig {
       providers,
       active: isProviderId(parsed.active) ? parsed.active : null,
       ...(typeof parsed.voice === "string" ? { voice: parsed.voice } : {}),
-      ...(typeof parsed.allowOrigin === "string" ? { allowOrigin: parsed.allowOrigin } : {}),
     };
   } catch {
     cache = { providers: {}, active: null };
@@ -136,22 +133,6 @@ export function getVoice(): string | null {
 export async function setVoice(voice: string): Promise<void> {
   cache.voice = voice;
   await persist();
-}
-
-/**
- * The one other origin allowed to call the API — the page published on GitHub
- * Pages or a domain of its own — from config.json's `allowOrigin` or the
- * JARVIS_ALLOW_ORIGIN environment variable. Null means the page is only ever
- * served by this server.
- */
-export function allowedOrigin(): string | null {
-  const raw = cache.allowOrigin ?? process.env.JARVIS_ALLOW_ORIGIN ?? "";
-  try {
-    const u = new URL(raw);
-    return u.protocol === "https:" ? u.origin : null;
-  } catch {
-    return null;
-  }
 }
 
 export function envVarName(id: ProviderId): string {

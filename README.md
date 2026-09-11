@@ -9,7 +9,9 @@ simulated** — real CPU cores, real GPU thermals, real devices on your network,
 real weather where you actually are. It speaks with a neural voice generated on
 your own machine and answers through whichever AI service you connect.
 
-Runs on a desktop and on a phone.
+Runs on a desktop and on a phone. Or skip the install: the
+**[web version](https://evirtual.github.io/jarvis/)** runs entirely in the
+browser, with no server — see [Two ways to run it](#two-ways-to-run-it).
 
 ## Quick start
 
@@ -32,7 +34,7 @@ The console is installable on a desktop or a phone — its own icon, its own
 window, no browser bars. In Chrome, Edge or Brave use **Install** in the address
 bar (or the menu); on an iPhone, **Share → Add to Home Screen**. Browsers only
 offer this on a secure origin: `localhost` on the machine itself, or `https`
-anywhere else (see [Running it somewhere else](#running-it-somewhere-else)). The
+anywhere else — the published web page is (see [Two ways to run it](#two-ways-to-run-it)). The
 installed app caches nothing — every reading and answer is live.
 
 ## The deck, and the board
@@ -80,9 +82,14 @@ The board above him:
   (moving it into a *different* group does reload the player).
 - **Tidy up.** After a smaller screen or a busy session has left windows piled
   on each other, **Tidy up** in the Threads panel — or "tidy up the board" —
-  packs every window and group from the top-left, clear of each other, of open
-  panels and of JARVIS, keeping their sizes. (On a phone the list is already
-  tidy; drag to reorder instead.)
+  folds every thread to its title bar and stacks everything in one column down
+  the middle: the biggest (a group, a long conversation) in the middle, the rest
+  above and below it in turn, clear of JARVIS. Only when one column is too tall
+  for the screen do two or three go to a row, each row centred the same way.
+  Nothing is resized unless a row is too wide for the screen; then only widths
+  come down, and the next tidy on a bigger screen gives them back. The
+  instrument panels float over the board and are left where they are. (On a
+  phone the list is already tidy; drag to reorder instead.)
 - **Whatever you touch is on top.** Windows, groups and panels share one stacking
   order: the one you clicked (or asked for) comes above everything else, the one
   before it sits just under it, and so on. The order is remembered.
@@ -92,8 +99,9 @@ The board above him:
   bubble dissolves where it was — a group of one isn't a group. Drop a window onto
   JARVIS to pull it out of its group.
 - **Bubbles** can be moved by their name, resized from any edge or corner, and
-  folded to a single orb. Windows inside a bubble grow from their right and
-  bottom edges, since the bubble decides where they sit. Deleting a bubble takes its threads with it
+  folded to a single orb. A thread inside a bubble isn't resized on its own:
+  it takes the bubble's width, and shares its height — growing with it until its
+  whole conversation shows, and scrolling inside itself when the bubble is shorter. Deleting a bubble takes its threads with it
   (after asking).
 - **Windows stay as you leave them.** The first click on a window only brings it
   forward; clicking the title bar of the window you're in folds it to a bar.
@@ -308,9 +316,7 @@ The server listens on the machine's interfaces so a phone on your network can us
 it, but it is deliberately unfriendly to anything else:
 
 - **No CORS.** The console is served from the same origin; in dev, Vite proxies
-  `/api`, so the browser never makes a cross-origin call. The one exception is
-  an origin you name yourself, for the page published elsewhere (see
-  [The page on GitHub Pages](#the-page-on-github-pages)).
+  `/api`, so the browser never makes a cross-origin call.
 - Anything that changes state must carry the console's own header, which a page
   on another site cannot set without a preflight that is never granted.
 - Keys never reach the browser or a model; a key pasted into the chat is
@@ -318,45 +324,47 @@ it, but it is deliberately unfriendly to anything else:
 - Replies are always rendered as text. Only `https` links become clickable, and
   videos are embedded only from YouTube and Vimeo, by validated video ID.
 
-## Running it somewhere else
+## Two ways to run it
 
-JARVIS is not a static site: the console needs its own server, on the machine
-whose readings it shows — that server reads the CPU, GPU and disks, sweeps the
-local network, runs the voice and holds the API keys. A copy on GitHub Pages
-alone is a screen with nothing behind it: it opens, installs, and reports the
-server unreachable.
+**On your PC**, with its own server (`npm run serve`): the readings are the
+machine's own — CPU per core, GPU load and temperature, disks, the devices on
+your network — the neural voice runs locally, and API keys stay in
+`config.json`, never reaching the browser.
 
-To use it away from home (and install it on a phone there), the server has to
-be reachable over https. Put it behind a tunnel — for example a Cloudflare
-Tunnel from `jarvis.<your-domain>` to `http://localhost:7823` — **and** put an
-access check in front of it (Cloudflare Access, or similar). The server is built
-to refuse other websites, not other people: anyone who can open the address can
-use your API credit, see your machine's readings and sweep your network. Never
-expose it without that check. Once the tunnel is up, the simplest thing is to
-open the console at that address: the server serves the page itself, and nothing
-below is needed.
+**As a web page**, with no server at all: [evirtual.github.io/jarvis](https://evirtual.github.io/jarvis/),
+published by [`pages.yml`](.github/workflows/pages.yml) on every push to
+`main`. Open it in any browser, or install it on a phone (Share → Add to
+Home Screen on an iPhone; Install in Chrome, Edge or Brave). Everything else is
+the same console — the board, threads, groups, tidy, the web, commands, voice
+input — and it talks to the same services with the same code.
 
-### The page on GitHub Pages
+What differs is where the work happens:
 
-The console's page can also be published on its own — [`pages.yml`](.github/workflows/pages.yml)
-builds the client and deploys it on every push to `main` — and pointed at the
-server at home. Three settings tie the two together:
+- **Keys** are pasted into Configuration → Connections as on the PC, but kept in
+  that browser on that device, and sent only to the service they belong to
+  (OpenAI, Anthropic or Google), which all accept calls straight from a web page.
+  The published page carries a Content Security Policy that lets it talk to
+  those services and nothing else. Use a key with a spending limit, and
+  **Disconnect** removes it from the device.
+- **Readings** are what a browser can genuinely measure of the device it runs
+  on — six, like the PC:
 
-- **`JARVIS_SERVER`** (a repository *variable*, Settings → Secrets and
-  variables → Actions → Variables): the server's https address, e.g.
-  `https://jarvis.example.com`. The page is built to call it. Without it the
-  page calls its own origin, where there is no server.
-- **`allowOrigin`** in the server's `config.json` (or the `JARVIS_ALLOW_ORIGIN`
-  environment variable): the page's origin, e.g. `https://evirtual.github.io`.
-  This is the one other site the server answers; every other origin is still
-  refused. Restart the server after changing it.
-- **`JARVIS_SITE_URL`** (repository variable): set it once a custom domain
-  serves the page, so it is built for `/` rather than `/<repo>/`; then add the
-  domain under Settings → Pages.
+  | Reading | On the PC | As a web page |
+  | --- | --- | --- |
+  | Compute | CPU per core | how much slower a fixed task runs than at its quickest (a background worker, 20 ms every 2 s), cores, app memory |
+  | Graphics | GPU load, temperature, power | the adapter the browser names, frame rate against the display's refresh rate, screen, colour |
+  | Storage | disks | what the app keeps on the device, and what the browser allows it |
+  | Perimeter | devices on your network | the services JARVIS relies on — ChatGPT, Claude, Gemini, the weather, this page's host — placed on the radar by measured round trip |
+  | Uplink | Wi-Fi, gateway, throughput | the connection as the browser reports it, measured round trips, public IP and provider (GeoJS) |
+  | Environment | weather where the IP says | the same, or where GPS says once you press **Use GPS** |
 
-Calls from the page carry the browser's cookies, so an access check in front
-of the tunnel still applies — allow the page's origin (with credentials) in
-that check's CORS settings, or the browser will refuse the calls.
+  The battery ring shows the real battery where the browser shares it (not on
+  iPhone). Readings pause while the page is out of sight.
+- **Voice**: JARVIS speaks with the device's own voices for now.
+
+A custom domain: set the repository variable `JARVIS_SITE_URL` (so the page
+is built for `/` rather than `/jarvis/`) and add the domain under
+Settings → Pages.
 
 ## Development
 
@@ -386,7 +394,10 @@ the types are broken.
 | `src/client/main.ts` | Boot only: imports the modules below in order and starts them |
 | `src/client/state.ts` | The singletons every module shares (stage, workspace, panels, voice, connections) |
 | `src/client/deck.ts` | The deck and title row: readings, More sheets, the phone/desktop switch |
-| `src/client/readings.ts` | Painting the live readings, and receiving them over one pushed stream |
+| `src/client/readings.ts` | Painting the live readings, and receiving them — over one pushed stream on the PC, from the browser's own sensors on the web |
+| `src/client/server.ts` | Which of the two it is: the PC with its server, or the web page on its own (`VITE_JARVIS_SERVERLESS`) |
+| `src/client/browser-core.ts` | The web version's back end: keys kept on the device, the same connections, asking and transcription the server offers |
+| `src/client/sensors.ts` | The web version's instruments: what a browser can genuinely measure of its device |
 | `src/client/say.ts` | How JARVIS speaks to you: notices, lines in a window, his status word, busy |
 | `src/client/ask.ts` | The command line, the queue, what the core is told, the streamed answer |
 | `src/client/actions.ts` | Carrying out every action, by you or by the core's directives |
@@ -403,11 +414,14 @@ the types are broken.
 | `src/client/icons.ts` | Every drawn icon, once: title-bar buttons and the instrument pictures |
 | `src/client/address.ts` | Sir or ma'am, and turning the console's own lines round to match |
 | `src/client/styles.css` | Ends with the two shared materials, `.glass` (every box) and `.veil` (behind anything modal); use the class rather than restyling an element |
-| `src/server/` | HTTP, credential store, provider adapters, telemetry, scan, world, Kokoro |
+| `src/shared/providers.ts` | The three reasoning cores behind one interface — used by the server, and by the browser in the web version |
+| `src/shared/weather.ts` | The weather from open-meteo, for both |
+| `src/server/` | HTTP, credential store, validation cache, telemetry, scan, world, Kokoro |
 | `tests/` | Node's test runner over the pure modules |
 | `src/client/public/` | The logo (`icon.svg`, JARVIS's core simplified), app icons, manifest, the do-nothing service worker that makes it installable, robots and sitemap |
 | `scripts/icons.mjs` | Renders every icon size and the social preview image from `icon.svg` — run it after changing the logo |
 | `.github/workflows/ci.yml` | Typecheck, tests and build on every push and pull request |
+| `.github/workflows/pages.yml` | Publishes the web version to GitHub Pages on every push to `main` |
 | `docs/QA.md` | The manual test plan: every feature, its steps and edge cases, and a log of each run |
 | `docs/PLAN-code-mode.md` | The plan for the next big feature: a code mode driven by the Claude Agent SDK or the Codex SDK |
 

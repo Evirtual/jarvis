@@ -31,7 +31,6 @@ import { PROVIDER_IDS } from "../shared/types.js";
 import {
   ROOT,
   clearKey,
-  allowedOrigin,
   getActive,
   getModel,
   getVoice,
@@ -50,6 +49,7 @@ import {
   personaFor,
   cachedValidation,
   humanise,
+  prepareTurns,
   validate,
 } from "./providers.js";
 import { DEFAULT_VOICE, DTYPE, hasVoice, kokoro, loadKokoro, synthesize, voices } from "./kokoro.js";
@@ -214,27 +214,11 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   const url = new URL(req.url ?? "/", "http://localhost");
   const p = url.pathname;
 
-  // No CORS, with one exception: the console is served from this origin (in
-  // dev Vite proxies /api), so the browser never makes a cross-origin call —
-  // unless the page is published elsewhere, in which case that one origin is
-  // named in config.json and answered with its cookies (an access check in
-  // front of the tunnel needs them). Anything that changes state must also
-  // come from the console itself — any other site can't forge the header
-  // without a preflight it is never granted.
-  const origin = req.headers.origin;
-  const allowed = allowedOrigin();
-  if (origin && allowed && origin === allowed) {
-    res.setHeader("access-control-allow-origin", origin);
-    res.setHeader("access-control-allow-credentials", "true");
-    res.setHeader("vary", "origin");
-    if (req.method === "OPTIONS") {
-      res.setHeader("access-control-allow-methods", "GET, POST, DELETE");
-      res.setHeader("access-control-allow-headers", "content-type, x-jarvis");
-      res.setHeader("access-control-max-age", "86400");
-      res.writeHead(204).end();
-      return;
-    }
-  } else if (req.method === "OPTIONS") {
+  // No CORS: the console is served from this origin, and in dev Vite proxies
+  // /api, so the browser never makes a cross-origin call. Anything that
+  // changes state must also come from the console itself — a page on another
+  // site can't forge the header without a preflight we never grant.
+  if (req.method === "OPTIONS") {
     res.writeHead(403).end();
     return;
   }
@@ -479,30 +463,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       return;
     }
 
-    const turns: Turn[] = (Array.isArray(body.turns) ? body.turns : [])
-      .slice(-12)
-      .map((t) => ({
-        role: t.role === "assistant" ? ("assistant" as const) : ("user" as const),
-        content: String(t.content ?? "").slice(0, 4000),
-      }))
-      .filter((t) => t.content.length > 0)
-      // Console replies are kept in history too, so two assistant turns can sit
-      // side by side. Providers want strict alternation starting with the user.
-      .reduce<Turn[]>((acc, t) => {
-        const prev = acc[acc.length - 1];
-        if (prev && prev.role === t.role) prev.content = `${prev.content}\n\n${t.content}`;
-        else acc.push({ ...t });
-        return acc;
-      }, []);
-    while (turns[0]?.role === "assistant") turns.shift();
-    if (!turns.length || turns[turns.length - 1]!.role !== "user") {
+    // Live readings ride along with the newest question only, never the history.
+    const turns = prepareTurns(body.turns, body.context);
+    if (!turns) {
       json(res, 400, { error: "no_turns" });
       return;
     }
-
-    // Live readings ride along with the newest question only, never the history.
-    const last = turns[turns.length - 1]!;
-    if (body.context) last.content = `${last.content}\n\n${body.context}`;
 
     const ac = new AbortController();
     req.on("close", () => ac.abort());
@@ -556,7 +522,6 @@ function fromConsole(req: http.IncomingMessage): boolean {
   if (req.headers["x-jarvis"] !== "1") return false;
   const origin = req.headers.origin;
   if (!origin) return true; // same-origin fetches may omit it; the header already proves intent
-  if (origin === allowedOrigin()) return true; // the page, published elsewhere
   try {
     const o = new URL(origin);
     const host = String(req.headers.host ?? "").split(":")[0];
