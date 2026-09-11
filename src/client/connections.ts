@@ -188,7 +188,7 @@ export class Connections {
         (p.id === "openrouter"
           ? // one click: sign in (or make a free account) at OpenRouter and come straight back
             `<button class="btn primary wide" data-act="oauth" data-id="openrouter">Connect with OpenRouter</button>` +
-            `<p class="hint">Opens OpenRouter in a new tab to sign in — or make a free account, no card. Approve, and this card connects by itself. Or paste a key:</p>`
+            `<p class="hint">Opens OpenRouter to sign in — or make a free account, no card. Approve, and this card connects by itself. Or paste a key:</p>`
           : "") +
         `<ol class="steps"${p.id === "openrouter" ? " hidden" : ""}>` +
         `<li>Open <a href="${p.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${p.free ? " and sign in with a Google account" : ""}.</li>` +

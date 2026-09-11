@@ -32,9 +32,17 @@ export async function startOpenRouter(): Promise<void> {
   };
   const back = `${location.origin}${location.pathname}`;
   const url = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(back)}&code_challenge=${challenge}&code_challenge_method=${method}`;
-  // A new tab keeps this console as it is; if the browser won't open one, go in this tab instead.
-  remember(true);
-  if (!window.open(url, "_blank")) { remember(false); location.href = url; }
+  // In a browser, a new tab keeps this console as it is. Installed as an app,
+  // sign in within the app itself: a new tab would open in the ordinary
+  // browser, which — on an iPhone — doesn't share the app's storage, so the key
+  // would never reach it. And if a new tab can't be opened, this tab it is.
+  const installed = matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  if (!installed) {
+    remember(true);
+    if (window.open(url, "_blank")) return;
+  }
+  remember(false);
+  location.href = url;
 }
 
 /** The original tab: told when the sign-in tab has connected. */
