@@ -31,6 +31,9 @@ panels.onChange = (): void => {
   // a panel's body is painted only while it is open — fill it the moment it opens
   paintTelemetry();
 };
+// …and once now: panels left open last time are already open, and nothing has
+// told the radar (or the readings' highlights) yet.
+panels.onChange();
 
 /* ---------------------------------------------------------------------
  * The deck is always one row. The readings are split either side of JARVIS —

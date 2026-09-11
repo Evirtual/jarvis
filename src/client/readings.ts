@@ -400,6 +400,8 @@ function closeStream(): void {
 export function startReadings(): void {
   if (SERVERLESS) {
     // No server: the browser measures, and pauses itself while out of sight.
+    // the services it sweeps are across the internet: a radar scaled to match
+    hud.scale = { maxMs: 1000, rings: [10, 50, 200, 1000] };
     applyScan(S);
     startSensors(applyTelemetry, applyWorld, applyScan);
     $("locateBtn").addEventListener("click", locate);

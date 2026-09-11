@@ -36,6 +36,12 @@ export class Hud {
   onHover: (() => void) | null = null;
   /** Whether the radar can be seen at all — the Perimeter panel is open. Nothing is drawn otherwise. */
   visible = false;
+  /**
+   * The radar's scale: the round trip at its rim, and the rings marked on it.
+   * Devices on a home network answer in 1–100 ms; the services the web
+   * version sweeps, across the internet, in 10 ms to a second.
+   */
+  scale: { maxMs: number; rings: number[] } = { maxMs: 100, rings: [1, 5, 20, 100] };
 
   /** Live audio level, 0-1 — the globe breathes with this, not with a timer. */
   amplitude = 0;
@@ -104,7 +110,7 @@ export class Hud {
     this.plotted = hosts.map((h) => ({
       host: h,
       a: h.gateway ? -Math.PI / 2 : bearing(h.ip),
-      r: h.gateway ? 20 : radiusFor(h.rttMs, 104),
+      r: h.gateway ? 20 : radiusFor(h.rttMs, 104, this.scale.maxMs),
       lit: 0,
       x: 0,
       y: 0,
@@ -247,7 +253,9 @@ export class Hud {
 
     ctx.strokeStyle = "#12313f";
     ctx.lineWidth = 1;
-    for (const rr of [26, 52, 78, 104]) {
+    // the rings sit where a host that far away would be plotted, and the rim
+    const rings = this.scale.rings.map((ms) => ({ ms, r: radiusFor(ms, R, this.scale.maxMs) }));
+    for (const rr of [...rings.map((x) => x.r), R]) {
       ctx.beginPath();
       ctx.arc(cx, cy, rr, 0, Math.PI * 2);
       ctx.stroke();
@@ -262,8 +270,8 @@ export class Hud {
     // Ring labels are real latency bands, so the distances mean something.
     ctx.font = "8px 'IBM Plex Mono', monospace";
     ctx.fillStyle = "#1f5164";
-    for (const [r, label] of [[26, "1ms"], [52, "5ms"], [78, "20ms"], [104, "100ms"]] as const) {
-      ctx.fillText(label, cx + 3, cy - r + 9);
+    for (const { ms, r } of rings) {
+      ctx.fillText(ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`, cx + 3, cy - r + 9);
     }
 
     if (!reduceMotion) this.sweep += 0.017;
@@ -314,7 +322,8 @@ export class Hud {
       if (hover) {
         ctx.font = "9px 'IBM Plex Mono', monospace";
         ctx.fillStyle = "#d6f2fa";
-        ctx.fillText(`${p.host.ip.split(".").pop()} · ${Math.round(p.host.rttMs)}ms`, p.x + 7, p.y - 5);
+        const name = /^d+.d+.d+.d+$/.test(p.host.ip) ? p.host.ip.split(".").pop() : (p.host.hostname ?? p.host.ip);
+        ctx.fillText(`${name} · ${Math.round(p.host.rttMs)}ms`, p.x + 7, p.y - 5);
       }
     }
 
@@ -325,13 +334,22 @@ export class Hud {
   }
 }
 
+/**
+ * A host's bearing: fixed for its address, so it keeps its place between
+ * sweeps, and well mixed (FNV-1a, then a finaliser), so neighbouring
+ * addresses — 192.168.0.3, .22, .23 — land all round the dish rather than in
+ * one corner of it.
+ */
 function bearing(ip: string): number {
-  let h = 0;
-  for (let i = 0; i < ip.length; i++) h = (h * 31 + ip.charCodeAt(i)) >>> 0;
-  return ((h % 3600) / 3600) * Math.PI * 2;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < ip.length; i++) h = Math.imul(h ^ ip.charCodeAt(i), 0x01000193);
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b);
+  h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return ((h >>> 0) / 0x100000000) * Math.PI * 2;
 }
 
-function radiusFor(ms: number, R: number): number {
-  const t = Math.log10(Math.max(0.4, ms) + 1) / Math.log10(101);
+function radiusFor(ms: number, R: number, maxMs: number): number {
+  const t = Math.log10(Math.max(0.4, ms) + 1) / Math.log10(maxMs + 1);
   return 20 + Math.min(1, t) * (R - 26);
 }

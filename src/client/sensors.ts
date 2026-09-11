@@ -141,9 +141,17 @@ function measureLoad(): void {
 let frames = 0;
 let fastest = 0;
 const RATES = [30, 48, 50, 60, 72, 75, 90, 100, 120, 144, 165, 180, 240];
-function countFrame(): void {
-  frames++;
-  if (!document.hidden) requestAnimationFrame(countFrame);
+// One counting loop at a time: each start begins a new one and retires the last,
+// or a page shown and hidden quickly would count every frame several times over.
+let frameLoop = 0;
+function countFrames(): void {
+  const mine = ++frameLoop;
+  const count = (): void => {
+    if (mine !== frameLoop || document.hidden) return;
+    frames++;
+    requestAnimationFrame(count);
+  };
+  requestAnimationFrame(count);
 }
 function sampleFrames(elapsedMs: number): void {
   // No frames at all means the page isn't being drawn (a covered window, a
@@ -186,11 +194,28 @@ function readConnection(): void {
     : null;
 }
 
-/** One round trip to a host, in ms: the second of two requests, so the connection is already open. */
-async function roundTrip(url: string): Promise<number | null> {
+/**
+ * Something to time a round trip against: an address that answers cleanly
+ * without a key — 200 or 204, nothing refused — so no request shows as an
+ * error and no browser has reason to block it (Brave's shields block
+ * Cloudflare's /cdn-cgi/trace, for one). `read`: the reply is one the page is
+ * allowed to read (the service allows it), so it's asked for openly; otherwise
+ * only its timing is taken.
+ */
+interface Probe { url: string; read?: boolean; accept?: string }
+
+/** One round trip, in ms: the second of two requests, so the connection is already open. */
+async function roundTrip(p: Probe): Promise<number | null> {
+  const init: RequestInit = {
+    mode: p.read ? "cors" : "no-cors",
+    cache: "no-store",
+    credentials: "omit",
+    ...(p.accept ? { headers: { accept: p.accept } } : {}),
+  };
   const once = async (): Promise<number> => {
     const t0 = performance.now();
-    await fetch(`${url}${url.includes("?") ? "&" : "?"}_=${Date.now()}`, { mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(6000) });
+    const r = await fetch(p.url, { ...init, signal: AbortSignal.timeout(6000) });
+    if (p.read && !r.ok) throw new Error(String(r.status));
     return performance.now() - t0;
   };
   try {
@@ -201,11 +226,15 @@ async function roundTrip(url: string): Promise<number | null> {
   }
 }
 
+const PAGE: Probe = { url: `${location.origin}${import.meta.env.BASE_URL}robots.txt`, read: true };
+const CLOUDFLARE: Probe = { url: "https://cloudflare-dns.com/dns-query?name=example.com&type=A", read: true, accept: "application/dns-json" };
+const GOOGLE: Probe = { url: "https://www.google.com/generate_204" };
+
 /** This page's own host, and two reference points on the internet. */
-const ANCHORS: { label: string; url: string }[] = [
-  { label: "This page's host", url: `${location.origin}${import.meta.env.BASE_URL}robots.txt` },
-  { label: "Cloudflare", url: "https://1.1.1.1/cdn-cgi/trace" },
-  { label: "Google", url: "https://www.google.com/generate_204" },
+const ANCHORS: { label: string; probe: Probe }[] = [
+  { label: "This page's host", probe: PAGE },
+  { label: "Cloudflare", probe: CLOUDFLARE },
+  { label: "Google", probe: GOOGLE },
 ];
 let anchors: Anchor[] = [];
 
@@ -214,7 +243,7 @@ async function measureAnchors(): Promise<void> {
   // at most every 15 s, however often the page is hidden and shown again
   if (Date.now() - anchorsAt < 15_000) return;
   anchorsAt = Date.now();
-  anchors = await Promise.all(ANCHORS.map(async (a) => ({ label: a.label, ip: new URL(a.url).host, ms: await roundTrip(a.url) })));
+  anchors = await Promise.all(ANCHORS.map(async (a) => ({ label: a.label, ip: new URL(a.probe.url).host, ms: await roundTrip(a.probe) })));
   const ms = anchors.map((a) => a.ms).filter((m): m is number => m != null).sort((a, b) => a - b);
   web.rttMs = ms.length ? ms[Math.floor(ms.length / 2)]! : null;
 }
@@ -224,15 +253,16 @@ async function measureAnchors(): Promise<void> {
 let battery: BatteryReading | null = null;
 /* ---------------- perimeter: the services JARVIS relies on ---------------- */
 
-const SERVICES: { name: string; role: string; url: string; self?: boolean }[] = [
-  { name: location.hostname.endsWith("github.io") ? "GitHub Pages" : location.host, role: "serves this page", url: `${location.origin}${import.meta.env.BASE_URL}robots.txt`, self: true },
-  { name: "ChatGPT", role: "reasoning core · OpenAI", url: "https://api.openai.com/v1/models" },
-  { name: "Claude", role: "reasoning core · Anthropic", url: "https://api.anthropic.com/v1/models" },
-  { name: "Gemini", role: "reasoning core · Google", url: "https://generativelanguage.googleapis.com/v1beta/models" },
-  { name: "Open-Meteo", role: "weather", url: "https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0" },
-  { name: "GeoJS", role: "where you are, by IP", url: "https://get.geojs.io/v1/ip.json" },
-  { name: "Cloudflare", role: "reference · 1.1.1.1", url: "https://1.1.1.1/cdn-cgi/trace" },
-  { name: "Google", role: "reference", url: "https://www.google.com/generate_204" },
+const SERVICES: { name: string; role: string; probe: Probe; self?: boolean }[] = [
+  { name: location.hostname.endsWith("github.io") ? "GitHub Pages" : location.host, role: "serves this page", probe: PAGE, self: true },
+  { name: "ChatGPT", role: "reasoning core · OpenAI", probe: { url: "https://api.openai.com/healthz" } },
+  // Claude's API has no address that answers without a key; anthropic.com is served from the same front door
+  { name: "Claude", role: "reasoning core · Anthropic", probe: { url: "https://www.anthropic.com/robots.txt" } },
+  { name: "Gemini", role: "reasoning core · Google", probe: { url: "https://generativelanguage.googleapis.com/generate_204" } },
+  { name: "Open-Meteo", role: "weather", probe: { url: "https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0", read: true } },
+  { name: "GeoJS", role: "where you are, by IP", probe: { url: "https://get.geojs.io/v1/ip.json", read: true } },
+  { name: "Cloudflare", role: "reference · 1.1.1.1 resolver", probe: CLOUDFLARE },
+  { name: "Google", role: "reference", probe: GOOGLE },
 ];
 
 export let scan: ScanResponse = { running: false, at: 0, durationMs: 0, subnet: "the internet", self: null, gateway: location.host, hosts: [] };
@@ -245,9 +275,9 @@ export async function sweepServices(onChange: (s: ScanResponse) => void): Promis
   onChange(scan);
   const hosts: ScanHost[] = [];
   await Promise.all(SERVICES.map(async (s) => {
-    const ms = await roundTrip(s.url);
+    const ms = await roundTrip(s.probe);
     if (ms == null) return;
-    hosts.push({ ip: new URL(s.url).host, rttMs: ms, mac: null, vendor: s.role, hostname: s.name, self: false, gateway: !!s.self, lastSeen: Date.now() });
+    hosts.push({ ip: new URL(s.probe.url).host, rttMs: ms, mac: null, vendor: s.role, hostname: s.name, self: false, gateway: !!s.self, lastSeen: Date.now() });
   }));
   hosts.sort((a, b) => Number(b.gateway) - Number(a.gateway) || a.rttMs - b.rttMs);
   scan = { ...scan, running: false, at: Date.now(), durationMs: Math.round(performance.now() - t0), hosts };
@@ -399,7 +429,7 @@ export function startSensors(onTelemetry: (t: TelemetryResponse) => void, onWorl
     if (timers.length) return;
     frames = 0;
     last = performance.now();
-    requestAnimationFrame(countFrame);
+    countFrames();
     void measureStorage();
     void measureAnchors();
     if (Date.now() - world.at > 10 * 60 * 1000) void refreshWorld(onWorld);

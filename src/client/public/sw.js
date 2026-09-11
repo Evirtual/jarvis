@@ -40,8 +40,9 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(req, { cache: "no-store" }).catch(() => fetch(req)).then(isolated));
     return;
   }
-  // this site's own scripts and workers carry the same policy as the page
-  if (ISOLATE && new URL(req.url).origin === self.location.origin) {
+  // A worker carries the same policy as the page; everything else — answers
+  // streaming in, the readings, pictures — is left to the browser untouched.
+  if (ISOLATE && (req.destination === "worker" || req.destination === "sharedworker") && new URL(req.url).origin === self.location.origin) {
     event.respondWith(fetch(req).then(isolated));
   }
 });

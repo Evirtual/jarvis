@@ -525,3 +525,26 @@ comma, streaming or not.
 | Speaking (Test voice, 5.5 s of speech): single core 11.6–12.1 s; isolated 5.6–5.9 s | Pass — about real time |
 | Next visit: loads from the browser's copy without asking; storage reading shows the 92.9 MB | Pass |
 | Isolated page: fonts, readings, sweep, weather, providers all still work; no CSP violations | Pass |
+
+### 2026-09-12 — radar and sweep fixes
+
+61. the radar stayed blank when the page loaded with Perimeter already open —
+the open panels restored from last time never told it; the panel state is now
+applied once at start-up (a regression from the architecture pass). 62. the
+service worker had wrapped the live readings stream, so sweep results stopped
+reaching the PC's radar — it now touches only the page and its workers.
+63. devices on the radar bunched in one corner (a weak hash of similar
+addresses) — now spread round the dish, each still in a fixed place. 64. the
+web version's sweep timed the services with addresses that refuse requests
+without a key (red 401/403 in the console; Chrome and Brave block those replies,
+so most services dropped out) and one Brave's shields block — it now uses
+addresses that answer cleanly (OpenAI's /healthz, Google's /generate_204,
+anthropic.com on the same servers as Claude's API, Cloudflare's DNS service).
+65. the web radar used the home-network scale (1–100 ms), so every service sat
+on the rim — it now runs 10 ms to 1 s. 66. a page shown and hidden quickly ran
+several frame counters at once ("301 fps") — one at a time now.
+
+| Area | Result |
+| --- | --- |
+| PC: Perimeter open at load, sweep → radar drawn, 13 hosts spread round the dish | Pass (confirmed in Brave) |
+| Web: sweep → 8 services, only 200/204 or timing-only requests, no new console errors | Pass |
