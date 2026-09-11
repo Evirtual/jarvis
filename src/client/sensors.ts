@@ -209,7 +209,11 @@ const ANCHORS: { label: string; url: string }[] = [
 ];
 let anchors: Anchor[] = [];
 
+let anchorsAt = 0;
 async function measureAnchors(): Promise<void> {
+  // at most every 15 s, however often the page is hidden and shown again
+  if (Date.now() - anchorsAt < 15_000) return;
+  anchorsAt = Date.now();
   anchors = await Promise.all(ANCHORS.map(async (a) => ({ label: a.label, ip: new URL(a.url).host, ms: await roundTrip(a.url) })));
   const ms = anchors.map((a) => a.ms).filter((m): m is number => m != null).sort((a, b) => a - b);
   web.rttMs = ms.length ? ms[Math.floor(ms.length / 2)]! : null;
@@ -401,7 +405,7 @@ export function startSensors(onTelemetry: (t: TelemetryResponse) => void, onWorl
     if (Date.now() - world.at > 10 * 60 * 1000) void refreshWorld(onWorld);
     timers = [
       window.setInterval(tick, 1000),
-      window.setInterval(() => void measureAnchors(), 20_000),
+      window.setInterval(() => void measureAnchors(), 20_500),
       window.setInterval(() => void measureStorage(), 30_000),
       window.setInterval(() => void refreshWorld(onWorld), 10 * 60 * 1000),
     ];
