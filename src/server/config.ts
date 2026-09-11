@@ -30,6 +30,12 @@ const ENV_VAR: Record<ProviderId, string> = {
 interface StoredProvider {
   apiKey?: string;
   model?: string;
+  /**
+   * Disconnected while its key came from the environment: the variable can't
+   * be removed from here (and other tools may rely on it), so it's ignored
+   * until a key is connected again.
+   */
+  ignoreEnv?: boolean;
 }
 
 interface StoredConfig {
@@ -55,6 +61,7 @@ export function loadConfig(): StoredConfig {
       providers[k] = {
         ...(typeof entry.apiKey === "string" ? { apiKey: entry.apiKey } : {}),
         ...(typeof entry.model === "string" ? { model: entry.model } : {}),
+        ...(entry.ignoreEnv === true ? { ignoreEnv: true } : {}),
       };
     }
     cache = {
@@ -81,7 +88,7 @@ export function resolveKey(id: ProviderId): { key: string; source: KeySource } |
   if (saved) return { key: saved, source: "saved" };
   const envName = ENV_VAR[id];
   const fromEnv = process.env[envName];
-  if (fromEnv) return { key: fromEnv, source: "environment" };
+  if (fromEnv && !cache.providers[id]?.ignoreEnv) return { key: fromEnv, source: "environment" };
   return null;
 }
 
@@ -94,14 +101,18 @@ export function maskKey(key: string): string {
 export async function setKey(id: ProviderId, apiKey: string): Promise<void> {
   const entry = cache.providers[id] ?? {};
   entry.apiKey = apiKey;
+  delete entry.ignoreEnv; // connecting again undoes a disconnect
   cache.providers[id] = entry;
   if (!cache.active) cache.active = id;
   await persist();
 }
 
 export async function clearKey(id: ProviderId): Promise<void> {
-  const entry = cache.providers[id];
-  if (entry) delete entry.apiKey;
+  const entry = cache.providers[id] ?? {};
+  delete entry.apiKey;
+  // A key from the environment would otherwise come straight back: ignore it.
+  if (process.env[ENV_VAR[id]]) entry.ignoreEnv = true;
+  cache.providers[id] = entry;
   if (cache.active === id) cache.active = null;
   await persist();
 }

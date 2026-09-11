@@ -13,6 +13,9 @@ import { api } from "./api.js";
 import { $, esc } from "./dom.js";
 import { SERVERLESS } from "./server.js";
 
+/** Where a key "from the environment" came from, named so it can be found. */
+const ENV_VARS: Record<ProviderId, string> = { openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY" };
+
 export class Connections {
   private root: HTMLElement;
   private hint: HTMLElement;
@@ -204,7 +207,7 @@ export class Connections {
       head +
       `<div class="keyline">` +
       `<span class="mask">${esc(st.maskedKey)}</span>` +
-      `<span class="src">${st.source === "environment" ? "from environment" : "saved here"}</span>` +
+      `<span class="src"${st.source === "environment" ? ` title="Disconnect makes JARVIS stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${ENV_VARS[p.id]}` : "saved here"}</span>` +
       `</div>` +
       (st.problem ? `<p class="err">${esc(st.problem)}</p>` : "") +
       `<div class="ctl"><span class="ctl-k"><span>Model</span><span class="n">${st.models.length} available</span></span>` +
