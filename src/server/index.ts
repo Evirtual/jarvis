@@ -121,9 +121,9 @@ async function readRaw(req: http.IncomingMessage, limit: number): Promise<Buffer
   });
 }
 
-async function readJson<T>(req: http.IncomingMessage): Promise<T | null> {
+async function readJson<T>(req: http.IncomingMessage, limit?: number): Promise<T | null> {
   try {
-    return JSON.parse(await readBody(req)) as T;
+    return JSON.parse(await readBody(req, limit)) as T;
   } catch {
     return null;
   }
@@ -402,7 +402,9 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
 
   /* ---- ask ---- */
   if (p === "/api/ask" && req.method === "POST") {
-    const body = await readJson<AskRequest>(req);
+    // A conversation is up to 24 turns of up to 4,000 characters plus the console
+    // snapshot — comfortably over the 64 KB default, so this route allows 1 MB.
+    const body = await readJson<AskRequest>(req, 1024 * 1024);
     if (!body) {
       json(res, 400, { error: "bad_json" });
       return;

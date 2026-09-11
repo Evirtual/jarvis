@@ -107,7 +107,14 @@ function termsOf(turns: Turn[]): Map<string, Term> {
 export function relatedness(threads: LinkThread[], id: string): { id: string; score: number; why: string[] }[] {
   const me = threads.find((t) => t.id === id);
   if (!me) return [];
-  const live = threads.filter((t) => t.turns.length > 0 || t.id === id);
+  // Connections made on purpose, from either end, with the reason given.
+  const tied = new Map<string, string>();
+  for (const x of me.ties ?? []) tied.set(x.to, x.why);
+  for (const t of threads) for (const x of t.ties ?? []) if (x.to === id) tied.set(t.id, x.why);
+
+  // Threads with nothing said yet have no context to share — unless they were
+  // connected on purpose or branched, which is a relationship in itself.
+  const live = threads.filter((t) => t.turns.length > 0 || t.id === id || tied.has(t.id) || t.parentId === id || me.parentId === t.id);
   const terms = new Map(live.map((t) => [t.id, termsOf(t.turns)]));
   const mine = terms.get(id);
   if (!mine) return [];
@@ -116,11 +123,6 @@ export function relatedness(threads: LinkThread[], id: string): { id: string; sc
   const df = new Map<string, number>();
   for (const m of terms.values()) for (const k of m.keys()) df.set(k, (df.get(k) ?? 0) + 1);
   const common = (k: string): boolean => live.length >= 4 && (df.get(k) ?? 0) / live.length > 0.7;
-
-  // Connections made on purpose, from either end, with the reason given.
-  const tied = new Map<string, string>();
-  for (const x of me.ties ?? []) tied.set(x.to, x.why);
-  for (const t of threads) for (const x of t.ties ?? []) if (x.to === id) tied.set(t.id, x.why);
 
   const out: { id: string; score: number; why: string[] }[] = [];
   for (const other of live) {

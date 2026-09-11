@@ -1636,9 +1636,13 @@ $("quick").addEventListener("click", (e) => {
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (graph.closeWeb()) return;
-  if (menuOpen()) { closeMenus(); return; }
+  // Whatever is on top goes first, in the order they stack on screen: the
+  // configuration drawer over everything, then a confirmation (Esc means
+  // "no"), the deck's menus, the web, the keyboard, the front panel.
   if ($("drawer").classList.contains("open")) { setDrawer(false); return; }
+  if (pendingConfirm) { const note = answerConfirm(false); if (note) announce(note); return; }
+  if (menuOpen()) { closeMenus(); return; }
+  if (graph.closeWeb()) return;
   if (typing_) { showKeyboard(false); return; }
   if (panels.closeTop()) return;
   voice.stop();

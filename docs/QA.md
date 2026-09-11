@@ -397,6 +397,35 @@ edge margin is now 16px like everything else. 44. the Connections card shows the
 last account problem (out of credit / no access to the model) until an answer
 succeeds; choosing another model clears a model-access note.
 
+### 2026-09-11 — fresh-reviewer pass (Fable 5.1), trying to break it
+
+Desktop 1440×900 and 1280×800, landscape phone 812×375, phone 375×812.
+
+| # | Tried | Result |
+| --- | --- | --- |
+| A1 | A thread named `<img src=x onerror=…> "quoted" & co` shown in the title bar, Threads list, web, notices and a confirmation | No script runs anywhere; the name is shown as text |
+| A2 | Blank, whitespace and 20,000-character messages | Blank ignored; the long one accepted |
+| A3 | Triple-clicking New thread; double-clicking ×, delete and Cancel | Three threads, one archive, one confirmation, no errors |
+| B1 | Dragging a window far past every edge, and below JARVIS | Always pulled back onto the board; never binned by accident |
+| B2 | Resizing past the screen; double-click reset | Capped (760 wide, above JARVIS); reset works |
+| B3 | By voice: connect, rename group, move into group, collapse, delete group → yes | All as intended |
+| C1–C2 | Esc with panel + web + drawer + confirmation open at once | **Fixed 45**: wrong order |
+| C3 | Pressing a letter while a confirmation is open | Opens the keyboard (so "yes" can be typed); never answers by itself |
+| C4 | Web from a thread that was connected on purpose but has no messages yet | **Fixed 46** |
+| L1 | Landscape phone 812×375 | Desktop layout; boxes shrink to the 137px above JARVIS and scroll |
+| P1–P4 | Phone: sheet veil blocks the list; confirmation above the Threads sheet; put all away → restore; lone thread fill and shrink | All pass |
+| S | Server: 100 KB body, bad JSON, no turns, assistant-only turns, bad key, unknown provider, empty speech, path traversal (plain and encoded) | All refused cleanly; **fixed 47** |
+| R | A hostile model reply: HTML, `<script>`, `javascript:` media, an unknown video host, a plain http link | Nothing runs; only https is linked (**48**); YouTube via nocookie |
+
+**Fixed:** 45. Esc now peels overlays in the order they stack — drawer, then a
+confirmation (Esc means "no"), menus, the web, the keyboard, the front panel;
+before, it closed the web underneath an open confirmation. 46. a thread connected
+on purpose (or branched) showed in the web only once it had messages. 47. the
+server accepted at most 64 KB per question, but a conversation can carry 24
+turns of 4,000 characters — a long research thread would have failed with
+"Could not reach ChatGPT"; `/api/ask` now allows 1 MB. 48. plain `http://`
+links were made clickable despite the README's https-only promise.
+
 **Limits of automated testing noticed:** a browser tab in the background runs no
 animation frames (so drags and transitions freeze in a hidden tab) and receives
 no synthetic mouse or key input; and automated "typing" inserts text without key

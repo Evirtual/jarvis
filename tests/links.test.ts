@@ -41,3 +41,16 @@ test("the board's automatic links stay sparse", () => {
     assert.ok(links.filter((l) => l.a === id || l.b === id).length <= 2, "at most two strings per thread");
   }
 });
+
+test("a thread connected on purpose, or a branch, is related even before anything is said in it", () => {
+  const list = [
+    th("lt", "Lithuania", [["news in Lithuania", "Vilnius is quiet."]], { ties: [{ to: "empty", why: "same trip" }] }),
+    th("empty", "Empty", []),
+    th("kid", "Branch", [], { parentId: "lt" }),
+    th("other", "Other", []),
+  ];
+  const r = relatedness(list, "lt");
+  assert.deepEqual(r.map((x) => x.id).sort(), ["empty", "kid"]);
+  assert.ok(r.find((x) => x.id === "empty")!.why.includes("same trip"));
+  assert.ok(r.find((x) => x.id === "kid")!.why.includes("branch"));
+});
