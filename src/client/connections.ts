@@ -86,7 +86,7 @@ export class Connections {
     if (!id) return;
 
     if (act === "save") await this.save(id);
-    // opens in a new tab; this card updates when that tab reports back (main.ts)
+    // to OpenRouter and back in this window; main.ts finishes the connection on the way back
     if (act === "oauth") { await startOpenRouter(); return; }
     if (act === "use") {
       this.apply(await api.setActive(id));
@@ -188,7 +188,7 @@ export class Connections {
         (p.id === "openrouter"
           ? // one click: sign in (or make a free account) at OpenRouter and come straight back
             `<button class="btn primary wide" data-act="oauth" data-id="openrouter">Connect with OpenRouter</button>` +
-            `<p class="hint">Opens OpenRouter to sign in — or make a free account, no card. Approve, and this card connects by itself. Or paste a key:</p>`
+            `<p class="hint">Takes you to OpenRouter to sign in — or make a free account, no card — and straight back, connected. Or paste a key:</p>`
           : "") +
         `<ol class="steps"${p.id === "openrouter" ? " hidden" : ""}>` +
         `<li>Open <a href="${p.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${p.free ? " and sign in with a Google account" : ""}.</li>` +

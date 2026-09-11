@@ -29,7 +29,7 @@ import "./actions.js";
 import "./ask.js";
 import "./drawer.js";
 import { SERVERLESS } from "./server.js";
-import { finishOpenRouter, onOpenRouterConnected } from "./oauth.js";
+import { finishOpenRouter } from "./oauth.js";
 
 /* ===================================================================== *
  * Boot
@@ -88,15 +88,10 @@ conn.onChange = (): void => {
 
 void pollStatus();
 startReadings();
-// The OpenRouter sign-in, finished in the tab it opened: this one just catches up.
-onOpenRouterConnected(() => {
-  void conn.refresh().then(() => sys("OpenRouter connected — its free models are ready. Ask me anything, sir."));
-});
 // Back from OpenRouter's sign-in? Finish connecting before saying anything about connections.
 void finishOpenRouter().then(async (back) => {
   await conn.refresh();
   if (back === "connected") sys("OpenRouter connected — its free models are ready. Ask me anything, sir.");
-  else if (back === "connected-elsewhere") sys("OpenRouter connected — you can close this tab and carry on in the other one.");
   else if (back !== "none") sys(back);
   else if (!conn.anyReady) sys("No reasoning core connected — open Config: OpenRouter connects in one click, with free models.");
 });
