@@ -919,6 +919,12 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .radar-foot .info { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim); }
 .radar-foot .info b { color: var(--text-hi); font-weight: 600; }
 .hosts { margin-top: 8px; border-top: 1px solid var(--line); max-height: 116px; overflow-y: auto; }
+/* Resized taller or shorter, Perimeter gives the difference to its host list:
+   the radar and its footer keep their size, the list takes what's left (116px
+   when the panel is its own size). */
+.panel.float[data-panel="perimeter"] { display: flex; flex-direction: column; }
+.panel.float[data-panel="perimeter"] > * { flex-shrink: 0; }
+.panel.float[data-panel="perimeter"] > .hosts { flex: 1 1 116px; min-height: 48px; max-height: none; }
 .host { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; padding: 5px 2px; border-bottom: 1px dashed rgba(18,49,63,.6); font-size: 11px; }
 .host:last-child { border-bottom: 0; }
 .host:hover, .host.lit { background: rgba(111,240,255,.07); }
