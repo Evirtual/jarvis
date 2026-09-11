@@ -9,8 +9,9 @@
 import crypto from "node:crypto";
 
 import type { KokoroState, VoiceOption } from "../shared/types.js";
+import { KOKORO_MODEL as MODEL_ID, VOICE_ORDER, encodeWav16 } from "../shared/voices.js";
 
-const MODEL_ID = "onnx-community/Kokoro-82M-v1.0-ONNX";
+export { DEFAULT_VOICE } from "../shared/voices.js";
 export const DTYPE = process.env.KOKORO_DTYPE ?? "q8";
 
 interface KokoroTTSLike {
@@ -26,23 +27,6 @@ export const kokoro: { state: KokoroState; tts: KokoroTTSLike | null; error: str
   tts: null,
   error: null,
 };
-
-/** British voices first — this console has a preference. */
-const VOICE_ORDER: VoiceOption[] = [
-  { id: "bm_george", name: "George", note: "British male · Received Pronunciation" },
-  { id: "bm_fable", name: "Fable", note: "British male · warm" },
-  { id: "bm_lewis", name: "Lewis", note: "British male · mature" },
-  { id: "bm_daniel", name: "Daniel", note: "British male · crisp" },
-  { id: "bf_emma", name: "Emma", note: "British female" },
-  { id: "bf_alice", name: "Alice", note: "British female" },
-  { id: "bf_isabella", name: "Isabella", note: "British female" },
-  { id: "bf_lily", name: "Lily", note: "British female" },
-  { id: "am_michael", name: "Michael", note: "American male" },
-  { id: "am_fenrir", name: "Fenrir", note: "American male · deep" },
-  { id: "af_heart", name: "Heart", note: "American female" },
-];
-
-export const DEFAULT_VOICE = "bm_george";
 
 export function voices(): VoiceOption[] {
   if (kokoro.state !== "ready" || !kokoro.tts) return [];
@@ -95,33 +79,6 @@ export async function loadKokoro(): Promise<void> {
   }
 }
 
-/**
- * Kokoro returns float32 samples and its own `toWav` writes a 32-bit float WAV —
- * twice the bytes, and not every browser decodes it. Write plain 16-bit PCM.
- */
-function encodeWav16(samples: Float32Array, sampleRate: number): Buffer {
-  const n = samples.length;
-  const buf = Buffer.alloc(44 + n * 2);
-  buf.write("RIFF", 0, "ascii");
-  buf.writeUInt32LE(36 + n * 2, 4);
-  buf.write("WAVE", 8, "ascii");
-  buf.write("fmt ", 12, "ascii");
-  buf.writeUInt32LE(16, 16);
-  buf.writeUInt16LE(1, 20); // PCM
-  buf.writeUInt16LE(1, 22); // mono
-  buf.writeUInt32LE(sampleRate, 24);
-  buf.writeUInt32LE(sampleRate * 2, 28);
-  buf.writeUInt16LE(2, 32);
-  buf.writeUInt16LE(16, 34);
-  buf.write("data", 36, "ascii");
-  buf.writeUInt32LE(n * 2, 40);
-  for (let i = 0; i < n; i++) {
-    const s = Math.max(-1, Math.min(1, samples[i]!));
-    buf.writeInt16LE(Math.round(s < 0 ? s * 0x8000 : s * 0x7fff), 44 + i * 2);
-  }
-  return buf;
-}
-
 const cache = new Map<string, Buffer>();
 const CACHE_MAX = 60;
 
@@ -139,7 +96,7 @@ export async function synthesize(text: string, voice: string, speed: number): Pr
   const run = async (): Promise<Buffer> => {
     if (!kokoro.tts) throw new Error("kokoro not ready");
     const audio = await kokoro.tts.generate(text, { voice, speed });
-    return encodeWav16(audio.audio, audio.sampling_rate);
+    return Buffer.from(encodeWav16(audio.audio, audio.sampling_rate));
   };
   chain = chain.then(run, run);
   const wav = await chain;

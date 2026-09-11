@@ -23,6 +23,8 @@ import { T } from "./readings.js";
 import { submit } from "./ask.js";
 import { closeMenus, menuOpen } from "./deck.js";
 import { setDrawer } from "./drawer.js";
+import { SERVERLESS } from "./server.js";
+import { loadNeural, neuralError, neuralPct, neuralState, neuralVoices, onNeuralChange, resumeNeural } from "./browser-voice.js";
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
@@ -70,6 +72,39 @@ voice.onState = (): void => {
   note.textContent = d.text;
   renderVoiceSelect();
 };
+/* ---------------------------------------------------------------------
+ * The web version's neural voice: downloaded on request, then the same
+ * Kokoro voices as on the PC (browser-voice.ts).
+ * --------------------------------------------------------------------- */
+
+function paintNeural(): void {
+  const btn = $<HTMLButtonElement>("neuralBtn");
+  const note = $("neuralNote");
+  btn.hidden = neuralState === "ready" || neuralState === "loading";
+  if (neuralState === "loading") note.textContent = `Downloading JARVIS's voice — ${neuralPct}%. You can keep going; he'll switch when it's ready.`;
+  else if (neuralState === "ready") note.textContent = "JARVIS's own voice runs on this device — Kokoro, the same as on the PC. It works offline.";
+  else if (neuralState === "failed") {
+    note.textContent = `The voice couldn't load here (${neuralError ?? "unknown"}), so he's using this device's voices.`;
+    btn.textContent = "Try again";
+  }
+}
+
+if (SERVERLESS) {
+  let was = neuralState;
+  onNeuralChange(() => {
+    paintNeural();
+    if (neuralState === "ready" && was !== "ready") {
+      voice.setServerVoices(neuralVoices(), true);
+      renderVoiceSelect();
+      sys("Neural voice online — Kokoro-82M, on this device.");
+    }
+    was = neuralState;
+  });
+  $("neuralBtn").addEventListener("click", () => { voice.markUserActed(); loadNeural(); });
+  paintNeural();
+  void resumeNeural();
+}
+
 voice.onRecognised = (text, final): void => {
   if (typing_) { input.value = text; return; }
   if (final && text) setTimeout(() => submit(text), 120);

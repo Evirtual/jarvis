@@ -66,7 +66,8 @@ async function pollStatus(): Promise<void> {
     voice.setServerVoices(st.voices, st.kokoro === "ready");
     voice.setServerTranscription(st.transcription);
     renderVoiceSelect();
-    if (st.kokoro === "loading") { setTimeout(() => void pollStatus(), 1500); return; }
+    // (in the web version the voice screen follows its own download, and says when it's ready)
+    if (st.kokoro === "loading" && !SERVERLESS) { setTimeout(() => void pollStatus(), 1500); return; }
     if (!announced) {
       announced = true;
       if (st.kokoro === "ready") sys("Neural voice online — Kokoro-82M, local.");

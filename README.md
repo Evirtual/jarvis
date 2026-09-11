@@ -360,7 +360,15 @@ What differs is where the work happens:
 
   The battery ring shows the real battery where the browser shares it (not on
   iPhone). Readings pause while the page is out of sight.
-- **Voice**: JARVIS speaks with the device's own voices for now.
+- **Voice**: the same Kokoro voices as on the PC, run in the browser —
+  Configuration → Voice → **Download JARVIS's voice** (about 92 MB, once; the
+  browser keeps it and it works offline). Until then, and on a device that
+  can't run it, he speaks with the device's own voices. It runs in a worker,
+  so it never costs the page a frame. On Chrome, Edge and Brave the page is
+  made cross-origin isolated by its service worker, which lets the voice use
+  several cores — about real time on a laptop (roughly twice as long where
+  only one core is allowed: Safari, Firefox). The speech engine's files are
+  served with the page, not from a CDN.
 
 A custom domain: set the repository variable `JARVIS_SITE_URL` (so the page
 is built for `/` rather than `/jarvis/`) and add the domain under
@@ -398,6 +406,8 @@ the types are broken.
 | `src/client/server.ts` | Which of the two it is: the PC with its server, or the web page on its own (`VITE_JARVIS_SERVERLESS`) |
 | `src/client/browser-core.ts` | The web version's back end: keys kept on the device, the same connections, asking and transcription the server offers |
 | `src/client/sensors.ts` | The web version's instruments: what a browser can genuinely measure of its device |
+| `src/client/browser-voice.ts`, `voice-worker.ts` | The web version's neural voice: Kokoro downloaded on request and run in a worker |
+| `src/shared/voices.ts` | The Kokoro voices and the WAV writer, for the server and the browser |
 | `src/client/say.ts` | How JARVIS speaks to you: notices, lines in a window, his status word, busy |
 | `src/client/ask.ts` | The command line, the queue, what the core is told, the streamed answer |
 | `src/client/actions.ts` | Carrying out every action, by you or by the core's directives |

@@ -9,11 +9,12 @@
  */
 
 import type {
-  AskRequest, AskStatus, ConnectionsResponse, ProviderId, ProviderStatus, ProviderView, StatusResponse,
+  AskRequest, AskStatus, ConnectionsResponse, ProviderId, ProviderStatus, ProviderView, SpeakRequest, StatusResponse,
 } from "../shared/types.js";
 import { PROVIDER_IDS } from "../shared/types.js";
 import { PROVIDERS, adapterFor, humanise, personaFor, prepareTurns } from "../shared/providers.js";
 import { recall, store } from "./dom.js";
+import { neuralError, neuralState, neuralVoices, speakNeural } from "./browser-voice.js";
 
 /* ---------------- the keys, on this device ---------------- */
 
@@ -195,14 +196,17 @@ async function transcribe(audio: Blob): Promise<string> {
 async function status(): Promise<StatusResponse> {
   const conn = await connections();
   return {
-    kokoro: "failed",
-    kokoroError: "no neural voice in the browser yet",
-    dtype: "",
-    voices: [],
+    // the neural voice runs here too, once the user has downloaded it (browser-voice.ts)
+    kokoro: neuralState === "none" ? "failed" : neuralState,
+    kokoroError: neuralState === "none" ? "not downloaded on this device" : neuralError,
+    dtype: "q8",
+    voices: neuralVoices(),
     active: conn.active,
     anyProviderReady: conn.providers.some((p) => p.status.state === "ready"),
     transcription: !!saved.providers.openai,
   };
 }
 
-export const browserCore = { connections, saveKey, removeKey, selectModel, setActive, ask, transcribe, status };
+const speak = (body: SpeakRequest): Promise<Blob> => speakNeural(body.text, body.voice, body.speed);
+
+export const browserCore = { connections, saveKey, removeKey, selectModel, setActive, ask, transcribe, status, speak };

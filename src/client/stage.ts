@@ -1515,6 +1515,8 @@ export function line(kind: "user" | "jarvis" | "sys", text: string): HTMLElement
         const vimeoId = parsed.hostname.includes("vimeo.com") ? parsed.pathname.split("/").filter(Boolean).findLast((part) => /^\d+$/.test(part)) : null;
         if (youtubeId && /^[\w-]{6,}$/.test(youtubeId)) {
           const frame = document.createElement("iframe");
+          // credentialless (set before it loads): the page may be cross-origin isolated (see sw.js)
+          frame.setAttribute("credentialless", "");
           frame.src = `https://www.youtube-nocookie.com/embed/${youtubeId}`;
           frame.title = "Research video result";
           frame.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
@@ -1523,6 +1525,7 @@ export function line(kind: "user" | "jarvis" | "sys", text: string): HTMLElement
           embedded = true;
         } else if (vimeoId) {
           const frame = document.createElement("iframe");
+          frame.setAttribute("credentialless", "");
           frame.src = `https://player.vimeo.com/video/${vimeoId}`;
           frame.title = "Research video result";
           frame.allow = "autoplay; fullscreen; picture-in-picture";

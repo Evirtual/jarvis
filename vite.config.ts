@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
 
@@ -55,6 +55,28 @@ const SERVERLESS_CSP = [
   "form-action 'self'",
 ].join("; ");
 
+/**
+ * The web version's neural voice runs ONNX Runtime in the browser; its engine
+ * files are copied beside the page (dist/…/ort/) rather than fetched from a
+ * CDN at run time, so the page depends on nobody else's servers for them.
+ */
+function speechEngine(): Plugin {
+  let outDir = "";
+  return {
+    name: "jarvis-speech-engine",
+    apply: "build",
+    configResolved(c) { outDir = path.resolve(c.root, c.build.outDir); },
+    async closeBundle() {
+      if (process.env.VITE_JARVIS_SERVERLESS !== "1") return;
+      const from = path.resolve("node_modules/@huggingface/transformers/dist");
+      await mkdir(path.join(outDir, "ort"), { recursive: true });
+      for (const f of ["ort-wasm-simd-threaded.jsep.mjs", "ort-wasm-simd-threaded.jsep.wasm"]) {
+        await copyFile(path.join(from, f), path.join(outDir, "ort", f));
+      }
+    },
+  };
+}
+
 function serverlessCsp(): Plugin {
   return {
     name: "jarvis-serverless-csp",
@@ -71,7 +93,9 @@ export default defineConfig({
   base,
   // icons, manifest, service worker, robots — copied as they are (src/client/public)
   publicDir: "public",
-  plugins: [manifestBase(), serverlessCsp()],
+  plugins: [manifestBase(), serverlessCsp(), speechEngine()],
+  // the voice worker imports the speech engine lazily, which needs module workers
+  worker: { format: "es" },
   build: {
     outDir: "../../dist/client",
     emptyOutDir: true,

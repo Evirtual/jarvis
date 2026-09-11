@@ -502,3 +502,26 @@ storage — the board's own saves are added.
 
 Not testable here: a real conversation from the web version (needs the user's
 own key pasted on their device), GPS on a phone, battery on Android.
+
+### 2026-09-12 — the web version's neural voice
+
+Kokoro now runs in the browser too (`browser-voice.ts`, `voice-worker.ts`),
+downloaded on request from Configuration → Voice, kept by the browser, and
+loaded by itself on later visits.
+
+Fixes found: 57. after a deploy, a cached page asked for replaced script files
+(404) and could open blank for up to ten minutes — the service worker now always
+fetches the page fresh. 58. the latency anchors re-ran every time the page was
+shown again — now at most every 15 s. 59. in the browser the voice ran on one
+core, about 2× slower than real time — the service worker now makes the page
+cross-origin isolated on Chromium (COEP credentialless; videos in credentialless
+frames), about real time on this laptop. 60. a long first sentence was spoken
+in one piece when a whole reply was known up front — it now starts at its first
+comma, streaming or not.
+
+| Area | Result |
+| --- | --- |
+| Download in the Voice tab: progress 11 → 36 → 57 → 86% → ready in ~25 s; George selected by itself; "Neural voice online" said once | Pass |
+| Speaking (Test voice, 5.5 s of speech): single core 11.6–12.1 s; isolated 5.6–5.9 s | Pass — about real time |
+| Next visit: loads from the browser's copy without asking; storage reading shows the 92.9 MB | Pass |
+| Isolated page: fonts, readings, sweep, weather, providers all still work; no CSP violations | Pass |

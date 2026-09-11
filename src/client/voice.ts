@@ -313,9 +313,13 @@ export class Voice {
       // capital — so "14.92" and "Mr. Stark" never split, and we never cut a
       // sentence whose next word hasn't arrived yet.
       let m = /^([\s\S]*?[.!?]["”’)]?)\s+(?=[A-Z"“‘(])/.exec(rest);
-      // Get the first words out quickly: if the opening sentence runs long,
-      // speak up to its first comma rather than waiting for the full stop.
-      if (!m && r.chunks === 0 && rest.length > 90) m = /^([\s\S]{35,140}?[,;:—])\s+/.exec(rest);
+      // Get the first words out quickly: if the opening sentence runs long —
+      // finished or still arriving — speak up to its first comma first. What
+      // he says first is what you wait for; the rest is made while it plays.
+      if (r.chunks === 0 && (m ? m[1]!.length : rest.length) > 60) {
+        const clause = /^([\s\S]{20,110}?[,;:—])\s+/.exec(rest);
+        if (clause && (!m || clause[0].length < m[0].length)) m = clause;
+      }
       if (!m) break;
       r.consumed += m[0].length;
       this.enqueue(m[1]!);
