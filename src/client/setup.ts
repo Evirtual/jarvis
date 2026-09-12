@@ -58,12 +58,11 @@ export function closeSetup(): void {
 /* ---------------- the steps ---------------- */
 
 function whereYouAre(): string {
+  const who = `<p class="lead">JARVIS is a console that talks back: ask him anything, by voice or by typing, and he answers, hears and speaks through a service you connect with your own key.</p>`;
   return SERVERLESS
-    ? `<p class="lead">This is the web version: a page in your browser, with no server behind it.</p>
-       <p>Any key you connect is kept in this browser, on this device, and goes only to the service it belongs to. Nothing is sent anywhere else. The readings on the deck are what a browser can measure of this device.</p>
-       <p>Add it to your home screen or install it and it opens like an app.</p>`
-    : `<p class="lead">This is the PC version: the console's own server is running on this machine.</p>
-       <p>Any key you connect is saved in <b>config.json</b> beside the server and never sent to the browser. JARVIS reads this machine's sensors and, when asked, sweeps your network.</p>`;
+    ? who + `<p>This is the web version, running entirely in your browser. A key you connect stays in this browser, on this device, and goes only to the service it belongs to; nothing is sent anywhere else. The readings on the deck are what a browser can measure of this device.</p>
+       <p>Add it to your home screen, or install it, and it opens like an app.</p>`
+    : who + `<p>This is the PC version: his own server runs on this machine. A key you connect is saved in <b>config.json</b> beside it and never sent to the browser. He reads this machine's sensors and, when asked, sweeps your network.</p>`;
 }
 
 function providerCard(id: ProviderId): string {
@@ -83,7 +82,7 @@ function providerCard(id: ProviderId): string {
     `<div class="provider${err ? " bad" : ""}">${head}` +
     `<p class="blurb">${esc(meta.blurb)}</p><p class="cost">${esc(meta.cost)}</p>` +
     (err ? `<p class="err">${esc(err)}</p>` : "") +
-    `<p class="blurb"><a href="${meta.keyUrl}" target="_blank" rel="noreferrer noopener">Get a key</a> — it ${esc(meta.keyHint.toLowerCase())} — and paste it here.</p>` +
+    `<p class="blurb"><a href="${meta.keyUrl}" target="_blank" rel="noreferrer noopener">Get a key</a> — it starts with <b>${esc(meta.keyPrefix)}</b> — and paste it here.</p>` +
     `<div class="row"><input class="field grow" type="password" data-setup-key="${id}" placeholder="${esc(meta.keyPrefix)}…" autocomplete="off" spellcheck="false" aria-label="${esc(meta.name)} API key">` +
     `<button class="btn primary" type="button" data-setup-connect="${id}"${busy ? " disabled" : ""}>${busy ? "Checking" : "Connect"}</button></div>` +
     `</div>`

@@ -66,10 +66,9 @@ paintHosts();
  * --------------------------------------------------------------------- */
 
 conn.onChange = (c): void => {
-  const name = conn.anyReady ? conn.activeName() : "none";
   $("openDrawer").classList.toggle("primary", !conn.anyReady);
   $("openDrawer").title = conn.anyReady ? "Configuration" : "Connect a service";
-  document.title = `J.A.R.V.I.S. Console — ${name}`;
+  document.title = conn.anyReady ? `J.A.R.V.I.S. Console — ${conn.activeName()}` : "J.A.R.V.I.S. Console";
   const active = c.providers.find((p) => p.id === c.active);
   const ready = active?.status.state === "ready" ? active.status : null;
   voice.setServerTranscription(!!ready?.hears);

@@ -679,8 +679,13 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .setup-body .btn.wide { margin-bottom: 12px; }
 .setup-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
 .setup-actions .spacer { flex: 1; }
-body.m-compact .setup { padding: 0; align-items: stretch; }
-body.m-compact .setup-sheet { width: 100%; max-height: 100%; }
+body.m-compact .setup { padding: 0; align-items: flex-end; }
+body.m-compact .setup-sheet {
+  position: fixed; left: var(--edge); right: var(--edge); bottom: var(--sheet-bottom);
+  width: auto; max-height: calc(100dvh - var(--sheet-bottom) - var(--header-h) - 4px);
+  box-shadow: 0 18px 44px rgba(0,0,0,.55);
+  animation: sheetUp .26s cubic-bezier(.2,.9,.3,1);
+}
 
 .cw-head {
   display: flex; align-items: center; gap: 6px;
