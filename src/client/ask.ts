@@ -17,7 +17,8 @@ import { line, type Thread } from "./stage.js";
 import { clip, editDistance } from "./text.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
-import { addMsg, announce, busy, jarvis, noteIn, setBusy, stopTyping, sys } from "./say.js";
+import { addMsg, announce, busy, jarvis, noteIn, setBusy, stopTyping, sys, toast } from "./say.js";
+import { isNewSubject } from "./subject.js";
 import { interceptKey, KEY_PATTERNS, parseCtx, runAction } from "./actions.js";
 import { S, T, W } from "./readings.js";
 import { boardLinks, paintThread, paintThreadName, refreshLinks, relatedContext } from "./threads.js";
@@ -236,7 +237,7 @@ export async function askCore(question: string, thread: Thread): Promise<void> {
   }
 }
 
-/** Threads made only to carry a message typed at an empty board. */
+/** Threads made to carry a question — typed at an empty board, or on a new subject. */
 const madeForAsk = new Set<string>();
 
 /* ===================================================================== *
@@ -319,17 +320,23 @@ export async function handleSubmit(text: string): Promise<void> {
 }
 
 /**
- * Put a question into the window in front and get it answered. On a clean
- * screen the question opens the thread it belongs in.
+ * The thread a question goes in: the one in front, unless the question is on
+ * a new subject (subject.ts) or nothing is open — then a thread of its own.
  */
+function threadFor(question: string): Thread {
+  const front = graph.active;
+  if (front && !isNewSubject(front.turns, question)) return front;
+  const fresh = ws.createThread({});
+  madeForAsk.add(fresh.id);
+  graph.commit();
+  paintThread();
+  if (front) toast("A new subject, sir — it has a thread of its own.");
+  return fresh;
+}
+
+/** Put a question into the thread it belongs in and get it answered. */
 export async function ask_(t: string): Promise<void> {
-  const thread = graph.active ?? (() => {
-    const fresh = ws.createThread({});
-    madeForAsk.add(fresh.id);
-    graph.commit();
-    paintThread();
-    return fresh;
-  })();
+  const thread = threadFor(t);
   // A thread being asked something opens itself, so the answer is where you can see it.
   if (!ws.isOpen(thread)) { ws.setOpen(thread.id, true); graph.commit(); }
   // The server keeps 4,000 characters of a question; say so rather than cut quietly.

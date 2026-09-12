@@ -35,7 +35,8 @@ export interface Link {
   manual?: boolean;
 }
 
-const STOP = new Set(
+/** Words too common to say what anything is about. */
+export const STOP = new Set(
   (
     "a an and are as at be been being but by can could did do does doing done for from had has have having he her here hers him his how i if in into is it its just me more most my no not now of off on once only or our out over own same she should so some such than that the their them then there these they this those through to too under until up very was we were what when where which while who whom why will with would you your yours " +
     "about above after again against all am any because before below between both down during each few further ok okay other also just like well yes yet via per " +

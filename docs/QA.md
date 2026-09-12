@@ -726,3 +726,23 @@ Found and fixed:
 Observed, not changed (for the user to decide): a thread keeps its last 24
 messages, so a long one loses its oldest; and a question goes into the
 thread in front even when it's about something else.
+
+### 2026-09-12 — a new subject, a new thread
+
+The user's decision after the end-to-end pass: a question on a different
+subject opens a thread of its own. `subject.ts` decides locally, from the
+names and telling words in the question and the thread (the evidence the
+board's links use): a follow-on ("and…", "what about…", "why?") or anything
+the thread already names stays; a name the thread never mentioned, or two
+telling words none of which are here, is a new subject; "it"/"there"/"that"
+with nothing new named stays. When in doubt, it stays. Ten unit cases.
+
+| Step (PC, ChatGPT, clean board) | Result |
+| --- | --- |
+| "What's the best ramen to try in Tokyo?" | new thread (empty board) |
+| "Is it expensive?" | same thread — answered about the shop named before |
+| "What's the latest news on SpaceX Starship?" | a thread of its own; notice "A new subject, sir — it has a thread of its own." |
+| "When is the next launch attempt?" | stays in the Starship thread |
+
+Also: "What's the latest news on X" names the thread "X" (it came out as
+"What's the latest news on Sp…").

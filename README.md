@@ -108,6 +108,13 @@ The board above him:
   Nothing folds or shrinks on its own. "Minimise the Cambodia thread" and "expand
   it" work too. A conversation stays on its latest line when its window changes
   size, unless you've scrolled up to read.
+- **A new subject, a new thread.** A question goes into the thread in front
+  when it carries that conversation on — "and is it expensive?", "what about
+  Osaka?", anything naming what the thread is already about. When it names
+  something the thread never mentioned ("what's the latest on SpaceX?" in a
+  thread on Kyoto), it gets a thread of its own, and JARVIS says so. Decided
+  on the spot from the names and telling words in each (`subject.ts`), with no
+  model call; when in doubt the question stays where it was asked.
 - **Where things go.** A new thread opens in the middle of the board, between the
   top and JARVIS, and works outward from there, keeping clear of open panels.
   Anything you've placed by hand stays where you put it; closing a thread never

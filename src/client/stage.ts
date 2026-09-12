@@ -302,7 +302,7 @@ export class Stage {
       .replace(/^(?:ok(?:ay)?|so|please|jarvis|hey)[,\s]+/gi, "")
       .replace(/^(?:can you|could you|would you|please)\s+/i, "")
       .replace(/^(?:show|find|get|give|bring)(?:\s+me)?\s+(?:some\s+)?(?:images?|pictures?|photos?|videos?|clips?|footage)\s+(?:of|about|on|from)\s+/i, "")
-      .replace(/^(?:what(?:'s| is| are)|tell me|give me)\s+(?:the\s+)?(?:latest|news|update|updates|current situation|state of play)\s+(?:on|about|with|in|regarding)\s+/i, "")
+      .replace(/^(?:what(?:'s| is| are)|tell me|give me)\s+(?:the\s+)?(?:latest(?:\s+news)?|news|updates?|current situation|state of play)\s+(?:on|about|with|in|regarding)\s+/i, "")
       .replace(/^(?:what(?:'s| is)\s+(?:happening|going on)|what happened)\s+(?:with|in|to|at|on)\s+/i, "")
       .replace(/^(?:search(?:\s+for)?|find(?:\s+me)?(?:\s+on\s+(?:the\s+)?internet)?|look\s+up|tell\s+me(?:\s+about)?|google)\s+/i, "")
       .replace(/^the\s+/i, "")
