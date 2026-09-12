@@ -378,18 +378,29 @@ const openrouterAdapter: ProviderAdapter = {
     return [...router, ...free.filter((id) => id !== "openrouter/free"), ...paid];
   },
   async stream(key, model, turns, emit, signal, persona = PERSONA) {
-    const r = await fetch(`${OPENROUTER}/chat/completions`, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${key}`,
-        "content-type": "application/json",
-        // how OpenRouter names the app on the user's own activity page
-        "HTTP-Referer": "https://github.com/Evirtual/jarvis",
-        "X-Title": "J.A.R.V.I.S. Console",
-      },
-      body: JSON.stringify({ model, stream: true, max_tokens: 1024, messages: [{ role: "system", content: withoutSearch(persona) }, ...turns] }),
-      signal,
-    });
+    const call = (think: boolean): Promise<Response> =>
+      fetch(`${OPENROUTER}/chat/completions`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${key}`,
+          "content-type": "application/json",
+          // how OpenRouter names the app on the user's own activity page
+          "HTTP-Referer": "https://github.com/Evirtual/jarvis",
+          "X-Title": "J.A.R.V.I.S. Console",
+        },
+        body: JSON.stringify({
+          model, stream: true, max_tokens: 1024,
+          messages: [{ role: "system", content: withoutSearch(persona) }, ...turns],
+          // Every free model "thinks" before it writes, silently, for seconds —
+          // time JARVIS spends saying nothing. His answers are a few spoken
+          // sentences: answer straight away.
+          ...(think ? {} : { reasoning: { enabled: false } }),
+        }),
+        signal,
+      });
+    let r = await call(false);
+    // a model that can only answer by thinking: let it
+    if (r.status === 400) r = await call(true);
     if (!r.ok || !r.body) {
       const text = await r.text().catch(() => "");
       throw Object.assign(new Error(`OpenRouter returned ${r.status}: ${text.slice(0, 200)}`), { status: r.status });

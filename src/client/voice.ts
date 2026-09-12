@@ -316,8 +316,10 @@ export class Voice {
       // Get the first words out quickly: if the opening sentence runs long —
       // finished or still arriving — speak up to its first comma first. What
       // he says first is what you wait for; the rest is made while it plays.
-      if (r.chunks === 0 && (m ? m[1]!.length : rest.length) > 60) {
-        const clause = /^([\s\S]{20,110}?[,;:—])\s+/.exec(rest);
+      // (Kokoro takes roughly two-thirds of a second per second of speech, so
+      // a short opening clause is what gets him talking quickly.)
+      if (r.chunks === 0 && (m ? m[1]!.length : rest.length) > 40) {
+        const clause = /^([\s\S]{12,90}?[,;:—])\s+/.exec(rest);
         if (clause && (!m || clause[0].length < m[0].length)) m = clause;
       }
       if (!m) break;
