@@ -1,6 +1,6 @@
 /**
- * JARVIS himself, drawn: the aurora behind the board and the core's rings,
- * plasma, spectrum and battery arc. Pure drawing — everything it shows is
+ * JARVIS himself, drawn: the aurora behind the board and the core — the logo,
+ * live — with its spectrum and battery arc. Pure drawing — everything it shows is
  * handed in — so the stage decides what, and this decides how.
  */
 
@@ -51,25 +51,22 @@ export function drawAurora(ctx: CanvasRenderingContext2D, t: number, cx: number,
   ctx.restore();
 }
 
-export function drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, amp: number, idle: boolean, s: CoreLook): void {
-  // tick ring
-  ctx.save();
-  for (let i = 0; i < 72; i++) {
-    const major = i % 6 === 0;
-    ctx.rotate((Math.PI * 2) / 72);
-    ctx.beginPath();
-    ctx.moveTo(0, -DESIGN_R);
-    ctx.lineTo(0, major ? -DESIGN_R + 8 : -DESIGN_R + 4);
-    ctx.strokeStyle = major ? "#2e7f96" : "#12313f";
-    ctx.lineWidth = major ? 1.3 : 1;
-    ctx.stroke();
-  }
-  ctx.restore();
+/**
+ * The logo (public/icon.svg) drawn live: the same rings, segments, weights,
+ * colours and triangle, in its proportions — its outer ring (196) is 60 here —
+ * so a core at rest is the logo. What is live on top: the rings turn with the
+ * CPU, the glow follows the GPU and the voice, and the spectrum, the thinking
+ * arc and the battery arc are the console's own.
+ */
+const LOGO = 60 / 196;
+const deg = (d: number): number => (d * Math.PI) / 180;
 
+export function drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, amp: number, idle: boolean, s: CoreLook): void {
   const ring = (radius: number, rot: number, segs: number, gap: number, colour: string, w: number): void => {
     ctx.save();
     ctx.rotate(rot);
     ctx.lineWidth = w;
+    ctx.lineCap = "round";
     ctx.strokeStyle = colour;
     const span = (Math.PI * 2) / segs;
     for (let s = 0; s < segs; s++) {
@@ -79,18 +76,20 @@ export function drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, a
     }
     ctx.restore();
   };
-  ring(60, sp / (2600 - s.cpuLoad * 1600), 6, 0.3, "#2e7f96", 2);
-  ring(50, -sp / (1700 - s.cpuLoad * 1000), 4, 0.55, "#6ff0ff", 1.5);
-  ring(40, sp / 3400, 12, 0.12, "#1d5468", 1);
+  // outer: six segments; middle: four bright ones; inner: twelve fine ones —
+  // each starting where the logo's does, then turning with the machine's load
+  ring(196 * LOGO, deg(-78) + sp / (2600 - s.cpuLoad * 1600), 6, 0.3, "#2e7f96", 14 * LOGO);
+  ring(160 * LOGO, deg(-35) - sp / (1700 - s.cpuLoad * 1000), 4, 0.55, "#3fc9dc", 11 * LOGO);
+  ring(128 * LOGO, sp / 3400, 12, 0.12, "rgba(46,127,150,.7)", 6 * LOGO);
 
   // the plasma at the centre: a soft body that swells with sound and breathes at rest
   const breath = reduceMotion ? 0 : Math.sin(t / 2200) * 2.5;
-  const glowR = 32 + s.cpuLoad * 6 + amp * 22 + s.pulse * 6 + breath;
+  const glowR = 112 * LOGO + s.cpuLoad * 6 + amp * 22 + s.pulse * 6 + breath;
   const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, glowR);
   glow.addColorStop(0, "rgba(214,242,250,.95)");
-  glow.addColorStop(0.22, `rgba(111,240,255,${(0.4 + s.cpuLoad * 0.2 + amp * 0.5).toFixed(2)})`);
-  glow.addColorStop(0.6, "rgba(46,127,150,.2)");
-  glow.addColorStop(1, "rgba(4,8,13,0)");
+  glow.addColorStop(0.22, `rgba(111,240,255,${Math.min(1, 0.55 + s.cpuLoad * 0.15 + amp * 0.4).toFixed(2)})`);
+  glow.addColorStop(0.6, "rgba(46,127,150,.22)");
+  glow.addColorStop(1, "rgba(46,127,150,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
   ctx.arc(0, 0, glowR, 0, Math.PI * 2);
@@ -127,18 +126,24 @@ export function drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, a
     ctx.restore();
   }
 
+  // the gold triangle: the logo's line and soft glow; the shine on top is
+  // live — it brightens with the GPU's load and with his voice
   ctx.save();
   ctx.rotate(Math.sin(t / 5200) * 0.08);
   ctx.beginPath();
   for (let k = 0; k < 3; k++) {
     const a = -Math.PI / 2 + k * ((Math.PI * 2) / 3);
-    ctx.lineTo(Math.cos(a) * 19, Math.sin(a) * 19);
+    ctx.lineTo(Math.cos(a) * 66 * LOGO, Math.sin(a) * 66 * LOGO);
   }
   ctx.closePath();
-  ctx.strokeStyle = "#ffb648";
-  ctx.lineWidth = 1.9;
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = "rgba(255,182,72,.22)";
+  ctx.lineWidth = 16 * LOGO;
+  ctx.stroke();
+  ctx.strokeStyle = "#ec9422";
+  ctx.lineWidth = 8 * LOGO;
   ctx.shadowColor = "rgba(255,182,72,.9)";
-  ctx.shadowBlur = 5 + s.gpuLoad * 22 + amp * 14;
+  ctx.shadowBlur = s.gpuLoad * 22 + amp * 14;
   ctx.stroke();
   ctx.restore();
 
