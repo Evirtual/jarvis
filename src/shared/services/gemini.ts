@@ -5,7 +5,7 @@
  */
 
 import type { Catalogue, VoiceOption } from "../types.js";
-import { HEARING_HINT, MANNER, PERSONA, fromBase64, httpError, pcm16ToWav, rankModels, toBase64, type Service } from "./common.js";
+import { HEARING_HINT, MANNER, PERSONA, eventsOf, fromBase64, httpError, rankModels, toBase64, type Service } from "./common.js";
 
 const API = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -135,50 +135,42 @@ export const gemini: Service = {
     }
     if (!r.ok || !r.body) throw httpError("Gemini", r.status, await r.text());
 
-    const reader = r.body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
     let grounded = false;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        const payload = line.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        try {
-          const cand = (JSON.parse(payload) as GeminiResponse).candidates?.[0];
-          if (cand?.groundingMetadata && !grounded) {
-            grounded = true;
-            emit({ t: "status", status: "searching" });
-          }
-          for (const part of cand?.content?.parts ?? []) {
-            if (part.text) emit({ t: "text", delta: part.text });
-          }
-        } catch {
-          /* a split SSE frame; the next chunk completes it */
-        }
+    for await (const ev of eventsOf<GeminiResponse>(r.body)) {
+      const cand = ev.candidates?.[0];
+      if (cand?.groundingMetadata && !grounded) {
+        grounded = true;
+        emit({ t: "status", status: "searching" });
+      }
+      for (const part of cand?.content?.parts ?? []) {
+        if (part.text) emit({ t: "text", delta: part.text });
       }
     }
   },
 
-  async speak(key, model, text, voice, speed) {
-    // The manner is an instruction, read as one and not aloud; the line follows.
-    const res = await generate(key, model, {
-      contents: [{ parts: [{ text: `${MANNER} ${pace(speed)} Say: ${text}` }] }],
-      generationConfig: {
-        responseModalities: ["AUDIO"],
-        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
-      },
+  async *speak(key, model, text, voice, speed) {
+    // The manner is an instruction, read as one and not aloud; the line
+    // follows. The newest speech model sends the audio as it is made
+    // ("audio/L16;codec=pcm;rate=24000" — raw samples); an older one sends it
+    // whole, as a single piece, through the same stream.
+    const r = await fetch(url(`models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, key), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${MANNER} ${pace(speed)} Say: ${text}` }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+        },
+      }),
+      signal: AbortSignal.timeout(30000),
     });
-    const part = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data);
-    if (!part?.inlineData?.data) throw new Error("Gemini returned no audio.");
-    // "audio/L16;codec=pcm;rate=24000": raw 16-bit samples, the rate in the type
-    const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType ?? "")?.[1] ?? 24000);
-    return pcm16ToWav(fromBase64(part.inlineData.data), rate);
+    if (!r.ok || !r.body) throw httpError("Gemini", r.status, await r.text());
+    for await (const ev of eventsOf<GeminiResponse>(r.body)) {
+      for (const part of ev.candidates?.[0]?.content?.parts ?? []) {
+        if (part.inlineData?.data) yield fromBase64(part.inlineData.data);
+      }
+    }
   },
 
   async hear(key, model, audio) {

@@ -15,6 +15,7 @@ import type {
   TelemetryResponse,
   WorldResponse,
 } from "../shared/types.js";
+import { bytesOf } from "../shared/services/index.js";
 import { browserCore } from "./browser-core.js";
 import { SERVERLESS } from "./server.js";
 
@@ -79,18 +80,18 @@ const serverApi = {
     return (body.text ?? "").trim();
   },
 
-  /** One line as WAV, spoken by a service or by the PC's own voice (`via`). */
-  speak: async (body: SpeakRequest): Promise<Blob> => {
+  /** One line spoken by a service (`via`): 16-bit PCM at SPEECH_RATE, piece by piece as it is made. */
+  speak: async (body: SpeakRequest): Promise<AsyncIterable<Uint8Array>> => {
     const r = await fetch("/api/speak", {
       method: "POST",
       headers: { "content-type": "application/json", ...CONSOLE },
       body: JSON.stringify(body),
     });
-    if (!r.ok) {
+    if (!r.ok || !r.body) {
       const err = (await r.json().catch(() => ({}))) as { message?: string };
       throw new Error(err.message ?? `speak ${r.status}`);
     }
-    return r.blob();
+    return bytesOf(r.body);
   },
 
   /**

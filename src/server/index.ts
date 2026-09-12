@@ -41,12 +41,15 @@ import {
 } from "./config.js";
 import {
   PROVIDERS,
+  SPEECH_RATE,
   cachedValidation,
   connected,
+  hearWith,
   humanise,
   personaFor,
   prepareTurns,
   serviceFor,
+  speakWith,
   validate,
 } from "./services.js";
 import { gateway, snapshot, startSampler } from "./system.js";
@@ -375,11 +378,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       json(res, 200, { text: "" });
       return;
     }
-    const model = c.catalogue.hearing[0]!;
     const t0 = Date.now();
     try {
-      const text = await serviceFor(id).hear(c.key, model, new Blob([audio], { type: String(req.headers["content-type"] ?? "audio/webm") }));
-      console.log(`[hear] ${id} ${model} ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 60)}"`);
+      const text = await hearWith(id, c.key, c.catalogue.hearing, new Blob([audio], { type: String(req.headers["content-type"] ?? "audio/webm") }));
+      console.log(`[hear] ${id} ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 60)}"`);
       json(res, 200, { text });
     } catch (err) {
       const message = humanise(id, err);
@@ -407,23 +409,31 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       return;
     }
     const c = await connected(body.via);
-    const model = c?.catalogue.speech[0];
-    if (!c || !model) {
+    if (!c || !c.catalogue.speech.length) {
       json(res, 503, { error: "no_voice", message: `${PROVIDERS[body.via].name} can't speak from here.` });
       return;
     }
     // the voice chosen in Configuration → Voice, or the service's first if it isn't one of this service's
     const voice = c.catalogue.voices.some((v) => v.id === body.voice) ? body.voice : c.catalogue.voices[0]?.id ?? "";
+    // The samples go to the page as the service makes them: the first arrive
+    // within a second, and he starts talking while the rest is still coming.
     const t0 = Date.now();
+    let first: number | null = null;
     try {
-      const wav = Buffer.from(await serviceFor(body.via).speak(c.key, model, text, voice, speed));
-      console.log(`[speak] ${body.via} ${voice} ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 48)}${text.length > 48 ? "…" : ""}"`);
-      res.writeHead(200, { "content-type": "audio/wav", "content-length": wav.length, "cache-control": "no-store" });
-      res.end(wav);
+      for await (const bytes of speakWith(body.via, c.key, c.catalogue.speech, text, voice, speed)) {
+        if (first === null) {
+          first = Date.now() - t0;
+          res.writeHead(200, { "content-type": `audio/L16; rate=${SPEECH_RATE}`, "cache-control": "no-store", "x-content-type-options": "nosniff" });
+        }
+        res.write(Buffer.from(bytes));
+      }
+      console.log(`[speak] ${body.via} ${voice} first sound ${((first ?? 0) / 1000).toFixed(2)}s, done ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 48)}${text.length > 48 ? "…" : ""}"`);
+      res.end();
     } catch (err) {
       const message = humanise(body.via, err);
       console.error(`[speak] ${body.via}: ${message}`);
-      json(res, 502, { error: "speak_failed", message });
+      if (first === null) json(res, 502, { error: "speak_failed", message });
+      else res.end(); // what was made has been played; the rest is lost, and the page says so
     }
     return;
   }

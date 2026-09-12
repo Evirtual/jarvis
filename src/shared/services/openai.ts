@@ -5,7 +5,7 @@
  */
 
 import type { Catalogue, VoiceOption } from "../types.js";
-import { HEARING_HINT, MANNER, PERSONA, httpError, rankModels, type Service } from "./common.js";
+import { HEARING_HINT, MANNER, PERSONA, bytesOf, httpError, rankModels, type Service } from "./common.js";
 
 const API = "https://api.openai.com/v1";
 
@@ -104,7 +104,7 @@ export const openai: Service = {
     }
   },
 
-  async speak(key, model, text, voice, speed) {
+  async *speak(key, model, text, voice, speed) {
     // The current model shapes its pace from the instruction; only the older
     // tts-1 models take a speed figure.
     const paced = /^tts-1/.test(model);
@@ -115,13 +115,14 @@ export const openai: Service = {
         model,
         voice,
         input: text,
-        response_format: "wav",
+        // raw 24 kHz samples, sent as they are made
+        response_format: "pcm",
         ...(paced ? { speed } : { instructions: `${MANNER} ${pace(speed)}` }),
       }),
       signal: AbortSignal.timeout(30000),
     });
-    if (!r.ok) throw httpError("ChatGPT", r.status, await r.text());
-    return r.arrayBuffer();
+    if (!r.ok || !r.body) throw httpError("ChatGPT", r.status, await r.text());
+    yield* bytesOf(r.body);
   },
 
   async hear(key, model, audio) {

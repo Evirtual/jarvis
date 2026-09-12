@@ -15,7 +15,7 @@ import { openai } from "./openai.js";
 import type { Service } from "./common.js";
 
 export {
-  MANNER, PERSONA, personaFor, prepareTurns, rankModels,
+  MANNER, PERSONA, SPEECH_RATE, bytesOf, personaFor, prepareTurns, rankModels,
   type Address, type Service,
 } from "./common.js";
 
@@ -26,6 +26,65 @@ export function serviceFor(id: ProviderId): Service {
 }
 
 export const PROVIDERS: Record<ProviderId, ProviderMeta> = { gemini: gemini.meta, openai: openai.meta };
+
+/*
+ * A free tier gives each model its own small allowance — Gemini's newest
+ * voice, ten lines a day — so the account's models for a job are tried in
+ * order until one answers. A model that has used its allowance is left alone
+ * for a while rather than asked again for every sentence.
+ */
+
+const spent = new Map<string, number>(); // model → when to try it again
+const REST = 15 * 60 * 1000;
+
+function exhausted(err: unknown): boolean {
+  const raw = err instanceof Error ? err.message : String(err);
+  return (err as { status?: number } | null)?.status === 429 || /quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(raw);
+}
+
+function usable(models: string[]): string[] {
+  const now = Date.now();
+  const fresh = models.filter((m) => (spent.get(m) ?? 0) <= now);
+  return fresh.length ? fresh : models; // all resting: try them anyway rather than fall silent
+}
+
+/** Speech through the first of the account's speech models that answers. */
+export async function* speakWith(id: ProviderId, key: string, models: string[], text: string, voice: string, speed: number): AsyncIterable<Uint8Array> {
+  let last: unknown = new Error(`${PROVIDERS[id].name} has no speech model on this account.`);
+  for (const model of usable(models)) {
+    const pieces = serviceFor(id).speak(key, model, text, voice, speed)[Symbol.asyncIterator]();
+    let first: IteratorResult<Uint8Array>;
+    try {
+      first = await pieces.next();
+    } catch (err) {
+      if (exhausted(err)) spent.set(model, Date.now() + REST);
+      last = err;
+      continue;
+    }
+    if (first.done) continue;
+    yield first.value;
+    for (;;) {
+      const next = await pieces.next();
+      if (next.done) return;
+      yield next.value;
+    }
+  }
+  throw last;
+}
+
+/** What was said, through the first of the account's hearing models that answers. */
+export async function hearWith(id: ProviderId, key: string, models: string[], audio: Blob): Promise<string> {
+  let last: unknown = new Error(`${PROVIDERS[id].name} has no hearing model on this account.`);
+  for (const model of usable(models)) {
+    try {
+      return await serviceFor(id).hear(key, model, audio);
+    } catch (err) {
+      if (exhausted(err)) spent.set(model, Date.now() + REST);
+      last = err;
+    }
+  }
+  throw last;
+}
 
 /** Turn a service's error into something a person can act on. */
 export function humanise(id: ProviderId, err: unknown): string {
@@ -39,15 +98,21 @@ export function humanise(id: ProviderId, err: unknown): string {
   if (status === 403 || /403|permission|forbidden/i.test(raw)) {
     return `${name} accepted the key but refused the request — the key may lack model access.`;
   }
+  // Gemini's "quota" is the free tier's allowance, per minute and per day, and
+  // the voice has a smaller one than the answers.
+  if (id === "gemini" && (status === 429 || /quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(raw))) {
+    const daily = /per.?day|daily|PerDay/i.test(raw);
+    const voice = /tts|speech|audio/i.test(raw) ? "voice" : "free tier";
+    return daily
+      ? `Gemini's ${voice} has used today's free allowance, sir — it comes back overnight. Meanwhile the device's own voice speaks.`
+      : `Gemini's ${voice} is at its free-tier limit for the moment, sir — a minute's pause and it's back.`;
+  }
   // Out of credit is account-wide: switching to another of this service's models won't help.
   if (/no credits|credit balance|insufficient_quota|exceeded your current quota|billing|payment required/i.test(raw)) {
-    const free = id === "gemini" ? "" : " Gemini's free tier works meanwhile — Configuration → Connections.";
-    return `The ${name} account is out of credit, sir — every ${name} model stops until credit is added on ${name}'s billing page.${free}`;
+    return `The ${name} account is out of credit, sir — every ${name} model stops until credit is added on ${name}'s billing page. Gemini's free tier works meanwhile — Configuration → Connections.`;
   }
-  if (status === 429 || /429|rate.?limit|quota|insufficient_quota|RESOURCE_EXHAUSTED/i.test(raw)) {
-    return id === "gemini"
-      ? "Gemini's free tier is at its limit for the moment, sir — a minute's pause, or the daily allowance resets overnight."
-      : `${name} is rate-limiting or out of quota. Wait a moment, or check your billing.`;
+  if (status === 429 || /429|rate.?limit|quota|insufficient_quota/i.test(raw)) {
+    return `${name} is rate-limiting or out of quota. Wait a moment, or check your billing.`;
   }
   // OpenAI says "does not exist or you do not have access" both for a retired
   // model and for one this account can't use (often no credit) — say both.

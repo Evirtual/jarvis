@@ -15,7 +15,7 @@
 
 import type { ProviderId, VoiceOption } from "../shared/types.js";
 import { PROVIDER_IDS } from "../shared/types.js";
-import { PROVIDERS } from "../shared/services/index.js";
+import { PROVIDERS, SPEECH_RATE } from "../shared/services/index.js";
 import { api } from "./api.js";
 import { addressed } from "./address.js";
 import { recall, store } from "./dom.js";
@@ -65,22 +65,36 @@ const AudioCtor = (): typeof AudioContext | undefined =>
 /** When the browser can't take dictation (Brave has none; Chrome's needs Google's service). */
 const NO_DICTATION = "This browser can't take dictation, sir. Connect Gemini or ChatGPT in Configuration and I'll hear you through it — or type instead.";
 
-/**
- * Where the speech in a generated piece starts and ends, in seconds: the
- * silence before and after it trimmed, with a few milliseconds kept so no
- * word is clipped.
- */
-function speechBounds(buf: AudioBuffer): { start: number; end: number } {
-  const d = buf.getChannelData(0);
-  const quiet = 0.01;
-  let a = 0, b = d.length - 1;
-  while (a < d.length && Math.abs(d[a]!) < quiet) a++;
-  while (b > a && Math.abs(d[b]!) < quiet) b--;
-  if (a >= b) return { start: 0, end: buf.duration }; // nothing above the floor: play it as it is
-  return {
-    start: Math.max(0, a / buf.sampleRate - 0.03),
-    end: Math.min(buf.duration, b / buf.sampleRate + 0.06),
-  };
+/** Below this a sample counts as silence. */
+const QUIET = 0.01;
+
+/** Where the speech starts in a run of samples, keeping 30 ms so no word is clipped. */
+function speechStart(d: Float32Array): number {
+  let a = 0;
+  while (a < d.length && Math.abs(d[a]!) < QUIET) a++;
+  return a >= d.length ? 0 : Math.max(0, a - Math.floor(SPEECH_RATE * 0.03));
+}
+
+/** Where the speech ends in a run of samples, keeping 60 ms after it. */
+function speechEnd(d: Float32Array): number {
+  let b = d.length - 1;
+  while (b > 0 && Math.abs(d[b]!) < QUIET) b--;
+  return b <= 0 ? d.length : Math.min(d.length, b + Math.floor(SPEECH_RATE * 0.06));
+}
+
+/** 16-bit little-endian samples as floats. */
+function toFloat32(bytes: Uint8Array): Float32Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const out = new Float32Array(bytes.byteLength >> 1);
+  for (let i = 0; i < out.length; i++) out[i] = view.getInt16(i * 2, true) / 0x8000;
+  return out;
+}
+
+function joinFloat32(parts: Float32Array[]): Float32Array {
+  const out = new Float32Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) { out.set(p, at); at += p.length; }
+  return out;
 }
 
 /** A neural voice, and the connected service that makes it. */
@@ -487,22 +501,19 @@ export class Voice {
       return;
     }
 
-    const g = this.graph();
     const n = this.current();
-    if (!g || !n) return;
-    const { ac, bus } = g;
+    if (!this.graph() || !n) return;
     const id = r.id;
-    // Start synthesis now; play it once everything before it has been scheduled.
-    const audio = api.speak({ text, via: n.via, voice: n.voice.id, speed: this.rate })
-      .then((b) => b.arrayBuffer())
-      .then((ab) => ac.decodeAudioData(ab));
-    audio.catch(() => undefined);
+    // Ask for it now, so the samples are arriving while everything before it
+    // plays; it is played once everything before it has been scheduled.
+    const pieces = api.speak({ text, via: n.via, voice: n.voice.id, speed: this.rate });
+    pieces.catch(() => undefined);
 
     r.chain = r.chain.then(async () => {
       if (this.seq !== id) return;
-      let buf: AudioBuffer;
+      let stream: AsyncIterable<Uint8Array>;
       try {
-        buf = await audio;
+        stream = await pieces;
       } catch {
         if (this.seq !== id) return;
         if (!this.warned) {
@@ -517,22 +528,71 @@ export class Voice {
         this.synth?.speak(u);
         return;
       }
-      if (this.seq !== id) return;
+      await this.play(r, id, text, stream);
+    });
+  }
+
+  /**
+   * Play one piece as its samples arrive, each slice scheduled straight after
+   * the last on the audio clock. The silence a service leaves before and
+   * after the words — up to ¾ s in all — would be dead air at every join, so
+   * the first slice starts at the first sound, the final slice is held back
+   * until the stream ends and trimmed to the last, and then a pause that fits
+   * how the piece ended is left: a breath after a comma, a beat after a full stop.
+   */
+  private async play(r: NonNullable<typeof this.run>, id: number, text: string, stream: AsyncIterable<Uint8Array>): Promise<void> {
+    const g = this.graph();
+    if (!g) return;
+    const { ac, bus } = g;
+    const HOLD = Math.floor(SPEECH_RATE * 0.25); // kept back for the trailing trim
+    const SLICE = Math.floor(SPEECH_RATE * 0.25); // scheduled at a time
+    let held: Float32Array[] = [];
+    let heldLength = 0;
+    let carry = new Uint8Array(0); // an odd byte between pieces of the stream
+    let started = false;
+
+    const schedule = (samples: Float32Array, last: boolean): void => {
+      const a = started ? 0 : speechStart(samples);
+      const b = last ? speechEnd(samples) : samples.length;
+      if (b <= a) return;
+      started = true;
+      const buf = ac.createBuffer(1, b - a, SPEECH_RATE);
+      const slice = new Float32Array(b - a);
+      slice.set(samples.subarray(a, b));
+      buf.copyToChannel(slice, 0);
       const src = ac.createBufferSource();
       src.buffer = buf;
       src.connect(bus);
-      // A made piece carries silence before and after it — up to ¾ s in all —
-      // so back to back they would leave dead air at every join. Play only
-      // the speech, then a pause that fits how the piece ended: a breath
-      // after a comma, a beat after a full stop.
-      const { start, end } = speechBounds(buf);
-      const pause = /[.!?]["”’)]?$/.test(text.trim()) ? 0.3 : /[,;:—]$/.test(text.trim()) ? 0.12 : 0.18;
       const when = Math.max(ac.currentTime + 0.03, r.nextAt);
-      src.start(when, start, end - start);
-      r.nextAt = when + (end - start) + pause;
+      src.start(when);
+      r.nextAt = when + buf.duration;
       this.sources.push(src);
       r.last = src;
-    });
+    };
+
+    try {
+      for await (const bytes of stream) {
+        if (this.seq !== id) return;
+        const joined = new Uint8Array(carry.length + bytes.length);
+        joined.set(carry);
+        joined.set(bytes, carry.length);
+        const even = joined.length & ~1;
+        carry = joined.subarray(even);
+        held.push(toFloat32(joined.subarray(0, even)));
+        heldLength += even >> 1;
+        if (heldLength >= SLICE + HOLD) {
+          const all = joinFloat32(held);
+          schedule(all.subarray(0, all.length - HOLD), false);
+          held = [all.subarray(all.length - HOLD)];
+          heldLength = HOLD;
+        }
+      }
+      if (this.seq !== id) return;
+      if (heldLength) schedule(joinFloat32(held), true);
+    } catch {
+      if (this.seq === id && !started) this.onNotice?.("The voice broke off, sir.");
+    }
+    r.nextAt += /[.!?]["”’)]?$/.test(text.trim()) ? 0.3 : /[,;:—]$/.test(text.trim()) ? 0.12 : 0.18;
   }
 
   /* ---------------- listening ---------------- */

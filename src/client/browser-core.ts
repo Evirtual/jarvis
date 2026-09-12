@@ -12,7 +12,7 @@ import type {
   AskRequest, AskStatus, Catalogue, ConnectionsResponse, ProviderId, ProviderStatus, ProviderView, SpeakRequest, StatusResponse,
 } from "../shared/types.js";
 import { PROVIDER_IDS } from "../shared/types.js";
-import { PROVIDERS, humanise, personaFor, prepareTurns, serviceFor } from "../shared/services/index.js";
+import { PROVIDERS, hearWith, humanise, personaFor, prepareTurns, serviceFor, speakWith } from "../shared/services/index.js";
 import { recall, store } from "./dom.js";
 
 /* ---------------- the keys, on this device ---------------- */
@@ -187,26 +187,28 @@ async function ask(body: AskRequest, onDelta: (full: string) => void, onStatus: 
 async function transcribe(audio: Blob): Promise<string> {
   const id = await activeId();
   const c = id ? await connected(id) : null;
-  const model = c?.catalogue.hearing[0];
-  if (!id || !c || !model) throw new Error("I've no way to hear you yet, sir — connect Gemini or ChatGPT in Configuration, or type instead.");
+  if (!id || !c || !c.catalogue.hearing.length) throw new Error("I've no way to hear you yet, sir — connect Gemini or ChatGPT in Configuration, or type instead.");
   try {
-    return await serviceFor(id).hear(c.key, model, audio);
+    return await hearWith(id, c.key, c.catalogue.hearing, audio);
   } catch (err) {
     throw new Error(humanise(id, err));
   }
 }
 
-async function speak(body: SpeakRequest): Promise<Blob> {
+/** One line, 16-bit PCM at SPEECH_RATE, piece by piece as the service makes it. */
+async function speak(body: SpeakRequest): Promise<AsyncIterable<Uint8Array>> {
   const id = body.via;
   const c = await connected(id);
-  const model = c?.catalogue.speech[0];
-  if (!c || !model) throw new Error(`${PROVIDERS[id].name} can't speak from here.`);
+  if (!c || !c.catalogue.speech.length) throw new Error(`${PROVIDERS[id].name} can't speak from here.`);
   const voice = c.catalogue.voices.some((v) => v.id === body.voice) ? body.voice : c.catalogue.voices[0]?.id ?? "";
-  try {
-    return new Blob([await serviceFor(id).speak(c.key, model, body.text, voice, body.speed)], { type: "audio/wav" });
-  } catch (err) {
-    throw new Error(humanise(id, err));
-  }
+  const pieces = speakWith(id, c.key, c.catalogue.speech, body.text, voice, body.speed);
+  return (async function* () {
+    try {
+      yield* pieces;
+    } catch (err) {
+      throw new Error(humanise(id, err));
+    }
+  })();
 }
 
 /* ---------------- status ---------------- */

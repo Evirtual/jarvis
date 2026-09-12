@@ -623,3 +623,14 @@ answers in, and a model chosen before a change falls back to the newest.
 | Gemini hearing: `gemini-3.5-transcribe`, a 2 s line, 1.8–1.9 s, word-perfect; answers in `audioTranscription.text`; refuses `thinkingConfig` (400) — not sent to it | Pass after the fix |
 | `gemini-2.5-flash` "no longer available to new users" (404) — the chat list now ranks 3.8-flash first anyway | Noted |
 | Voice tab: device voices listed and one chosen even when the browser hands them over late; "no voices" only when there truly are none | Pass |
+
+**Streamed speech.** A service's speech now arrives as raw 24 kHz samples
+as it is made — `/api/speak` passes them straight through, the page
+schedules each quarter-second slice as it lands and holds the last back to
+trim its silence — and the first of the account's speech models that answers
+is used (`speakWith`; likewise `hearWith` for hearing).
+
+| Area | Result |
+| --- | --- |
+| Gemini's newest voice on the free tier: **10 lines a day per model** (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 10) — spent by the day's tests; the older 2.5 voice took over, whole-line, 6.2 s for a 5 s line | Measured — Gemini's free voice is not enough to talk with; answers and hearing are fine on it. The neural voice needs ChatGPT with credit. |
+| "Neural voice unavailable — using a system voice": what the user heard as "the PC voice" with Charon selected — the quota fallback, said once; the message now names Gemini's allowance | Fixed wording |

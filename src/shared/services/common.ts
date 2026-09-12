@@ -17,11 +17,19 @@ export interface Service {
   catalogue(key: string): Promise<Catalogue>;
   /** Stream a reply, emitting status and text events as they arrive. */
   chat(key: string, model: string, turns: Turn[], emit: (ev: AskEvent) => void, signal: AbortSignal, persona: string): Promise<void>;
-  /** One line of speech, as 16-bit PCM WAV. */
-  speak(key: string, model: string, text: string, voice: string, speed: number): Promise<ArrayBuffer>;
+  /**
+   * One line of speech as it is made: 16-bit little-endian PCM at
+   * SPEECH_RATE, in pieces of whatever size the service sends. The first
+   * arrives well before the line is finished, which is what lets him start
+   * talking within a second.
+   */
+  speak(key: string, model: string, text: string, voice: string, speed: number): AsyncIterable<Uint8Array>;
   /** What was said in a recording (as the microphone made it: WebM, Ogg, MP4 or WAV). */
   hear(key: string, model: string, audio: Blob): Promise<string>;
 }
+
+/** Both services make speech at 24 kHz. */
+export const SPEECH_RATE = 24000;
 
 /* ------------------------------------------------------------------ *
  * The persona
@@ -133,29 +141,38 @@ export function prepareTurns(raw: unknown, context?: string): Turn[] | null {
 }
 
 /* ------------------------------------------------------------------ *
- * Audio
+ * Streams and bytes
  * ------------------------------------------------------------------ */
 
-/** Raw 16-bit mono PCM wrapped as a WAV file — what the player decodes. */
-export function pcm16ToWav(pcm: Uint8Array, sampleRate: number): ArrayBuffer {
-  const out = new ArrayBuffer(44 + pcm.length);
-  const v = new DataView(out);
-  const ascii = (at: number, s: string): void => { for (let i = 0; i < s.length; i++) v.setUint8(at + i, s.charCodeAt(i)); };
-  ascii(0, "RIFF");
-  v.setUint32(4, 36 + pcm.length, true);
-  ascii(8, "WAVE");
-  ascii(12, "fmt ");
-  v.setUint32(16, 16, true);
-  v.setUint16(20, 1, true); // PCM
-  v.setUint16(22, 1, true); // mono
-  v.setUint32(24, sampleRate, true);
-  v.setUint32(28, sampleRate * 2, true);
-  v.setUint16(32, 2, true);
-  v.setUint16(34, 16, true);
-  ascii(36, "data");
-  v.setUint32(40, pcm.length, true);
-  new Uint8Array(out, 44).set(pcm);
-  return out;
+/** A response body, piece by piece, as it arrives. */
+export async function* bytesOf(body: ReadableStream<Uint8Array>): AsyncIterable<Uint8Array> {
+  const reader = body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return;
+    yield value;
+  }
+}
+
+/** The JSON events of a server-sent event stream, as they arrive. */
+export async function* eventsOf<T>(body: ReadableStream<Uint8Array>): AsyncIterable<T> {
+  const dec = new TextDecoder();
+  let buf = "";
+  for await (const bytes of bytesOf(body)) {
+    buf += dec.decode(bytes, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        yield JSON.parse(payload) as T;
+      } catch {
+        /* a split frame; the next piece completes it */
+      }
+    }
+  }
 }
 
 /** Bytes as base64, in pieces small enough for the platform's encoder. */
