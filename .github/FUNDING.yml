@@ -1,5 +1,3 @@
-# The Sponsor button on the repository. GitHub shows it once the Sponsors
-# account below is approved; the second line goes live when the Buy Me a
-# Coffee page exists (docs/SUPPORT.md has the steps for both).
-github: Evirtual
-# buy_me_a_coffee: <your page name>
+# The Sponsor button on the repository: it opens the Ko-fi page. (A GitHub
+# Sponsors line can join it later: docs/SUPPORT.md.)
+ko_fi: edgarasneverdauskas

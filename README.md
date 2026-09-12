@@ -77,9 +77,9 @@ product. Connect both and JARVIS falls back from one to the other, saying why.
 ## Support
 
 The console is free and runs on your own keys, so it costs nothing to run
-for anyone but you. If it earns its keep, you can
-[sponsor it on GitHub](https://github.com/sponsors/Evirtual) — one-off or
-monthly, nothing locked behind it. Details and tiers in
+for anyone but you. If it earns its keep,
+[buy the butler a coffee](https://ko-fi.com/edgarasneverdauskas) — one-off
+or monthly, nothing locked behind it. Details in
 [docs/SUPPORT.md](docs/SUPPORT.md).
 
 ## Licence
