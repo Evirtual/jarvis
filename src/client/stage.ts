@@ -24,6 +24,7 @@
  * under the core.
  */
 
+import { seat, separate, shown, type Rect, type Room } from "./board-geometry.js";
 import { recall, store } from "./dom.js";
 import { reduceMotion } from "./motion.js";
 import { CORE_R, DESIGN_R, drawAurora, drawCore, type Activity } from "./core-draw.js";
@@ -31,6 +32,7 @@ import { ICON } from "./icons.js";
 import { line } from "./message.js";
 import { ContextWeb } from "./web.js";
 import { forget, raise, stackKey, track } from "./stack.js";
+import { planTidy, type TidyItem } from "./tidy.js";
 import { averageHues, GENERAL_ID, Workspace, migrate, THREAD_HUES, threadRef, type Group, type Thread } from "./workspace.js";
 
 export type { Thread, Group } from "./workspace.js";
@@ -71,8 +73,6 @@ interface Bubble {
   /** Where it is drifting to, and its own phase so no two move alike. */
   phase: number;
 }
-
-interface Rect { x: number; y: number; w: number; h: number }
 
 export class Stage {
   private root: HTMLElement;
@@ -337,16 +337,9 @@ export class Stage {
   }
 
   /**
-   * Tidy the board: every thread is folded to its title bar, and everything
-   * is stacked in one column down
-   * the middle of the board: the biggest in the middle, the rest above and
-   * below it in turn. When one column is too tall for the screen, two go to
-   * a row, then three, each row centred the same way — the biggest in the
-   * middle of the middle row. It all stays above JARVIS; the instrument
-   * panels float over the board and are not in the way.
-   *
-   * Nothing is resized, unless there are so many that they don't fit side by
-   * side — then only their widths come down, and only as far as they must.
+   * Tidy the board: every thread is folded to its title bar, then everything
+   * is seated by the plan in tidy.ts — one column down the middle, more to a
+   * row when one is too tall, widths coming down only when a row is too wide.
    */
   tidy(): { seated: number } {
     if (this.compact) return { seated: 0 }; // a phone's board is already a list
@@ -354,129 +347,43 @@ export class Stage {
     // Measured with their easing held, or a window still changing size would
     // be measured at the size it is leaving.
     for (const el of hold) el.classList.add("sizing");
-
-    const B = this.bounds, gap = 14;
-    const W = B.right - B.left;
-    const room = Math.min(B.bottom, this.coreFloor) - B.top;
     const THREAD_MIN_W = 260; // a folded title bar still shows its name and buttons
 
-    type Item = { w: number; h: number; minW: number; weight: number; at: number; fit: (w: number) => void; place: (x: number, y: number) => void };
-    /** Fold, give back what an earlier tidy took, and measure what's left. */
-    const measure = (): Item[] => {
-      for (const t of this.ws.live) {
-        if (this.ws.isOpen(t)) this.ws.setOpen(t.id, false);
-        delete t.fit;
-      }
-      for (const g of this.ws.groups) delete g.fit;
-      this.renderAll();
-      const items: Item[] = [];
-      for (const g of this.ws.visibleGroups) {
-        if (g.id === GENERAL_ID) continue;
-        const el = this.bubbles.get(g.id)?.el;
-        if (!el) continue;
-        const shut = el.classList.contains("collapsed");
-        items.push({
-          w: el.offsetWidth, h: el.offsetHeight, minW: shut ? el.offsetWidth : Math.min(el.offsetWidth, THREAD_MIN_W + 30),
-          weight: this.ws.treeOrder(g.id).reduce((sum, t) => sum + 1 + t.turns.length, 0), at: g.createdAt,
-          fit: (w) => { g.fit = { w, h: 0 }; }, place: (x, y) => { g.x = x; g.y = y; },
-        });
-      }
-      for (const t of this.ws.treeOrder(GENERAL_ID)) {
-        const el = this.cards.get(t.id)?.el;
-        if (!el) continue;
-        items.push({
-          w: el.offsetWidth, h: el.offsetHeight, minW: Math.min(el.offsetWidth, THREAD_MIN_W),
-          weight: t.turns.length, at: t.createdAt,
-          fit: (w) => { t.fit = { w, h: 0 }; }, place: (x, y) => { t.x = x; t.y = y; },
-        });
-      }
-      // Biggest first; among equals, the one with more in it, then the newest.
-      return items.sort((a, b) => b.w * b.h - a.w * a.h || b.weight - a.weight || b.at - a.at);
-    };
-
-    /** `cols` to a row, as evenly as rows allow — the fuller rows first, as they sit in the middle. */
-    const rowsOf = (n: number, cols: number): number[][] => {
-      const count = Math.ceil(n / cols), base = Math.floor(n / count), extra = n % count;
-      const rows: number[][] = [];
-      let i = 0;
-      for (let r = 0; r < count; r++) { const k = base + (r < extra ? 1 : 0); rows.push(Array.from({ length: k }, () => i++)); }
-      return rows;
-    };
-    const tall = (items: Item[], rows: number[][]): number =>
-      rows.reduce((sum, r) => sum + Math.max(...r.map((i) => items[i]!.h)), 0) + gap * (rows.length - 1);
-    const wide = (widths: number[], rows: number[][]): number =>
-      Math.max(...rows.map((r) => r.reduce((sum, i) => sum + widths[i]!, 0) + gap * (r.length - 1)));
-
-    /**
-     * One centred column if it fits; two to a row if not, then three… — the
-     * fewest that fit the height. Widths stay as they are unless a row is too
-     * wide for the screen, and then come down only as far as that row needs.
-     * Null if nothing fits.
-     */
-    const plan = (items: Item[]): { widths: number[]; rows: number[][] } | null => {
-      for (let cols = 1; cols <= items.length; cols++) {
-        const rows = rowsOf(items.length, cols);
-        if (tall(items, rows) > room) continue;
-        for (let sx = 1; sx >= 0.3; sx -= 0.02) {
-          const widths = items.map((it) => Math.round(Math.max(it.minW, Math.min(it.w, it.w * sx))));
-          if (wide(widths, rows) <= W) return { widths, rows };
-          if (widths.every((w, i) => w === items[i]!.minW)) break;
-        }
-        return null; // too narrow for this many side by side; more to a row won't help
-      }
-      return null;
-    };
-    /** Whatever fits across at the narrowest, for when nothing fits the height. */
-    const fallback = (items: Item[]): { widths: number[]; rows: number[][] } => {
-      const widths = items.map((it) => it.minW);
-      let cols = items.length;
-      while (cols > 1 && wide(widths, rowsOf(items.length, cols)) > W) cols--;
-      return { widths, rows: rowsOf(items.length, cols) };
-    };
-
-    const items = measure();
-    const planned = plan(items);
-    // Too many for the screen: the narrowest they go, and any that would land
-    // on JARVIS or another window take the nearest free seat instead.
-    const p = planned ?? fallback(items);
-    const { widths } = p;
-    items.forEach((it, i) => { if (widths[i]! < it.w) it.fit(widths[i]!); });
-
-    // Within a row: the biggest in the middle, the rest to its right and
-    // left in turn. Rows stack the same way: the first in the middle, the
-    // next above it, the next below, and so on.
-    const stacked: { line: number[]; h: number; at: "mid" | "above" | "below" }[] = [];
-    p.rows.forEach((row, k) => {
-      const line: number[] = [];
-      row.forEach((i, n) => (n % 2 ? line.push(i) : line.unshift(i)));
-      const r = { line, h: Math.max(...row.map((i) => items[i]!.h)) };
-      if (k === 0) stacked.push({ ...r, at: "mid" });
-      else if (k % 2) stacked.unshift({ ...r, at: "above" });
-      else stacked.push({ ...r, at: "below" });
-    });
-    const total = stacked.reduce((sum, r) => sum + r.h, 0) + gap * (stacked.length - 1);
-    let y = B.top + Math.max(0, (room - total) / 2);
-    const mx = (B.left + B.right) / 2;
-    const placed: Rect[] = [];
-    for (const r of stacked) {
-      const width = r.line.reduce((sum, i) => sum + widths[i]!, 0) + gap * (r.line.length - 1);
-      let x = mx - width / 2;
-      for (const i of r.line) {
-        // Rows above hang from the middle row, rows below stand on it, and the
-        // middle one is centred on its own line.
-        const h = items[i]!.h;
-        const dy = r.at === "above" ? r.h - h : r.at === "below" ? 0 : (r.h - h) / 2;
-        let at: Rect = { x: Math.round(x), y: Math.round(y + dy), w: widths[i]!, h };
-        if (!planned) {
-          const shown = this.shown(at);
-          if (shown.x !== at.x || shown.y !== at.y || placed.some((o) => overlapArea(at, o, gap / 2) > 0)) at = this.seat(at.w, at.h, placed);
-        }
-        placed.push(at);
-        items[i]!.place(at.x, at.y);
-        x += widths[i]! + gap;
-      }
-      y += r.h + gap;
+    // Fold, give back what an earlier tidy took, and measure what's left.
+    for (const t of this.ws.live) {
+      if (this.ws.isOpen(t)) this.ws.setOpen(t.id, false);
+      delete t.fit;
     }
+    for (const g of this.ws.groups) delete g.fit;
+    this.renderAll();
+    type Measured = TidyItem & { fit: (w: number) => void; place: (x: number, y: number) => void };
+    const items: Measured[] = [];
+    for (const g of this.ws.visibleGroups) {
+      if (g.id === GENERAL_ID) continue;
+      const el = this.bubbles.get(g.id)?.el;
+      if (!el) continue;
+      const shut = el.classList.contains("collapsed");
+      items.push({
+        w: el.offsetWidth, h: el.offsetHeight, minW: shut ? el.offsetWidth : Math.min(el.offsetWidth, THREAD_MIN_W + 30),
+        weight: this.ws.treeOrder(g.id).reduce((sum, t) => sum + 1 + t.turns.length, 0), at: g.createdAt,
+        fit: (w) => { g.fit = { w, h: 0 }; }, place: (x, y) => { g.x = x; g.y = y; },
+      });
+    }
+    for (const t of this.ws.treeOrder(GENERAL_ID)) {
+      const el = this.cards.get(t.id)?.el;
+      if (!el) continue;
+      items.push({
+        w: el.offsetWidth, h: el.offsetHeight, minW: Math.min(el.offsetWidth, THREAD_MIN_W),
+        weight: t.turns.length, at: t.createdAt,
+        fit: (w) => { t.fit = { w, h: 0 }; }, place: (x, y) => { t.x = x; t.y = y; },
+      });
+    }
+
+    const plan = planTidy(items, this.room);
+    items.forEach((it, i) => {
+      if (plan.widths[i]! < it.w) it.fit(plan.widths[i]!);
+      it.place(plan.seats[i]!.x, plan.seats[i]!.y);
+    });
     this.commit();
     requestAnimationFrame(() => { for (const el of hold) el.classList.remove("sizing"); });
     return { seated: items.length };
@@ -896,23 +803,14 @@ export class Stage {
     return cy - (CORE_R * (DESIGN_R + 8)) / DESIGN_R - CORE_STATUS_ROOM;
   }
 
+  /** The board as the geometry sees it: its edges, and the column kept clear above JARVIS. */
+  private get room(): Room {
+    return { bounds: this.bounds, cx: this.core().cx, coreZone: CORE_ZONE, coreFloor: this.coreFloor };
+  }
+
   /** Where a window or bubble is actually shown: inside the board, clear of the deck and of JARVIS. */
   private shown(r: Rect): Rect {
-    const B = this.bounds;
-    let x = Math.max(B.left, Math.min(B.right - r.w, r.x));
-    const { cx } = this.core();
-    const inColumn = (px: number): boolean => px < cx + CORE_ZONE && px + r.w > cx - CORE_ZONE;
-    // Too tall to fit above him: step out of his column, to whichever side is nearer.
-    if (inColumn(x) && r.h > this.coreFloor - B.top) {
-      const left = cx - CORE_ZONE - r.w, right = cx + CORE_ZONE;
-      const fitsL = left >= B.left, fitsR = right + r.w <= B.right;
-      if (fitsL && (!fitsR || x - left < right - x)) x = left;
-      else if (fitsR) x = right;
-    }
-    const bottom = inColumn(x) ? Math.min(B.bottom, this.coreFloor) : B.bottom;
-    let y = Math.max(B.top, Math.min(bottom - r.h, r.y));
-    if (r.h > bottom - B.top) y = B.top;
-    return { x: Math.round(x), y: Math.round(y), w: r.w, h: r.h };
+    return shown(r, this.room);
   }
 
   /** Open instruments reserve their screen area for new conversations. */
@@ -1012,73 +910,14 @@ export class Stage {
     if (changed) this.save();
   }
 
-  /**
-   * Bubbles change size as windows open and close in them, so two that were
-   * seated apart can come to overlap. Nudge them apart for display — the one
-   * you're working in stays still — without touching where they're saved.
-   */
+  /** Nudge overlapping bubbles apart for display; the one you're working in stays still. */
   private separate(placed: { r: Rect; here: boolean }[]): void {
-    const gap = 20;
-    const clear = (a: Rect, b: Rect): boolean =>
-      Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) + gap <= 0 ||
-      Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) + gap <= 0;
-
-    for (let pass = 0; pass < 10; pass++) {
-      let moved = false;
-      for (let i = 0; i < placed.length; i++) {
-        for (let j = i + 1; j < placed.length; j++) {
-          const A = placed[i]!, B = placed[j]!;
-          if (clear(A.r, B.r)) continue;
-          const ox = Math.min(A.r.x + A.r.w, B.r.x + B.r.w) - Math.max(A.r.x, B.r.x) + gap;
-          const oy = Math.min(A.r.y + A.r.h, B.r.y + B.r.h) - Math.max(A.r.y, B.r.y) + gap;
-          // The bubble you're working in stays; the other one gives way. If the
-          // way out is against an edge, try the other direction, then the other
-          // bubble — anything rather than leaving two of them on top of
-          // each other.
-          const order = A.here ? [B, A] : [A, B];
-          for (const mover of order) {
-            const still = mover === A ? B : A;
-            const dx = mover.r.x + mover.r.w / 2 < still.r.x + still.r.w / 2 ? -ox : ox;
-            const dy = mover.r.y + mover.r.h / 2 < still.r.y + still.r.h / 2 ? -oy : oy;
-            const tries: Rect[] = ox < oy
-              ? [{ ...mover.r, x: mover.r.x + dx }, { ...mover.r, y: mover.r.y + dy }, { ...mover.r, x: mover.r.x - dx }]
-              : [{ ...mover.r, y: mover.r.y + dy }, { ...mover.r, x: mover.r.x + dx }, { ...mover.r, y: mover.r.y - dy }];
-            const fixed = tries.map((t) => this.shown(t)).find((t) => clear(t, still.r));
-            if (!fixed) continue;
-            mover.r = fixed;
-            moved = true;
-            break;
-          }
-        }
-      }
-      if (!moved) break;
-    }
+    separate(placed, this.room);
   }
 
   /** A free seat begins in the board's centre, then works outward. */
   private seat(w: number, h: number, taken: Rect[]): Rect {
-    const B = this.bounds;
-    const step = 24;
-    const mid = (B.left + B.right) / 2;
-    // Both axes begin at the board's centre and fan out from there.
-    const xs: number[] = [];
-    for (let x = B.left + 6; x + w <= B.right; x += step) xs.push(x);
-    xs.sort((a, b) => Math.abs(a + w / 2 - mid) - Math.abs(b + w / 2 - mid));
-    const ys: number[] = [];
-    for (let y = B.top + 6; y + h <= B.bottom; y += step) ys.push(y);
-    const yMid = (B.top + B.bottom - h) / 2;
-    ys.sort((a, b) => Math.abs(a - yMid) - Math.abs(b - yMid));
-    let best: { r: Rect; cost: number } | null = null;
-    for (const y of ys) {
-      for (const x of xs) {
-        // judged where it would really be shown (clear of JARVIS), not where asked
-        const r = this.shown({ x, y, w, h });
-        const overlap = taken.reduce((sum, o) => sum + overlapArea(r, o, 24), 0);
-        if (overlap === 0) return r;
-        if (!best || overlap < best.cost) best = { r, cost: overlap };
-      }
-    }
-    return this.shown(best?.r ?? { x: Math.round(mid - w / 2), y: B.top + 6, w, h });
+    return seat(w, h, taken, this.room);
   }
 
   /**
@@ -1496,9 +1335,4 @@ export class Stage {
 
 }
 
-function overlapArea(a: Rect, b: Rect, margin: number): number {
-  const w = Math.min(a.x + a.w, b.x + b.w + margin) - Math.max(a.x, b.x - margin);
-  const h = Math.min(a.y + a.h, b.y + b.h + margin) - Math.max(a.y, b.y - margin);
-  return w > 0 && h > 0 ? w * h : 0;
-}
 

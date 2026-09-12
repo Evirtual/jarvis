@@ -61,14 +61,17 @@ the web version answers the same API calls in the browser
 | `src/client/browser-core.ts` | The console core with its keys in the browser's storage — the same calls the server answers |
 | `src/client/sensors.ts` | The web version's instruments: what a browser can genuinely measure of its device |
 | `src/client/workspace.ts` | Threads, groups, colours and their lifecycle, as pure data (plus migrations) |
-| `src/client/stage.ts` | The board: JARVIS, windows, bubbles, the bin |
+| `src/client/stage.ts` | The board: JARVIS, windows, bubbles, the bin — measured and moved by pointer; the pure parts are beside it |
+| `src/client/board-geometry.ts`, `tidy.ts` | Pure and tested: keeping a window inside the board and clear of JARVIS, a free seat, bubbles nudged apart; the Tidy-up plan |
 | `src/client/message.ts` | One line in a window: links, and pictures and players for image and video results |
 | `src/client/ask.ts` | The command line, the queue, what JARVIS is told, the streamed answer, his housekeeping (naming threads, moving a new subject) |
 | `src/client/commands.ts` | What can be said or written as a directive, and what the model may not do |
 | `src/client/actions.ts` | Carrying out every action, by you or by JARVIS's directives |
 | `src/client/confirm.ts` | Anything destructive waits for a yes — by button or by word |
 | `src/client/local.ts` | Questions answered from live readings, never from a model |
-| `src/client/voice.ts` | Speech out (the service's voice, streamed; the device's as the fallback) and in (recording, silence detection, dictation) |
+| `src/client/voice.ts` | Which voice speaks, and speech out: sentences as they arrive, streamed and scheduled on the audio clock |
+| `src/client/hearing.ts` | Speech in: the microphone, silence detection, the service's transcription, dictation as the fallback |
+| `src/client/pcm.ts`, `device-voices.ts` | Pure and tested: the samples a service sends and where the speech in them is; ranking the device's own voices |
 | `src/client/voice-ui.ts` | JARVIS as the microphone, the keyboard, Esc, the voice controls |
 | `src/client/connections.ts` | The Connections screen |
 | `src/client/setup.ts` | The first-run guide: where it's running, connecting a service, saying hello; back from Configuration or by asking |
@@ -89,7 +92,7 @@ the web version answers the same API calls in the browser
 
 ## Tests
 
-**What they cover:** the console core with fake services (checking a key
+**What they cover:** the board's geometry and the Tidy-up plan; the speech samples and the device-voice ranking; the console core with fake services (checking a key
 once, the newest model, the chosen service, the reasons a question can't be
 asked, an account out of credit shown on its card, hearing, a spent speech
 model giving way to the next); migrations (including bringing an older save forward

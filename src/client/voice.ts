@@ -18,7 +18,10 @@ import { PROVIDER_IDS } from "../shared/types.js";
 import { PROVIDERS, SPEECH_RATE } from "../shared/services/index.js";
 import { api } from "./api.js";
 import { addressed } from "./address.js";
+import { rankDeviceVoices, shortName } from "./device-voices.js";
 import { recall, store } from "./dom.js";
+import { Hearing } from "./hearing.js";
+import { joinFloat32, speechEnd, speechStart, toFloat32 } from "./pcm.js";
 
 /** "<source>:<id>" back into a selection, or null for anything else. */
 function parseSelection(value: string): Selection | null {
@@ -31,71 +34,9 @@ function parseSelection(value: string): Selection | null {
   return null;
 }
 
-const GB_MALE = /(george|ryan|thomas|oliver|arthur|daniel|james|brian|guy|edward|male)/i;
-const FEMALE = /(zira|hazel|susan|libby|sonia|maisie|olivia|female|samantha|karen|moira|tessa|fiona|catherine|aria|jenny)/i;
-const NOVELTY = /(novelty|whisper|zarvox|trinoids|bells|bad news|good news|cellos|organ|bubbles|boing|jester|superstar|wobble|rocko|shelley|grandma|grandpa|eddy|flo|sandy|reed|junior|albert|fred|ralph|kathy|princess|deranged|hysterical|bahh)/i;
-
-function scoreVoice(v: SpeechSynthesisVoice): number {
-  let s = 0;
-  const lang = String(v.lang || "").replace("_", "-");
-  const n = String(v.name || "");
-  if (/^en-GB/i.test(lang)) s += 120;
-  else if (/^en-(IE|AU|NZ|ZA)/i.test(lang)) s += 55;
-  else if (/^en/i.test(lang)) s += 15;
-  else s -= 400;
-  if (GB_MALE.test(n)) s += 45;
-  if (FEMALE.test(n)) s -= 65;
-  if (/natural|neural|online/i.test(n)) s += 35;
-  if (NOVELTY.test(n)) s -= 400;
-  return s;
-}
-
-function shortName(v: SpeechSynthesisVoice): string {
-  return v.name
-    .replace(/^(Microsoft|Google|Apple)\s+/i, "")
-    .replace(/\s*[-–]\s*English.*$/i, "")
-    .replace(/\s*\((Natural|Enhanced|Premium)\)\s*/i, " ✦ ")
-    .trim();
-}
-
 const AudioCtor = (): typeof AudioContext | undefined =>
   window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
-
-/** When the browser can't take dictation (Brave has none; Chrome's needs Google's service). */
-const NO_DICTATION = "This browser can't take dictation, sir. Connect Gemini or ChatGPT in Configuration and I'll hear you through it — or type instead.";
-
-/** Below this a sample counts as silence. */
-const QUIET = 0.01;
-
-/** Where the speech starts in a run of samples, keeping 30 ms so no word is clipped. */
-function speechStart(d: Float32Array): number {
-  let a = 0;
-  while (a < d.length && Math.abs(d[a]!) < QUIET) a++;
-  return a >= d.length ? 0 : Math.max(0, a - Math.floor(SPEECH_RATE * 0.03));
-}
-
-/** Where the speech ends in a run of samples, keeping 60 ms after it. */
-function speechEnd(d: Float32Array): number {
-  let b = d.length - 1;
-  while (b > 0 && Math.abs(d[b]!) < QUIET) b--;
-  return b <= 0 ? d.length : Math.min(d.length, b + Math.floor(SPEECH_RATE * 0.06));
-}
-
-/** 16-bit little-endian samples as floats. */
-function toFloat32(bytes: Uint8Array): Float32Array {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const out = new Float32Array(bytes.byteLength >> 1);
-  for (let i = 0; i < out.length; i++) out[i] = view.getInt16(i * 2, true) / 0x8000;
-  return out;
-}
-
-function joinFloat32(parts: Float32Array[]): Float32Array {
-  const out = new Float32Array(parts.reduce((n, p) => n + p.length, 0));
-  let at = 0;
-  for (const p of parts) { out.set(p, at); at += p.length; }
-  return out;
-}
 
 /** A neural voice, and the connected service that makes it. */
 export interface NeuralVoice {
@@ -117,9 +58,9 @@ const REST_MS = 10 * 60 * 1000;
 
 export class Voice {
   enabled = true;
-  listening = false;
-  transcribing = false;
   speaking = false;
+  /** Speech in: the microphone and the transcription live here. */
+  private readonly hearing: Hearing;
   private userActed = false;
   private pitch = 0.78;
   private rate = 0.96;
@@ -145,20 +86,11 @@ export class Voice {
   private actx: AudioContext | null = null;
   private bus: GainNode | null = null;
   private outAnalyser: AnalyserNode | null = null;
-  private micAnalyser: AnalyserNode | null = null;
   private bins: Uint8Array<ArrayBuffer> = new Uint8Array(new ArrayBuffer(128));
   private sources: AudioBufferSourceNode[] = [];
 
   /** Real signal level, 0-1, from whichever audio is live right now. */
   amplitude = 0;
-
-  /* input */
-  private serverStt = false;
-  private recog: SpeechRecognition | null = null;
-  private micStream: MediaStream | null = null;
-  private recorder: MediaRecorder | null = null;
-  private chunks: Blob[] = [];
-  private vadTimer: number | null = null;
 
   onState: (() => void) | null = null;
   onNotice: ((msg: string) => void) | null = null;
@@ -169,7 +101,10 @@ export class Voice {
     const r = Number.parseFloat(recall("jarvis.rate") ?? "");
     if (p >= 0.4 && p <= 1.2) this.pitch = p;
     if (r >= 0.7 && r <= 1.3) this.rate = r;
-    this.initRecognition();
+    this.hearing = new Hearing({ graph: () => this.graph(), level: () => this.amplitude });
+    this.hearing.onState = () => this.onState?.();
+    this.hearing.onNotice = (msg) => this.onNotice?.(msg);
+    this.hearing.onRecognised = (text, final) => this.onRecognised?.(text, final);
     this.watchSystemVoices();
     this.pumpAmplitude();
   }
@@ -181,9 +116,9 @@ export class Voice {
   get systemVoices(): SpeechSynthesisVoice[] { return this.systemList; }
   /** Whether the device can speak at all. */
   get deviceSpeaks(): boolean { return this.synth !== null; }
-  get micAvailable(): boolean {
-    return (this.serverStt && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined") || this.recog !== null;
-  }
+  get listening(): boolean { return this.hearing.listening; }
+  get transcribing(): boolean { return this.hearing.transcribing; }
+  get micAvailable(): boolean { return this.hearing.available; }
 
   setPitch(v: number): void { this.pitch = v; store("jarvis.pitch", String(v)); }
   setRate(v: number): void { this.rate = v; store("jarvis.rate", String(v)); }
@@ -191,9 +126,7 @@ export class Voice {
 
   /** Turn on recorded-and-heard input when a connected service can hear. */
   setServerTranscription(on: boolean): void {
-    if (this.serverStt === on) return;
-    this.serverStt = on;
-    this.onState?.();
+    this.hearing.setServerTranscription(on);
   }
 
   /* ---------------- which voice ----------------
@@ -235,9 +168,7 @@ export class Voice {
   }
 
   private refreshSystemList(): void {
-    const all = this.synth?.getVoices() ?? [];
-    const en = all.filter((v) => /^en/i.test(String(v.lang || "").replace("_", "-")));
-    const list = (en.length ? en : all).slice().sort((a, b) => scoreVoice(b) - scoreVoice(a));
+    const list = rankDeviceVoices(this.synth?.getVoices() ?? []);
     if (list.length === this.systemList.length && list.every((v, i) => v.name === this.systemList[i]?.name)) return;
     this.systemList = list;
     this.choose();
@@ -366,7 +297,7 @@ export class Voice {
   /** The globe reads this every frame: the real level of what is live. */
   private pumpAmplitude(): void {
     const tick = (): void => {
-      const an = this.listening ? this.micAnalyser : this.speaking ? this.outAnalyser : null;
+      const an = this.hearing.listening ? this.hearing.analyser : this.speaking ? this.outAnalyser : null;
       if (an) {
         an.getByteFrequencyData(this.bins);
         let sum = 0;
@@ -659,151 +590,10 @@ export class Voice {
 
   /* ---------------- listening ---------------- */
 
+  /** Tap: listen, or stop listening. He goes quiet first, so as not to record his own voice. */
   toggleListen(): void {
     this.userActed = true;
-    if (this.listening) { this.stopListening(); return; }
-    if (this.transcribing) return;
-    this.stop(); // don't record our own voice
-    if (this.serverStt && typeof MediaRecorder !== "undefined") void this.startRecording();
-    else this.startRecognition();
-  }
-
-  private stopListening(): void {
-    if (this.recorder && this.recorder.state !== "inactive") this.recorder.stop();
-    else if (this.recog) this.recog.stop();
-  }
-
-  private async openMic(): Promise<MediaStream | null> {
-    if (this.micStream) return this.micStream;
-    try {
-      this.micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      const g = this.graph();
-      if (g) {
-        const an = g.ac.createAnalyser();
-        an.fftSize = 256;
-        an.smoothingTimeConstant = 0.6;
-        g.ac.createMediaStreamSource(this.micStream).connect(an);
-        this.micAnalyser = an;
-      }
-      return this.micStream;
-    } catch {
-      this.onNotice?.("Microphone access was refused. Allow it in the browser's site settings, or type instead.");
-      return null;
-    }
-  }
-
-  private closeMic(): void {
-    this.micStream?.getTracks().forEach((t) => t.stop());
-    this.micStream = null;
-    this.micAnalyser = null;
-  }
-
-  /** Record until you stop talking, then hand the audio to the connected service. */
-  private async startRecording(): Promise<void> {
-    const stream = await this.openMic();
-    if (!stream) return;
-
-    const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"]
-      .find((m) => MediaRecorder.isTypeSupported(m)) ?? "";
-    const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-    this.recorder = rec;
-    this.chunks = [];
-    rec.ondataavailable = (e) => { if (e.data.size) this.chunks.push(e.data); };
-    rec.onstop = () => void this.finishRecording(rec.mimeType || mime || "audio/webm");
-    rec.start(250);
-
-    this.listening = true;
-    this.onState?.();
-
-    // Voice-activity detection on the real mic level: stop after a pause once
-    // you've said something, give up if nothing is said at all.
-    const started = Date.now();
-    let heard = false;
-    let quietSince = 0;
-    const check = (): void => {
-      if (!this.listening || rec.state === "inactive") return;
-      const lvl = this.amplitude;
-      const now = Date.now();
-      if (lvl > 0.1) { heard = true; quietSince = 0; }
-      else if (heard) {
-        quietSince ||= now;
-        if (now - quietSince > 1300) { rec.stop(); return; }
-      }
-      if (!heard && now - started > 7000) { rec.stop(); return; }
-      if (now - started > 30000) { rec.stop(); return; }
-      this.vadTimer = window.setTimeout(check, 80);
-    };
-    this.vadTimer = window.setTimeout(check, 250);
-  }
-
-  private async finishRecording(mime: string): Promise<void> {
-    if (this.vadTimer) clearTimeout(this.vadTimer);
-    this.listening = false;
-    this.closeMic();
-    const blob = new Blob(this.chunks, { type: mime });
-    this.chunks = [];
-    this.recorder = null;
-
-    if (blob.size < 2000) {
-      this.onState?.();
-      this.onNotice?.("I didn't hear anything, sir.");
-      return;
-    }
-
-    this.transcribing = true;
-    this.onState?.();
-    try {
-      const text = await api.transcribe(blob);
-      if (text) this.onRecognised?.(text, true);
-      else this.onNotice?.("I didn't catch that, sir.");
-    } catch (err) {
-      this.onNotice?.(err instanceof Error ? err.message : String(err));
-    } finally {
-      this.transcribing = false;
-      this.onState?.();
-    }
-  }
-
-  /* ---- fallback: the browser's own dictation ---- */
-
-  private initRecognition(): void {
-    const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    if (!Ctor) return;
-    const r = new Ctor();
-    r.lang = "en-GB";
-    r.interimResults = true;
-    r.continuous = false;
-    r.onstart = (): void => { this.listening = true; void this.openMic(); this.onState?.(); };
-    r.onend = (): void => { this.listening = false; this.closeMic(); this.onState?.(); };
-    r.onresult = (e: SpeechRecognitionEvent): void => {
-      let txt = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) txt += e.results[i]![0]!.transcript;
-      this.onRecognised?.(txt.trim(), e.results[e.results.length - 1]!.isFinal);
-    };
-    r.onerror = (e: SpeechRecognitionErrorEvent): void => {
-      const c = e.error;
-      if (c === "not-allowed" || c === "service-not-allowed") {
-        this.onNotice?.("Microphone refused — the command line still works.");
-      } else if (c === "no-speech") {
-        this.onNotice?.("I didn't catch that, sir.");
-      } else if (c === "network") {
-        // Deliberately no automatic retry: restarting the mic unasked is what
-        // made it flick on and off.
-        this.onNotice?.(NO_DICTATION);
-      } else if (c !== "aborted") {
-        this.onNotice?.(`Voice input error: ${c}.`);
-      }
-    };
-    this.recog = r;
-  }
-
-  private startRecognition(): void {
-    if (!this.recog) {
-      this.onNotice?.(NO_DICTATION);
-      return;
-    }
-    try { this.recog.start(); } catch { /* already running */ }
+    if (!this.hearing.listening && !this.hearing.transcribing) this.stop();
+    this.hearing.toggle();
   }
 }

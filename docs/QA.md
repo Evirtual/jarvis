@@ -939,3 +939,40 @@ Found and fixed before commit:
     position and the lifted-window rule was split. Caught by the browser
     pass (the sheet sat under the deck); the block now sits after the
     confirm dialog's rules.
+
+### 2026-09-12 — read cold, and the two big files split
+
+**Read cold, five ways** (a stranger on a phone, a developer, someone
+impatient, a keyboard user, someone coming back): the guide opened with an
+insider's sentence before saying what JARVIS is; on a phone it was a strip at
+the top of a dark screen; the key hint had lost its capitals; the tab title
+read "— none"; after "Not now" the board was dark with nothing to say what to
+do; a single empty thread took the whole phone screen. All fixed (below).
+
+**The split.** `stage.ts` 1,494 → 1,338 lines and `voice.ts` 809 → 599, the
+pure parts in modules of their own with tests: `board-geometry.ts` (inside
+the board, clear of JARVIS, a free seat, bubbles apart), `tidy.ts` (the plan),
+`pcm.ts` (samples, where the speech in them is), `device-voices.ts` (ranking),
+`hearing.ts` (the microphone, silence detection, transcription, dictation).
+78 tests; typecheck clean; both versions rebuilt.
+
+| Check | PC | Web |
+| --- | --- | --- |
+| Guide on a phone: a sheet at the bottom edge, full width; on the desktop: centred | — | Pass |
+| A confirmation on a phone: the same sheet | — | Pass |
+| Guide's first line introduces him; "it starts with AIza"; title without "none"; empty board says "tap me to talk · or type" | — | Pass |
+| A lone empty thread is the size of any other (83 px); with an answer in it, the room (670 px) | — | Pass |
+| Tidy up after the split: six folded windows in one centred column, no overlaps, clear of the core, inside the board | Pass | — |
+| Listening after the split (fake microphone): heard in 0.96 s → answered → spoken | Pass | — |
+| The device voice after the split ("Hear his voice") | — | Pass (2 sentences) |
+
+Found and fixed:
+
+98. The guide was a strip at the top of a phone screen; every sheet on a
+    phone now rises to the same line, the bottom edge — the Threads list, the
+    More menus, the guide and a confirmation.
+99. A single thread on a phone took the whole screen even when empty. It
+    earns the room only with something in it, and the board's room class is
+    recomputed on every save rather than only on a full redraw.
+100. The line under the core (`#threadName`) had been hidden since code mode
+    left; it now says what to do on a clear board.
