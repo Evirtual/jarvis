@@ -174,7 +174,7 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       return confirmFirst(
         `Clear ${t.turns.length === 1 ? "the one message" : `all ${t.turns.length} messages`} in “${t.title}”? The thread stays; its history goes.`,
         "Clear it",
-        () => { ws.clear(t.id); graph.commit(); paintThread(); return "Cleared, sir."; },
+        () => { ws.clear(t.id); graph.redraw(t.id); graph.commit(); paintThread(); return "Cleared, sir."; },
       );
     }
     case "fold_thread": {
@@ -250,7 +250,7 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       for (const t of [...ws.live]) ws.archive(t.id); // any left by a vanished parent
       graph.commit();
       paintThread();
-      return `Put all ${n} thread${n === 1 ? "" : "s"} away, sir. They're in the Threads list.`;
+      return n === 1 ? "Put the thread away, sir. It's in the Threads list." : `Put all ${n} threads away, sir. They're in the Threads list.`;
     }
     case "delete_all": {
       const live = ws.live.length, away = ws.archived.length;
@@ -267,18 +267,22 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
         },
       );
     }
+    case "title_thread":
+    case "new_subject":
+      return null; // applied by ask.ts, together with the exchange they are about
     case "clear_archived": {
       const away = ws.archived;
       if (!away.length) return "Nothing is put away, sir — there's nothing to clear.";
       const messages = away.reduce((n, t) => n + t.turns.length, 0);
+      const one = away.length === 1;
       return confirmFirst(
-        `Delete the ${away.length} put-away thread${away.length === 1 ? "" : "s"}? ${lostWords(messages)}`,
-        "Delete them",
+        `Delete ${one ? `the put-away thread “${away[0]!.title}”` : `the ${away.length} put-away threads`}? ${lostWords(messages)}`,
+        one ? "Delete it" : "Delete them",
         () => {
           for (const t of [...ws.archived]) ws.remove(t.id);
           graph.commit();
           paintThread();
-          return `The put-away threads are gone, sir — ${away.length} of them. What's on the board is untouched.`;
+          return `${one ? "The put-away thread is" : `All ${away.length} put-away threads are`} gone, sir. What's on the board is untouched.`;
         },
       );
     }

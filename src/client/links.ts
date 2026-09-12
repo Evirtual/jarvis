@@ -36,7 +36,7 @@ export interface Link {
 }
 
 /** Words too common to say what anything is about. */
-export const STOP = new Set(
+const STOP = new Set(
   (
     "a an and are as at be been being but by can could did do does doing done for from had has have having he her here hers him his how i if in into is it its just me more most my no not now of off on once only or our out over own same she should so some such than that the their them then there these they this those through to too under until up very was we were what when where which while who whom why will with would you your yours " +
     "about above after again against all am any because before below between both down during each few further ok okay other also just like well yes yet via per " +
@@ -65,6 +65,8 @@ function termsOf(turns: Turn[]): Map<string, Term> {
     const show = raw.trim().replace(/['’]s$/i, "");
     const key = show.toLowerCase();
     if (key.length < 3 || STOP.has(key)) return;
+    // "I'd", "I'm", "you'll" — a capital and an apostrophe don't make a name
+    if (/^(?:i|you|we|they|he|she|it|that|there|here|what|who|let)['’](?:d|m|ll|ve|re)$/.test(key)) return;
     const c = counts.get(key);
     if (c) { c.n += 1; c.base = Math.max(c.base, base); }
     else counts.set(key, { show, base, n: 1 });

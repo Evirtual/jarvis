@@ -47,6 +47,11 @@ export interface Thread {
   parentId?: string;
   /** True once the thread has a real name (from its first question or given one). */
   named?: boolean;
+  /**
+   * The name is only its first question, cut short — until JARVIS or the
+   * user gives it a proper one. Any rename clears it.
+   */
+  provisional?: boolean;
   /** Deliberate connections to other threads, with the reason. */
   ties?: { to: string; why: string }[];
   /** Set when put away; the thread is kept and can be restored. */
@@ -485,6 +490,21 @@ export class Workspace {
     if (!t) return;
     t.title = fitTitle(title) || t.title;
     t.named = true;
+    delete t.provisional;
+  }
+
+  /**
+   * The last question and its answer turned out to be about something else:
+   * move them into a thread of their own, named for that subject, which
+   * becomes the one in front. Null when there's nothing to leave behind.
+   */
+  splitLast(id: string, title: string): Thread | null {
+    const t = this.thread(id);
+    if (!t || t.turns.length <= 2) return null;
+    const moved = t.turns.splice(-2);
+    const fresh = this.createThread({ title });
+    fresh.turns = moved;
+    return fresh;
   }
 
   /** Empty a thread's history. The thread stays where it is. */

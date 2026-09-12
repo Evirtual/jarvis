@@ -768,3 +768,45 @@ web, a key the browser refuses to keep is reported instead of seeming saved.
 | "clear the put-away threads" → "yes" | dialog "Delete the 17 put-away threads? 66 messages will be gone…"; board 4.1 M → 6 K characters; the thread on the board untouched |
 | Web build: Threads list shows **Delete put-away** | Pass |
 | Unit: "clear the put-away threads", "delete all the put away threads", "empty the archive", "delete the archived chats" → clear_archived; "delete everything" still the whole board; needs confirming; not a directive the model can give | Pass (56 tests) |
+
+### 2026-09-12 — second end-to-end pass, PC and web side by side
+
+Each test was started in both at once (PC on 7823, web on 4173, ChatGPT
+gpt-6-astra), results compared.
+
+| Area | PC | Web |
+| --- | --- | --- |
+| Put away → "clear the put-away threads" → "no" keeps them → "empty the archive" → "yes" | Pass | Pass |
+| Small talk ("Good evening JARVIS, how are you today?") | Pass, in character | Pass |
+| Lisbon → "is Sintra worth a day trip?" (stays) → carbonara video (moves) → "what wine goes with it?" (stays) → "switch to the Lisbon thread" (command) → tram ticket (stays) | Pass after fix 82 | Pass after fix 82 |
+| Pictures (Eiffel Tower at night, 960-px previews), video (carbonara, 2 real), news with sources (Artemis) | Pass | Pass |
+| "use the Sage voice", "speak a little slower", "which voice are you using?" (a question), Gemini and back | Pass | Pass |
+| Spoken question "What is the capital of Australia, and how far is it from Sydney?" | Pass — heard 0.97 s, Canberra ~250 km | Pass — heard 0.72 s by OpenAI |
+| Over 4,000 characters: said, and cut | Pass | Pass |
+| Two questions sent while answering, a third as the first finishes | Pass after fix 83 — answered in order | Pass after fix 83 |
+| Reload: threads, names, voice and speed kept | Pass | Pass |
+| Sweep | 11 hosts on the LAN, announced (when the tab is in view — the stream pauses while hidden, by design) | 7 services |
+| Phone layout (375 × 812): Threads sheet, a question answered, no sideways scroll | — | Pass |
+
+Found and fixed:
+
+81. "Put all 1 thread away, sir. They're…", "Delete the 1 put-away thread?" —
+    one thread is now spoken of as one.
+82. A new subject was guessed from the words in the question (`subject.ts`):
+    "find me a video on pasta carbonara" stayed in a thread on the Eiffel
+    Tower, "is Sintra worth a day trip?" would have left a Lisbon thread, and
+    a command the parser missed ("switch to the Lisbon thread", its title cut
+    to "…Lisbo…") opened a junk thread. Now JARVIS, who reads the whole
+    conversation, decides in the same reply: `[[do: new_subject title="…"]]`
+    moves the question and answer to a thread of their own, and
+    `[[do: title_thread title="…"]]` gives a thread named after its first
+    question a proper two-to-four-word name ("Lisbon in October", "Making
+    Pasta Carbonara") — so threads can be found by subject. No extra request.
+    Greetings no longer become names.
+83. On the web, a question typed as the answer before it finished could jump
+    a question already waiting. The queue now keeps the order asked.
+84. Two threads "related — both mention I'd": contractions are no longer names.
+85. After a question moved to a thread of its own, the window it left still
+    showed it: that window only redrew when its message count changed, and the
+    move restored the count it had last drawn. Removing messages (a move, a
+    clear) now redraws the window.

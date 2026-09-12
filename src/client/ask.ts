@@ -18,7 +18,6 @@ import { clip, editDistance } from "./text.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
 import { addMsg, announce, busy, jarvis, noteIn, setBusy, stopTyping, sys, toast } from "./say.js";
-import { isNewSubject } from "./subject.js";
 import { interceptKey, KEY_PATTERNS, parseCtx, runAction } from "./actions.js";
 import { S, T, W } from "./readings.js";
 import { boardLinks, paintThread, paintThreadName, refreshLinks, relatedContext } from "./threads.js";
@@ -81,7 +80,8 @@ export function appSnapshot(): string {
     out.push(`Group “${g.title}”${g.collapsed ? " (folded)" : ""} — ${members.length} thread${members.length === 1 ? "" : "s"}:`);
     for (const t of members) {
       const indent = "  ".repeat(1 + ws.depth(t));
-      const here = t.id === ws.activeId ? " (the one we're in)" : "";
+      const here = t.id !== ws.activeId ? ""
+        : t.provisional ? " (the one we're in — its title is only a stand-in)" : " (the one we're in)";
       const qs = t.turns.filter((x) => x.role === "user");
       const lastA = t.turns.filter((x) => x.role === "assistant").pop();
       const body = !t.turns.length
@@ -146,6 +146,7 @@ export async function askCore(question: string, thread: Thread): Promise<void> {
 
   const turns = ws.historyFor(thread);
   let pendingActions: Action[] = [];
+  let housekeeping: Action[] = [];
 
   // Speak as it's written: each sentence goes to the voice the moment it's complete.
   voice.beginStream();
@@ -184,7 +185,10 @@ export async function askCore(question: string, thread: Thread): Promise<void> {
       raw = await askVia(spare);
     }
     const d = extractDirectives(raw);
-    pendingActions = d.actions;
+    // his own housekeeping — naming the thread, moving a new subject — waits
+    // until the exchange is recorded; the rest are the console operations asked for
+    housekeeping = d.actions.filter(isHousekeeping);
+    pendingActions = d.actions.filter((a) => !isHousekeeping(a));
     const out = cleanReply(d.text);
     graph.detachLive(thread.id, body);
     if (!out && pendingActions.length) {
@@ -213,6 +217,7 @@ export async function askCore(question: string, thread: Thread): Promise<void> {
     void conn.refresh();
   }
   graph.streamingId = null;
+  housekeep(thread, housekeeping);
   graph.save();
   refreshLinks();
   setBusy(false);
@@ -237,8 +242,39 @@ export async function askCore(question: string, thread: Thread): Promise<void> {
   }
 }
 
-/** Threads made to carry a question — typed at an empty board, or on a new subject. */
+/** Threads made only to carry a message typed at an empty board. */
 const madeForAsk = new Set<string>();
+
+const isHousekeeping = (a: Action): boolean => a.name === "title_thread" || a.name === "new_subject";
+
+/**
+ * JARVIS's own housekeeping, from the reply just given: a proper name for a
+ * thread that only has its first question as a stand-in, and — when the
+ * question turned out to be about something else — the question and answer
+ * moved to a thread of their own, which becomes the one in front. A name
+ * needs no announcement; a move gets a notice, so the jump is explained.
+ */
+function housekeep(thread: Thread, actions: Action[]): void {
+  for (const a of actions) {
+    if (a.name === "new_subject") {
+      const moved = ws.splitLast(thread.id, a.title);
+      if (moved) {
+        graph.redraw(thread.id);
+        graph.commit();
+        paintThread();
+        toast(`A new subject, sir — it has a thread of its own: “${moved.title}”.`);
+      } else if (thread.provisional) {
+        // nothing to leave behind: it is this thread's own subject, so it's the name
+        ws.rename(thread.id, a.title);
+        paintThreadName();
+      }
+    } else if (a.name === "title_thread" && thread.provisional) {
+      ws.rename(thread.id, a.title);
+      graph.commit();
+      paintThreadName();
+    }
+  }
+}
 
 /* ===================================================================== *
  * Input
@@ -269,10 +305,11 @@ export function drainQueue(): void {
     graph.focus(job.threadId);
   }
   if (job.fromCore) { voice.markUserActed(); void ask_(job.text); }
-  else submit(job.text);
+  else void handleSubmit(job.text, true);
 }
 
-export async function handleSubmit(text: string): Promise<void> {
+/** `fromQueue`: this is the queue's own turn, so it doesn't wait behind itself. */
+export async function handleSubmit(text: string, fromQueue = false): Promise<void> {
   const t = text.trim();
   if (!t) return;
   voice.markUserActed();
@@ -292,12 +329,16 @@ export async function handleSubmit(text: string): Promise<void> {
   const { actions, ask } = parseUtterance(t, parseCtx());
 
   // Operating the console never has to wait for an answer to finish. A
-  // question does, so it queues and is shown as waiting.
-  if (busy && (ask || !actions.length)) {
+  // question does, so it queues and is shown as waiting — and it also waits
+  // behind any question already queued, even if the answer before them has
+  // just finished: questions are answered in the order they were asked.
+  const waiting = busy || (!fromQueue && queued.length > 0);
+  if (waiting && (ask || !actions.length)) {
     // Asked in the thread you were looking at when you asked, even if JARVIS
     // has moved on to another window by the time he gets to it.
     queued.push({ text: t, ...(graph.activeId ? { threadId: graph.activeId } : {}) });
-    sys(`Queued — I'll take “${clip(t, 60)}” next.`);
+    if (busy) sys(`Queued — I'll take “${clip(t, 60)}” next.`);
+    else setTimeout(drainQueue, 0);
     return;
   }
 
@@ -320,23 +361,19 @@ export async function handleSubmit(text: string): Promise<void> {
 }
 
 /**
- * The thread a question goes in: the one in front, unless the question is on
- * a new subject (subject.ts) or nothing is open — then a thread of its own.
+ * Put a question into the window in front and get it answered. On a clean
+ * screen the question opens a thread of its own. If it turns out to be on a
+ * new subject, JARVIS says so in his reply and the exchange moves to a
+ * thread of its own afterwards (housekeep).
  */
-function threadFor(question: string): Thread {
-  const front = graph.active;
-  if (front && !isNewSubject(front.turns, question)) return front;
-  const fresh = ws.createThread({});
-  madeForAsk.add(fresh.id);
-  graph.commit();
-  paintThread();
-  if (front) toast("A new subject, sir — it has a thread of its own.");
-  return fresh;
-}
-
-/** Put a question into the thread it belongs in and get it answered. */
 export async function ask_(t: string): Promise<void> {
-  const thread = threadFor(t);
+  const thread = graph.active ?? (() => {
+    const fresh = ws.createThread({});
+    madeForAsk.add(fresh.id);
+    graph.commit();
+    paintThread();
+    return fresh;
+  })();
   // A thread being asked something opens itself, so the answer is where you can see it.
   if (!ws.isOpen(thread)) { ws.setOpen(thread.id, true); graph.commit(); }
   // The server keeps 4,000 characters of a question; say so rather than cut quietly.

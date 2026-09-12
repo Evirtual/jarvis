@@ -302,7 +302,8 @@ export class Stage {
     // becomes "Baltic cable damage", "show me images of the Eagle S" becomes
     // "Eagle S".
     let name = text
-      .replace(/^(?:ok(?:ay)?|so|please|jarvis|hey)[,\s]+/gi, "")
+      // greetings and his name, however many of them open the sentence
+      .replace(/^(?:(?:ok(?:ay)?|so|please|jarvis|hey|hi|hello|good (?:morning|afternoon|evening))[,!.\s]+)+/gi, "")
       .replace(/^(?:can you|could you|would you|please)\s+/i, "")
       .replace(/^(?:show|find|get|give|bring)(?:\s+me)?\s+(?:some\s+)?(?:images?|pictures?|photos?|videos?|clips?|footage)\s+(?:of|about|on|from)\s+/i, "")
       .replace(/^(?:what(?:'s| is| are)|tell me|give me)\s+(?:the\s+)?(?:latest(?:\s+news)?|news|updates?|current situation|state of play)\s+(?:on|about|with|in|regarding)\s+/i, "")
@@ -315,6 +316,8 @@ export class Stage {
     name = name.charAt(0).toUpperCase() + name.slice(1);
     t.title = name.length > 30 ? `${name.slice(0, 28).trim()}…` : name;
     t.named = true;
+    // only a stand-in: JARVIS names it properly with his first answer (ask.ts)
+    t.provisional = true;
     this.save();
     this.paintHead(t);
     this.onChange?.();
@@ -494,6 +497,17 @@ export class Stage {
     const list = (this.liveEls.get(id) ?? []).filter((x) => x !== el);
     if (list.length) this.liveEls.set(id, list);
     else this.liveEls.delete(id);
+  }
+
+  /**
+   * Draw a thread's conversation afresh from its history on the next commit —
+   * after messages were taken out of it (cleared, or moved to a thread of
+   * their own). A window otherwise redraws only when its history grows or
+   * shrinks from what it last drew, which a removal can happen to match.
+   */
+  redraw(id: string): void {
+    const c = this.cards.get(id);
+    if (c) c.sig = "";
   }
 
   private card(t: Thread): Card {

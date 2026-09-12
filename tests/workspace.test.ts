@@ -335,3 +335,34 @@ test("a long name is cut at a word, with an ellipsis", () => {
   ws.rename(t.id, "Pneumonoultramicroscopicsilicovolcanoconiosis-and-more");
   assert.ok(t.title.endsWith("…") && t.title.length <= 40, t.title);
 });
+
+/* ---------------- a new subject, and naming ---------------- */
+
+test("a question on a new subject moves, with its answer, to a thread of its own", () => {
+  const ws = new Workspace();
+  const lisbon = ws.createThread({ title: "Lisbon trip" });
+  lisbon.turns.push(...turns("Weather in Lisbon in October?", "Mild, sir."), ...turns("Who won the last F1 race?", "Antonelli, sir."));
+  const f1 = ws.splitLast(lisbon.id, "Formula 1 results");
+  assert.ok(f1);
+  assert.equal(f1!.title, "Formula 1 results");
+  assert.deepEqual(f1!.turns.map((t) => t.content), ["Who won the last F1 race?", "Antonelli, sir."]);
+  assert.deepEqual(lisbon.turns.map((t) => t.content), ["Weather in Lisbon in October?", "Mild, sir."], "the Lisbon conversation stays");
+  assert.equal(ws.activeId, f1!.id, "and the new subject is the one in front");
+});
+
+test("a thread's only exchange is never moved away from it", () => {
+  const ws = new Workspace();
+  const t = ws.createThread({});
+  t.turns.push(...turns("Who won the last F1 race?", "Antonelli, sir."));
+  assert.equal(ws.splitLast(t.id, "Formula 1 results"), null);
+  assert.equal(t.turns.length, 2);
+});
+
+test("a stand-in title is cleared by any real name", () => {
+  const ws = new Workspace();
+  const t = ws.createThread({});
+  t.provisional = true;
+  ws.rename(t.id, "Lisbon in October");
+  assert.equal(t.title, "Lisbon in October");
+  assert.equal(t.provisional, undefined);
+});

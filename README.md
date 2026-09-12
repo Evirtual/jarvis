@@ -108,13 +108,15 @@ The board above him:
   Nothing folds or shrinks on its own. "Minimise the Cambodia thread" and "expand
   it" work too. A conversation stays on its latest line when its window changes
   size, unless you've scrolled up to read.
-- **A new subject, a new thread.** A question goes into the thread in front
-  when it carries that conversation on — "and is it expensive?", "what about
-  Osaka?", anything naming what the thread is already about. When it names
-  something the thread never mentioned ("what's the latest on SpaceX?" in a
-  thread on Kyoto), it gets a thread of its own, and JARVIS says so. Decided
-  on the spot from the names and telling words in each (`subject.ts`), with no
-  model call; when in doubt the question stays where it was asked.
+- **A new subject, a new thread — and a proper name.** A question goes to the
+  thread in front, and JARVIS, who reads the whole conversation, judges whether
+  it carries it on ("is Sintra worth a day trip?" in a Lisbon thread) or starts
+  something else ("find me a carbonara recipe"). A new subject moves, question
+  and answer, to a thread of its own the moment he has answered, and he says
+  so. A thread starts out named after its first question; with his first
+  answer he gives it a proper two-to-four-word name ("Lisbon in October"), so
+  "switch to the Lisbon thread" finds it. Both come in the same reply — no
+  extra request, no wait.
 - **Where things go.** A new thread opens in the middle of the board, between the
   top and JARVIS, and works outward from there, keeping clear of open panels.
   Anything you've placed by hand stays where you put it; closing a thread never
@@ -438,7 +440,6 @@ the types are broken.
 | `src/client/local.ts` | Questions answered from live readings, never from a model |
 | `src/client/threads.ts` | The Threads list, what the stage reports back, the links between threads |
 | `src/client/links.ts` | Which threads are about the same things, and why — the board's web |
-| `src/client/subject.ts` | Whether a question carries the thread in front on, or is a new subject that gets a thread of its own |
 | `src/client/memory.ts` | The board's room in the browser's storage: a word when it's nearly full, and at once if a save is refused |
 | `src/client/voice-ui.ts` | JARVIS as the microphone, the keyboard, Esc, the voice controls |
 | `src/client/drawer.ts` | The configuration drawer and its tabs |

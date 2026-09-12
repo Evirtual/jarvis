@@ -54,3 +54,11 @@ test("a thread connected on purpose, or a branch, is related even before anythin
   assert.ok(r.find((x) => x.id === "empty")!.why.includes("same trip"));
   assert.ok(r.find((x) => x.id === "kid")!.why.includes("branch"));
 });
+
+test("“I'd” and other contractions are not names two threads share", () => {
+  const r = relatedness([
+    th("lis", "Lisbon in October", [["weather in Lisbon", "I’d pack layers, sir; I’m told it's mild."]]),
+    th("pasta", "Making Pasta Carbonara", [["what wine with carbonara", "I’d choose a Frascati, sir. I'm fond of it."]]),
+  ], "lis");
+  assert.deepEqual(r, [], `found ${JSON.stringify(r)}`);
+});
