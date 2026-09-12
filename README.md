@@ -427,6 +427,8 @@ the types are broken.
 | `src/client/confirm.ts` | Anything destructive waits for a yes — by button or by word |
 | `src/client/local.ts` | Questions answered from live readings, never from a model |
 | `src/client/threads.ts` | The Threads list, what the stage reports back, the links between threads |
+| `src/client/links.ts` | Which threads are about the same things, and why — the board's web |
+| `src/client/subject.ts` | Whether a question carries the thread in front on, or is a new subject that gets a thread of its own |
 | `src/client/voice-ui.ts` | JARVIS as the microphone, the keyboard, Esc, the voice controls |
 | `src/client/drawer.ts` | The configuration drawer and its tabs |
 | `src/client/stage.ts` | The board: JARVIS, windows, bubbles, the bin, media in threads |
