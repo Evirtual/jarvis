@@ -74,6 +74,14 @@ product. Connect both and JARVIS falls back from one to the other, saying why.
 - **[Development](docs/DEVELOPMENT.md)** — commands, the code map and tests
 - **[QA log](docs/QA.md)** — the manual test plan and every end-to-end run
 
+## Support
+
+The console is free and runs on your own keys, so it costs nothing to run
+for anyone but you. If it earns its keep, you can
+[sponsor it on GitHub](https://github.com/sponsors/Evirtual) — one-off or
+monthly, nothing locked behind it. Details and tiers in
+[docs/SUPPORT.md](docs/SUPPORT.md).
+
 ## Licence
 
 [AGPL-3.0](LICENSE). Use it, read it, change it, share it; if you run a

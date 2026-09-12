@@ -966,6 +966,8 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .hint { margin: 8px 0 0; font-size: 10px; color: var(--ice-dim); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 7px; }
 .hint.warn { color: var(--gold); }
 .hint b { color: var(--text-hi); font-weight: 600; }
+.hint a { color: var(--ice); text-decoration: none; border-bottom: 1px solid rgba(111,240,255,.35); }
+.hint a:hover { border-bottom-color: var(--ice); }
 .hint kbd { font-family: var(--f-mono); font-size: 9.5px; color: var(--text-hi); border: 1px solid var(--line-hot); padding: 0 4px; background: #071119; }
 
 .quick { display: flex; flex-direction: column; gap: 5px; }

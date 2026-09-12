@@ -84,6 +84,7 @@ the web version answers the same API calls in the browser
 | `.github/workflows/` | `ci.yml` (typecheck, tests, build on every push) and `pages.yml` (publishes the web version) |
 | `docs/QA.md` | The manual test plan and a log of every run |
 | `docs/PLAN-*.md` | Design decisions: the connection as the core; code mode |
+| `docs/SUPPORT.md`, `.github/FUNDING.yml` | How to support the project, the sponsor tiers, and what puts the Sponsor button on the repository |
 
 ## Tests
 
