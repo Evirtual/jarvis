@@ -71,14 +71,14 @@ export interface ParseContext {
   pendingApproval: boolean;
 }
 
-export const NO_CONTEXT: ParseContext = { knowsThread: () => false, knowsGroup: () => false, pendingApproval: false };
+const NO_CONTEXT: ParseContext = { knowsThread: () => false, knowsGroup: () => false, pendingApproval: false };
 
 const CORE_NAMES: Record<string, ProviderWord> = {
   chatgpt: "openai", "open ai": "openai", openai: "openai", gpt: "openai",
   gemini: "gemini", google: "gemini",
 };
 
-export function coreFrom(word: string): ProviderWord | null {
+function coreFrom(word: string): ProviderWord | null {
   const k = word.toLowerCase().replace(/\s+/g, " ").trim();
   return CORE_NAMES[k] ?? null;
 }

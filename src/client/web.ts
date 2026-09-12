@@ -8,6 +8,7 @@
  * answers for threads, colours, relatedness and the board's edges.
  */
 
+import { reduceMotion } from "./motion.js";
 import { threadRef, type Thread } from "./workspace.js";
 
 /** What the web shows about another thread. */
@@ -25,7 +26,6 @@ export interface WebHost {
   pick(id: string): void;
 }
 
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export class ContextWeb {
   readonly el: HTMLElement;

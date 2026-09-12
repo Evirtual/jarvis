@@ -1,9 +1,9 @@
 name: Pages
 
 # Publishes the console to GitHub Pages on every push to main — the serverless
-# build: no console server behind it. The browser talks to OpenAI, Anthropic
-# or Google directly with the key the user connects (kept in their own
-# browser), and measures what a browser can of the device it runs on.
+# build: no console server behind it. The browser talks to Gemini or OpenAI
+# directly with the key the user connects (kept in their own browser), and
+# measures what a browser can of the device it runs on.
 #
 # Repository variable (optional):
 #   JARVIS_SITE_URL  https://jarvis.example.com  set once a custom domain serves

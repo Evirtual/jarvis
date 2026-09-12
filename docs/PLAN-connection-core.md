@@ -1,168 +1,101 @@
 # Plan: the connection is the core
 
-**Decided (2026-09-12).** One connected service gives JARVIS everything —
-his reasoning, his hearing and his voice — and the console is the same on
-the PC, on the web and on the phone. Two services: **OpenAI** and **Gemini**.
-Gemini's free tier makes it the recommended first connection. Claude leaves
-the chat connections and lives only in code mode (`PLAN-code-mode.md`), where
-the Max plan counts; Codex on a ChatGPT plan joins it there later. OpenRouter
-goes: 50 free questions a day and then credit anyway, for a second sign-in
-path and a set of confusing errors.
+**Decided (2026-09-12).** One connected service gives JARVIS everything:
+his reasoning, his hearing and his voice. The console behaves the same on the
+PC, on the web and on the phone. There are two services, **Gemini** and
+**OpenAI**. Gemini comes first because its free tier needs no card. Claude
+leaves the chat connections and lives only in code mode
+(`PLAN-code-mode.md`), where a Max plan counts; Codex on a ChatGPT plan joins
+it there later. OpenRouter goes: it gave 50 free questions a day, then needed
+credit anyway, and it added a second sign-in path and a set of confusing
+errors.
 
-**Settled with the user, later the same day:** no speech engine of its own,
-anywhere. Moonshine (hearing) and Kokoro (voice) both go, PC included, and
-their dependencies with them. The **device's own voice is the default** —
-instant, free, the same on the PC and the web — and the connected service's
-neural voice is offered as a choice in Configuration → Voice. The service
-hears everywhere. (Kokoro on the web was briefly rebuilt as an optional
-download on the graphics chip, and dropped the same hour to keep the app to
-one way of speaking.)
+**Settled with the user the same day:**
+
+- **No speech engine of the app's own, anywhere.** Moonshine (hearing) and
+  Kokoro (voice) both go, PC included, and so do their dependencies.
+- **JARVIS speaks with the connected service's voice.** Gemini's voices
+  through Gemini, ChatGPT's through ChatGPT.
+- **The device's own voice is only the fallback,** used when no service is
+  connected or the service's voice has hit its limit.
+- **The service hears everywhere.** The browser's dictation is the fallback.
 
 ## Why
 
-The web version ran the speech models in the browser — Kokoro to speak,
+The web version ran the speech models in the browser: Kokoro to speak,
 Moonshine to hear. In a browser they are five to ten times slower than on the
-PC, Brave lies about the core count, and a sentence could take half a minute.
-A day of scheduling work did not make it fluid, because the problem is where
-the work runs, not how it is cut. The services we already connect can speak
-and hear, from a browser, in well under a second. So: no model runs in the
-browser. Ever.
+PC, and a sentence could take half a minute. A day of scheduling work did not
+make it fluid, because the problem was where the work ran, not how it was
+cut. The services we already connect can speak and hear, from a browser, in
+well under a second. So no model runs in the browser.
 
 ## What each service gives, from the browser and the PC alike
 
 | | Text | Hearing (speech → text) | Voice (text → speech) | Cost |
 |---|---|---|---|---|
-| **Gemini** | Flash, newest | the Flash model takes audio directly | `gemini-*-tts` models, 30 voices, style by instruction; 3.1 streams | free tier for text and voice (rate-limited); audio input on the free tier to be confirmed on a real key |
-| **OpenAI** | GPT-5 family, newest | `gpt-transcribe` / `gpt-4o-mini-transcribe`, ~$0.003–0.0045 a minute | `gpt-4o-mini-tts`, 13 voices, an `instructions` line for accent and manner, streams PCM | prepaid credit; an hour of talking well under $1 |
+| **Gemini** | the newest `gemini-N` model | `gemini-3.5-transcribe` when the account has it, otherwise the chat model takes the audio directly | the `*-tts` models, the voice's manner given as an instruction | free tier: text generous, voice about 10 lines a day per model |
+| **OpenAI** | the newest GPT model (dated snapshots, `chat-latest` and live models left out) | the newest `*-transcribe` model | the newest `*-tts` model, 13 voices, streamed | prepaid credit; an hour of talking well under $1 |
 
 Both accept plain `fetch` from a browser with the user's own key. Neither
-subscription (ChatGPT Plus, Claude Pro/Max) covers API use; that is not a
-thing we can change, and the setup guide says so plainly.
+subscription (ChatGPT Plus, Claude Pro/Max) covers API use. We can't change
+that, and the setup guide will say so plainly.
 
-Verified today: OpenAI lists `gpt-4o-mini-tts-2025-12-15`, `gpt-transcribe`,
-`gpt-4o-mini-transcribe-2025-12-15`. Not yet verified (no credit on the
-OpenAI key, no Gemini key on the PC): first-audio latency, and whether the
-Gemini free tier accepts audio input. Both are checked in phase 1 with
-`scratchpad/speech-probe.mjs`, which prints timings and never a key.
-
-## The shape
+## What was built
 
 ```
                     ┌──────────────── shared/services ────────────────┐
-                    │  Service = { validate, chat, speak, hear }       │
-                    │  openai.ts   gemini.ts                          │
+                    │  common.ts: Service = { catalogue, chat,        │
+                    │             speak, hear }, persona, helpers     │
+                    │  gemini.ts   openai.ts                          │
+                    │  index.ts: an account's models tried in turn,   │
+                    │            errors in plain words                │
                     └────────────┬───────────────────────┬────────────┘
                                  │                       │
      PC:  server/index.ts ───────┘        web: client/browser-core.ts
           + keys on disk (config.json)          + keys in localStorage
-          + Kokoro / Moonshine offline          (nothing else)
-          + real sensors, scan, code mode
+          + real sensors and network sweep
                                  │                       │
                                  └────── client/api.ts ──┘  (one interface)
                                                  │
-                 ask.ts   speech.ts   connections.ts   setup.ts
+                        ask.ts   voice.ts   connections.ts
 ```
 
-### 1. `shared/services/` replaces `shared/providers.ts`
+- **One module per service, one interface.** `catalogue` lists the
+  account's models once and sorts them into three jobs: chat, speech and
+  hearing. `rankModels` picks the newest capable model for each job.
+  `speak` yields 24 kHz PCM as it arrives; `hear` takes the recording as it
+  was made.
+- **Models are tried in turn.** `speakWith` and `hearWith` move to the
+  account's next model when one runs out, and leave the spent model to rest
+  for 15 minutes. `humanise` turns each refusal into a plain sentence: a
+  daily quota, a momentary one, out of credit, or a rejected key.
+- **`voice.ts` chooses the voice once.** If a service is connected, it uses
+  that service's voice: the one picked in Configuration → Voice
+  (remembered per service), otherwise the first on its list. If no service is
+  connected, or its voice is resting after a refusal (10 minutes), it uses the
+  device's voice and says why, once. Playback streams in quarter-second
+  slices, with silence trimmed at the joins.
+- **Removed:** OpenRouter (`oauth.ts`, its route and messages), Anthropic from
+  chat (the SDK went with it), Kokoro and Moonshine with their workers and
+  dependencies, and the cross-origin isolation in `sw.js` that existed only for
+  them. The one runtime dependency left is `openai`.
 
-One module per service, one interface:
+## Still to build: the first-run guide (`client/setup.ts`)
 
-```ts
-interface Service {
-  meta: ServiceMeta;                       // name, key page, cost line, free?
-  validate(key): Promise<Catalogue>;       // { chat: string[]; speech: string[]; hearing: string[]; voices: VoiceOption[] }
-  chat(key, model, turns, emit, signal, persona): Promise<void>;   // as today
-  speak(key, model, text, voice, style, signal): AsyncIterable<Int16Array>;  // 24 kHz PCM, streamed
-  hear(key, model, audio: Blob, hint: string): Promise<string>;
-}
-```
+Shown once (`jarvis.setupDone`) and reopened from Configuration. It checks
+where it is running (`SERVERLESS`) and says so:
 
-- `validate` lists the account's models once and sorts them into the three
-  jobs; `rankModels` picks the newest capable one for each (the rule the
-  console already follows for text: always the latest). The Connections
-  screen shows all three choices.
-- `chat` is today's streaming adapter, unchanged in behaviour (search
-  grounding on Gemini, the `[[…]]` directives, `humanise` for errors).
-- `speak` yields PCM as it arrives. OpenAI streams; Gemini 3.1 TTS streams,
-  2.5 returns whole. The player (`speech.ts`) does not care which.
-- `hear` sends the recording as it was made (WebM/Opus or WAV); both services
-  take those. `audio.ts` stays only for the PC's Moonshine.
-- The JARVIS voice per service is chosen by us and can be changed in Config:
-  OpenAI `ash` (or `cedar`) with the instruction *"a calm, precise British
-  butler; Received Pronunciation; unhurried"*; Gemini `Charon` with the same
-  line in the prompt; on the PC offline, Kokoro `bm_george`.
-
-### 2. `client/speech.ts` — one chooser, one player
-
-Replaces the engine logic scattered over `voice.ts`, `voice-ui.ts`,
-`browser-voice.ts`, `browser-hearing.ts`, `server/transcribe.ts` and
-`server/index.ts`. It decides **once**, and Config → Voice shows the decision
-in one line:
-
-- **Voice:** the active connection's voice → (PC only) Kokoro offline → the
-  device's own voice. "Speaking through Gemini · Charon" / "Speaking with this
-  PC's own voice (offline)" / "Speaking with Windows' voice — connect a
-  service for JARVIS's own".
-- **Hearing:** the active connection's hearing → (PC only) Moonshine → the
-  browser's dictation → the keyboard. Same one-line status.
-
-The player keeps what already works — sentences cut as they arrive and
-scheduled back to back on the audio clock, silence trimmed at the joins — and
-requests them **in parallel over the network**, so the first sentence plays
-within about a second and the rest are ready before they are due. No pacing,
-no lanes, no per-device speed tests.
-
-`voice.ts` shrinks to: the microphone (recording and silence detection), the
-audio graph and amplitude for the globe, and the sentence splitter.
-
-### 3. `client/setup.ts` — the first-run guide
-
-Shown once (`jarvis.setupDone`), reopened from Config. It reads where it is
-(`SERVERLESS`) and says so:
-
-1. **Where you are.** "Running on your PC" — keys stay on this machine, the
-   offline voice and real sensors are here; or "Running as a web page" — keys
-   stay in this browser and go only to the service they belong to.
-2. **Connect.** Two cards. *Gemini — free, no card; gives text, hearing and
-   voice.* *OpenAI — the best voice; needs a small prepaid credit.* Each with
-   its key page one tap away and the paste field. The guide waits for one to
-   validate and then says what JARVIS can now do.
+1. **Where you are.** "Running on your PC": keys stay on this machine, and
+   the real sensors are here. Or "Running as a web page": keys stay in this
+   browser and go only to the service they belong to.
+2. **Connect.** Two cards. *Gemini: free, no card; gives text, hearing and
+   voice.* *OpenAI: needs a small prepaid credit.* Each has its key page one
+   tap away and a paste field. The guide waits for one key to validate, then
+   says what JARVIS can now do.
 3. **Say hello.** Microphone permission, one spoken line back through the
-   connection, and the address (sir / ma'am).
-4. **(PC) Code mode.** A note that code mode signs in with a Claude or ChatGPT
-   account through Claude Code or Codex — a later step, not blocking.
+   connection, and the address (sir or ma'am).
+4. **(PC) Code mode.** A note that code mode signs in with a Claude or
+   ChatGPT account through Claude Code or Codex. It's a later step and
+   doesn't block setup.
 
-### 4. What goes
-
-- `openrouter` everywhere: `oauth.ts`, the server route, the provider, the
-  free-limit messages.
-- `anthropic` from the chat providers (the SDK dependency goes with it; code
-  mode uses the CLI, not the SDK).
-- `browser-voice.ts`, `voice-worker.ts`, `browser-hearing.ts`,
-  `hearing-worker.ts`, the `/ort/` copy, the cross-origin isolation in
-  `sw.js` (it existed only for those threads).
-- The stashed voice-pacing experiment (`git stash list`).
-- `kokoro-js` and `@huggingface/transformers` remain **server** dependencies
-  only, for the PC's offline fallback.
-
-## Phases
-
-1. **Services** — `shared/services/{index,openai,gemini}.ts` with
-   `validate/chat/speak/hear`; types; the server's routes and `browser-core.ts`
-   delegate to them (`/api/speak` and `/api/transcribe` take a `via`:
-   connection or offline). Remove OpenRouter and Anthropic. Probe both
-   services on real keys and record the numbers in `QA.md`.
-2. **Speech** — `client/speech.ts` chooser and player; `voice.ts` trimmed;
-   in-browser models deleted; Config → Voice shows source and voice; the phone
-   checked on the live site.
-3. **Setup guide** — `client/setup.ts`, first run on both versions, voice
-   commands "run setup" / "show me the guide".
-4. **Docs and QA** — README "Two ways to run it" rewritten around the
-   connection; `QA.md` entries; memory updated.
-
-## Open until a key is on the PC
-
-- Gemini free tier and audio input: run the probe once the Gemini key is
-  connected on the PC's Connections screen (the user pastes it there; it is
-  never shown or typed by the assistant).
-- OpenAI's voice latency: needs credit on the account first.
+Voice commands "run setup" and "show me the guide" open it again.

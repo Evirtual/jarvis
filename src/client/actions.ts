@@ -2,29 +2,25 @@
  * Carrying out what was asked — by you, or by the reasoning core's directives.
  */
 
-import type { ProviderId, ScanResponse, TelemetryResponse, WorldResponse } from "../shared/types.js";
+import type { ProviderId } from "../shared/types.js";
 import type { NeuralVoice } from "./voice.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
 import {
-  NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type Action, type ConfigTab, type ParseContext, type ProviderWord,
+  NEEDS_CONFIRMATION, type Action, type ParseContext, type ProviderWord,
 } from "./commands.js";
-import { addressed, getAddress, setAddress, type Address } from "./address.js";
-import { ICON, instrumentIcon as icon } from "./icons.js";
-import { $, esc, fmtRate, gib, gib0, hhmm, recall, setMeter, setPill, store } from "./dom.js";
-import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
-import { type PanelName } from "./panels.js";
-import { line, type Thread } from "./stage.js";
-import { clip, editDistance } from "./text.js";
+import { $ } from "./dom.js";
+import { type Thread } from "./stage.js";
+import { editDistance } from "./text.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
-import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
+import { conn, graph, panels, voice, ws } from "./state.js";
 import { announce, sys } from "./say.js";
 import { answerConfirm, confirmFirst, deleteGroup, lostWords, pendingConfirm } from "./confirm.js";
 import { paintThread, refreshLinks } from "./threads.js";
 import { enqueue } from "./ask.js";
 import { sweep } from "./readings.js";
 import { mode } from "./deck.js";
-import { applyAddress, setVoiceOut, showKeyboard } from "./voice-ui.js";
+import { applyAddress, setVoiceOut } from "./voice-ui.js";
 import { setDrawer } from "./drawer.js";
 
 /* ===================================================================== *
@@ -36,11 +32,11 @@ import { setDrawer } from "./drawer.js";
  * something waits for the user to confirm.
  * ===================================================================== */
 
-export function coreLabel(p: ProviderWord): string {
+function coreLabel(p: ProviderWord): string {
   return PROVIDERS[p].name;
 }
 
-export function findVoice(name: string): NeuralVoice | null {
+function findVoice(name: string): NeuralVoice | null {
   const n = name.toLowerCase();
   const all = voice.neuralVoices();
   return (

@@ -5,20 +5,19 @@
  * before anything that needs it.
  */
 
-import { Hud } from "./canvas.js";
+import { Radar } from "./radar.js";
 import { Connections } from "./connections.js";
 import { $ } from "./dom.js";
 import { Panels } from "./panels.js";
 import { Stage } from "./stage.js";
 import { Voice } from "./voice.js";
 
-export const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export const voice = new Voice();
 export const conn = new Connections();
 export const graph = new Stage($("stage"), $<HTMLCanvasElement>("graph"), $("windows"));
 export const ws = graph.ws;
-export const hud = new Hud($<HTMLCanvasElement>("radar"));
+export const radar = new Radar($<HTMLCanvasElement>("radar"));
 export const panels = new Panels($("overlays"));
 
 /** The command line. */

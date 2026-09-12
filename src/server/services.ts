@@ -10,7 +10,7 @@ import type { Catalogue, KeySource, ProviderId } from "../shared/types.js";
 import { humanise, serviceFor } from "../shared/services/index.js";
 import { getModel, resolveKey } from "./config.js";
 
-export { PROVIDERS, SPEECH_RATE, hearWith, humanise, personaFor, prepareTurns, serviceFor, speakWith } from "../shared/services/index.js";
+export { PROVIDERS, SPEECH_RATE, hearWith, humanise, maskKey, personaFor, prepareTurns, serviceFor, speakWith } from "../shared/services/index.js";
 
 /* ------------------------------------------------------------------ *
  * Cached validation, so a key is never re-checked on every page load.

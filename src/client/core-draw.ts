@@ -4,11 +4,11 @@
  * handed in — so the stage decides what, and this decides how.
  */
 
+import { reduceMotion } from "./motion.js";
+
 /** The core is designed at DESIGN_R and drawn at CORE_R. */
 export const CORE_R = 52;
 export const DESIGN_R = 74;
-
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export type Activity = "idle" | "listening" | "speaking" | "thinking";
 

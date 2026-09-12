@@ -11,24 +11,17 @@
  * uplink data rather than inventing any.
  */
 
-import { execFile } from "node:child_process";
 import { setDefaultResultOrder } from "node:dns";
 
 import type { Anchor, WorldResponse } from "../shared/types.js";
 import { weatherAt } from "../shared/weather.js";
+import { exec } from "./exec.js";
 
 // Some networks resolve these hosts to an unreachable IPv6 address first, which
 // surfaces as a 10 s connect timeout. Prefer A records.
 setDefaultResultOrder("ipv4first");
 
 const OFFLINE = process.env.JARVIS_OFFLINE === "1";
-
-const exec = (cmd: string, args: string[], timeout = 5000): Promise<string> =>
-  new Promise((resolve) => {
-    execFile(cmd, args, { windowsHide: true, timeout }, (err, stdout) =>
-      resolve(err ? "" : String(stdout)),
-    );
-  });
 
 async function getJson<T>(url: string, ms = 8000): Promise<T> {
   const r = await fetch(url, { signal: AbortSignal.timeout(ms) });

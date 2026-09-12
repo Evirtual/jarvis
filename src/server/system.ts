@@ -11,7 +11,6 @@
  */
 
 import os from "node:os";
-import { execFile } from "node:child_process";
 
 import type {
   BatteryReading,
@@ -23,13 +22,7 @@ import type {
   NetReading,
   WifiReading,
 } from "../shared/types.js";
-
-const exec = (cmd: string, args: string[], timeout = 6000): Promise<string> =>
-  new Promise((resolve) => {
-    execFile(cmd, args, { windowsHide: true, timeout, maxBuffer: 1 << 20 }, (err, stdout) =>
-      resolve(err ? "" : String(stdout)),
-    );
-  });
+import { exec } from "./exec.js";
 
 /* ------------------------------------------------------------------ *
  * CPU — real per-core utilisation from cumulative tick deltas

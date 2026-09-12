@@ -29,7 +29,6 @@
   --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
   --chamfer: none;
 
-  --gap: 12px;
   --tap: 44px;
 
   /* Motion: things here settle rather than snap. One curve for travel, one
@@ -197,7 +196,6 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
 }
 .pill.more[aria-expanded="true"] { border-color: var(--ice); background: rgba(111,240,255,.1); }
-.caret-dn { font-size: 10px; color: var(--ice-dim); line-height: 1; }
 .menu {
   position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 60; min-width: 210px;
   display: flex; flex-direction: column; gap: 2px; padding: 6px;
@@ -220,7 +218,6 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .menu-item.warn .v { color: var(--gold); } .menu-item.crit .v { color: var(--red); }
 .menu-item.static { cursor: default; }
 .menu-item.static:hover { border-color: transparent; background: transparent; }
-.menu-sep { height: 1px; background: var(--line); margin: 4px 2px; }
 .pill {
   font: inherit; color: inherit; cursor: pointer;
   transition: border-color .18s, background .18s, box-shadow .18s;
@@ -263,7 +260,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .kv { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 11px; padding: 3px 0; }
 .kv .k { font-family: var(--f-hud); font-weight: 600; font-size: 8.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); white-space: nowrap; }
 .kv .v { color: var(--text-hi); text-align: right; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kv .v.gold { color: var(--gold); } .kv .v.red { color: var(--red); } .kv .v.green { color: var(--green); }
+.kv .v.gold { color: var(--gold); }
 
 .meter { margin: 6px 0 2px; }
 .meter .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; font-size: 11px; }
@@ -637,14 +634,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
   font-size: 11.5px; color: var(--ice-dim); max-width: 280px;
 }
 
-/* ---------- a clean screen, and a word under the core ---------- */
-.stage-empty {
-  position: absolute; transform: translateX(-50%); z-index: 4; text-align: center;
-  pointer-events: none; max-width: 360px; display: flex; flex-direction: column; gap: 6px;
-  animation: bloom .6s var(--ease) backwards;
-}
-.stage-empty b { font-family: var(--f-hud); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--ice-dim); font-weight: 700; }
-.stage-empty span { font-size: 11.5px; color: #40788c; }
+/* ---------- a word under the core ---------- */
 .toast {
   position: absolute; left: var(--core-x, 50%); top: var(--status-y, 70%); z-index: 215; pointer-events: none;
   transform: translate(-50%, calc(-100% + 10px)); opacity: 0;
@@ -726,11 +716,6 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .cw-msg.user { color: var(--gold); padding-left: 9px; border-left: 2px solid rgba(255,182,72,.45); }
 .cw-msg.jarvis { color: var(--text-hi); }
 .cw-msg.sys { color: var(--ice-dim); font-size: 10.5px; }
-.cw-msg.alert { color: var(--red); }
-.cw-msg.tool { color: #7fb8c9; font-size: 10.5px; padding-left: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* the confirm row for anything that destroys something */
-.cw-confirm { border: 1px solid rgba(255,79,95,.5); background: rgba(255,79,95,.05); padding: 8px 9px; display: flex; flex-direction: column; gap: 7px; }
 
 /* ---------- the Threads list: the whole board as a list ---------- */
 .panel.float[data-panel="threads"] {
@@ -852,35 +837,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 
 .chatwin.shut .cw-w, .chatwin.shut .cw-b, .chatwin.shut .cw-del { display: none; }
 
-/* ---------- reactor (unused by the stage; kept for canvas.ts) ---------- */
-.core-bay {
-  display: flex; align-items: center; gap: 16px;
-  border: 1px solid var(--line);
-  background: radial-gradient(circle at 76px 50%, rgba(111,240,255,.09), transparent 62%), linear-gradient(180deg, var(--panel-hi), var(--panel));
-  clip-path: var(--chamfer); padding: 11px 15px;
-}
-#reactor { width: 128px; height: 128px; flex: none; display: block; }
-.bay-read { flex: 1; min-width: 0; }
-.bay-read .unit { font-family: var(--f-hud); font-size: 9px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: var(--ice-dim); }
-.bay-read .headline { font-family: var(--f-hud); font-weight: 700; font-size: 23px; letter-spacing: .04em; color: var(--text-hi); margin: 2px 0 9px; }
-.bay-read .headline em { font-style: normal; color: var(--ice); }
-.bay-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
-.bay-cell .k { font-family: var(--f-hud); font-size: 8px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim); }
-.bay-cell .v { font-size: 13px; color: var(--text-hi); font-variant-numeric: tabular-nums; font-weight: 500; }
-.bay-cell .v.gold { color: var(--gold); }
-
-/* ---------- log ---------- */
-.log-wrap { border: 1px solid var(--line); background: linear-gradient(180deg, rgba(10,20,29,.9), rgba(6,13,20,.9)); clip-path: var(--chamfer); min-height: 0; display: flex; flex-direction: column; }
-.log-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-family: var(--f-hud); font-size: 9px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: var(--ice-dim); }
-.log-head .live { color: var(--ice); }
-.log { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 11px 13px 15px; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth; }
-.msg { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; align-items: start; }
-.msg .who { font-family: var(--f-hud); font-size: 8.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; padding-top: 3px; text-align: right; white-space: nowrap; }
-.msg .body { min-width: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
-.msg.jarvis .who { color: var(--ice); } .msg.jarvis .body { color: var(--text-hi); }
-.msg.user .who { color: var(--gold); } .msg.user .body { color: var(--text); }
-.msg.sys .who { color: #1f5164; } .msg.sys .body { color: var(--ice-dim); font-size: 11px; }
-.msg.alert .who, .msg.alert .body { color: var(--red); }
+/* the caret that trails a reply while it is still being written */
 .caret { display: inline-block; width: 7px; height: 12px; background: var(--ice); vertical-align: -2px; animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: .15; } }
 
@@ -905,13 +862,6 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .btn.wide { width: 100%; }
 .btn.primary { color: var(--void); background: var(--ice); border-color: var(--ice); font-weight: 700; }
 .btn.danger:hover:not(:disabled) { color: var(--red); border-color: var(--red); background: rgba(255,79,95,.08); }
-
-.vox { display: flex; align-items: flex-end; gap: 2px; height: 15px; width: 32px; flex: none; }
-.vox i { display: block; width: 3px; height: 3px; background: var(--line-hot); }
-.vox.live i { background: var(--ice); animation: vox .6s ease-in-out infinite alternate; }
-.vox.live i:nth-child(2){animation-delay:.1s} .vox.live i:nth-child(3){animation-delay:.22s}
-.vox.live i:nth-child(4){animation-delay:.07s} .vox.live i:nth-child(5){animation-delay:.16s}
-@keyframes vox { from { height: 3px; } to { height: 15px; } }
 
 /* ---------- radar ---------- */
 #radar { width: 100%; height: auto; aspect-ratio: 1; display: block; cursor: crosshair; }
@@ -1157,10 +1107,8 @@ body.m-compact .drawer { width: 100%; max-width: 100%; }
 .mi-ic { width: 18px; height: 18px; color: var(--ice-dim); }
 .menu-item .v { text-align: right; }
 
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
-  .log { scroll-behavior: auto; }
 }
 
 /* The default colour of a reading and of a More row — zero specificity, so an

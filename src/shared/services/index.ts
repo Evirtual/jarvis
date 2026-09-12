@@ -15,7 +15,7 @@ import { openai } from "./openai.js";
 import type { Service } from "./common.js";
 
 export {
-  MANNER, PERSONA, SPEECH_RATE, bytesOf, personaFor, prepareTurns, rankModels,
+  MANNER, PERSONA, SPEECH_RATE, bytesOf, maskKey, personaFor, prepareTurns, rankModels,
   type Address, type Service,
 } from "./common.js";
 

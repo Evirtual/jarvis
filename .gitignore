@@ -1,9 +1,6 @@
 node_modules/
 dist/
-.models/
-.cache/
 config.json
-*.wav
 .env
 .env.local
 *.log

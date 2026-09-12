@@ -2,20 +2,10 @@
  * The instruments: painting the live readings, and receiving them.
  */
 
-import type { ProviderId, ScanResponse, TelemetryResponse, VoiceOption, WorldResponse } from "../shared/types.js";
+import type { ScanResponse, TelemetryResponse, WorldResponse } from "../shared/types.js";
 import { api } from "./api.js";
-import {
-  NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type Action, type ConfigTab, type ParseContext, type ProviderWord,
-} from "./commands.js";
-import { addressed, getAddress, setAddress, type Address } from "./address.js";
-import { ICON, instrumentIcon as icon } from "./icons.js";
-import { $, esc, fmtRate, gib, gib0, hhmm, recall, setMeter, setPill, store } from "./dom.js";
-import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
-import { type PanelName } from "./panels.js";
-import { line, type Thread } from "./stage.js";
-import { clip, editDistance } from "./text.js";
-import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
-import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
+import { $, esc, fmtRate, gib, gib0, hhmm, setMeter, setPill } from "./dom.js";
+import { radar, panels } from "./state.js";
 import { paintCoreState, sys } from "./say.js";
 import { fitDockIfChanged } from "./deck.js";
 import { SERVERLESS } from "./server.js";
@@ -75,7 +65,6 @@ function drawSpark(): void {
 
 export function paintTelemetry(): void {
   if (!T) return;
-  hud.telemetry = T;
   if (T.web) { paintWeb(T); fitDockIfChanged(); return; }
   // The readings in the deck are always painted; a panel's body only while
   // it is open (and again the moment it opens — see deck.ts).
@@ -292,7 +281,7 @@ function paintWeb(t: TelemetryResponse): void {
 }
 let lastRttAt = 0;
 
-export function paintWorld(): void {
+function paintWorld(): void {
   if (W.uplink) {
     $("pubip").textContent = W.uplink.ip;
     $("isp").textContent = `${W.uplink.isp}${W.uplink.asn ? ` · ${W.uplink.asn}` : ""}`;
@@ -326,7 +315,7 @@ export function paintHosts(): void {
   }
   wrap.innerHTML = S.hosts
     .map((h) => {
-      const cls = ["host", h.gateway ? "gw" : "", h.self ? "self" : "", hud.hoverIp === h.ip ? "lit" : ""]
+      const cls = ["host", h.gateway ? "gw" : "", h.self ? "self" : "", radar.hoverIp === h.ip ? "lit" : ""]
         .filter(Boolean).join(" ");
       const label = [h.hostname, h.vendor].filter(Boolean).join(" · ") || h.mac || "unidentified";
       const role = SERVERLESS ? "" : h.gateway ? "router · " : h.self ? "this console · " : "";
@@ -338,7 +327,7 @@ export function paintHosts(): void {
     })
     .join("");
 }
-hud.onHover = paintHosts;
+radar.onHover = paintHosts;
 
 /* ===================================================================== *
  * Receiving the readings: one pushed stream, open only while the tab is
@@ -363,7 +352,7 @@ function applyScan(next: ScanResponse): void {
   const changed = next.at !== S.at;
   const wasRunning = S.running;
   S = next;
-  if (changed) { hud.layout(S.hosts); paintHosts(); }
+  if (changed) { radar.layout(S.hosts); paintHosts(); }
   $("hostCount").textContent = String(S.hosts.length);
   $("pLan").textContent = S.hosts.length ? String(S.hosts.length) : "—";
   $("subnetLbl").textContent = S.subnet ?? "—";
@@ -401,7 +390,7 @@ export function startReadings(): void {
   if (SERVERLESS) {
     // No server: the browser measures, and pauses itself while out of sight.
     // the services it sweeps are across the internet: a radar scaled to match
-    hud.scale = { maxMs: 1000, rings: [10, 50, 200, 1000] };
+    radar.scale = { maxMs: 1000, rings: [10, 50, 200, 1000] };
     applyScan(S);
     startSensors(applyTelemetry, applyWorld, applyScan);
     $("locateBtn").addEventListener("click", locate);
@@ -421,7 +410,7 @@ export function startReadings(): void {
 }
 
 /** Start a sweep — only ever on request; its results arrive on the stream. */
-export async function pollScan(run = false): Promise<void> {
+async function pollScan(run = false): Promise<void> {
   if (SERVERLESS) { if (run) await sweepServices(applyScan); return; }
   try {
     applyScan(await api.scan(run));

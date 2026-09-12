@@ -2,26 +2,15 @@
  * Anything that destroys something waits for a yes — by button, or by word.
  */
 
-import type { ProviderId, ScanResponse, TelemetryResponse, VoiceOption, WorldResponse } from "../shared/types.js";
-import { api } from "./api.js";
-import {
-  NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type Action, type ConfigTab, type ParseContext, type ProviderWord,
-} from "./commands.js";
-import { addressed, getAddress, setAddress, type Address } from "./address.js";
-import { ICON, instrumentIcon as icon } from "./icons.js";
-import { $, esc, fmtRate, gib, gib0, hhmm, recall, setMeter, setPill, store } from "./dom.js";
-import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
-import { type PanelName } from "./panels.js";
-import { line, type Thread } from "./stage.js";
-import { clip, editDistance } from "./text.js";
-import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
-import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
+import { $ } from "./dom.js";
+import { type Group } from "./workspace.js";
+import { graph, ws } from "./state.js";
 import { announce, paintCoreState } from "./say.js";
 import { paintThread } from "./threads.js";
 
 export let pendingConfirm: { run: () => string; question: string; yesLabel: string } | null = null;
 
-export function paintConfirm(): void {
+function paintConfirm(): void {
   const dialog = $("confirmDialog");
   const backdrop = $("confirmBackdrop");
   const pending = pendingConfirm;
@@ -51,7 +40,7 @@ export function answerConfirm(yes: boolean): string | null {
   return yes ? p.run() : "Leaving it as it is, sir.";
 }
 
-export function cancelConfirm(): void {
+function cancelConfirm(): void {
   if (!pendingConfirm) return;
   pendingConfirm = null;
   paintConfirm();

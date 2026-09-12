@@ -17,6 +17,10 @@
 export const PROVIDER_IDS = ["gemini", "openai"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
+export function isProviderId(v: unknown): v is ProviderId {
+  return typeof v === "string" && (PROVIDER_IDS as readonly string[]).includes(v);
+}
+
 export interface ProviderMeta {
   id: ProviderId;
   /** What a person calls it. */

@@ -3,20 +3,11 @@
  * thread's window, his status word, and whether he is busy.
  */
 
-import type { ProviderId, ScanResponse, TelemetryResponse, VoiceOption, WorldResponse } from "../shared/types.js";
-import { api } from "./api.js";
-import {
-  NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type Action, type ConfigTab, type ParseContext, type ProviderWord,
-} from "./commands.js";
-import { addressed, getAddress, setAddress, type Address } from "./address.js";
-import { ICON, instrumentIcon as icon } from "./icons.js";
-import { $, esc, fmtRate, gib, gib0, hhmm, recall, setMeter, setPill, store } from "./dom.js";
-import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
-import { type PanelName } from "./panels.js";
-import { line, type Thread } from "./stage.js";
-import { clip, editDistance } from "./text.js";
-import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
-import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
+import { addressed } from "./address.js";
+import { $ } from "./dom.js";
+import { reduceMotion } from "./motion.js";
+import { line } from "./stage.js";
+import { graph, voice } from "./state.js";
 import { drainQueue, queued } from "./ask.js";
 import { pendingConfirm } from "./confirm.js";
 import { S } from "./readings.js";

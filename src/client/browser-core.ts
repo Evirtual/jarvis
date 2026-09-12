@@ -11,8 +11,8 @@
 import type {
   AskRequest, AskStatus, Catalogue, ConnectionsResponse, ProviderId, ProviderStatus, ProviderView, SpeakRequest, StatusResponse,
 } from "../shared/types.js";
-import { PROVIDER_IDS } from "../shared/types.js";
-import { PROVIDERS, hearWith, humanise, personaFor, prepareTurns, serviceFor, speakWith } from "../shared/services/index.js";
+import { PROVIDER_IDS, isProviderId } from "../shared/types.js";
+import { PROVIDERS, hearWith, humanise, maskKey, personaFor, prepareTurns, serviceFor, speakWith } from "../shared/services/index.js";
 import { recall, store } from "./dom.js";
 
 /* ---------------- the keys, on this device ---------------- */
@@ -32,7 +32,7 @@ function load(): Saved {
       const p = s.providers?.[id];
       if (p && typeof p.key === "string" && p.key) providers[id] = { key: p.key, ...(typeof p.model === "string" ? { model: p.model } : {}) };
     }
-    return { providers, active: PROVIDER_IDS.includes(s.active as ProviderId) ? (s.active as ProviderId) : null };
+    return { providers, active: isProviderId(s.active) ? s.active : null };
   } catch {
     return { providers: {}, active: null };
   }
@@ -41,12 +41,6 @@ function load(): Saved {
 let saved = load();
 /** False when the browser refused to keep them (storage full, or a private window that blocks it). */
 const persist = (): boolean => store(KEYS, JSON.stringify(saved));
-
-function mask(key: string): string {
-  const tail = key.slice(-4);
-  const head = key.slice(0, Math.min(7, Math.max(0, key.length - 4)));
-  return `${head}…${tail}`;
-}
 
 /* ---------------- validation, cached as the server caches it ---------------- */
 
@@ -95,13 +89,13 @@ async function view(id: ProviderId, revalidate: boolean): Promise<ProviderView> 
   const v = await validate(id, p.key, revalidate);
   const status: ProviderStatus = v.ok && v.catalogue
     ? {
-        state: "ready", maskedKey: mask(p.key), source: "saved",
+        state: "ready", maskedKey: maskKey(p.key), source: "saved",
         // a model chosen earlier that the account no longer lists (or that is no longer for chat) gives way to the newest
         models: v.catalogue.chat, model: p.model && v.catalogue.chat.includes(p.model) ? p.model : v.catalogue.chat[0] ?? "",
         voices: v.catalogue.voices, hears: v.catalogue.hearing.length > 0,
         ...(lastProblem.has(id) ? { problem: lastProblem.get(id)! } : {}),
       }
-    : { state: "error", maskedKey: mask(p.key), message: v.message ?? "Unknown error", source: "saved" };
+    : { state: "error", maskedKey: maskKey(p.key), message: v.message ?? "Unknown error", source: "saved" };
   return { ...meta, status };
 }
 
@@ -157,7 +151,7 @@ async function activeId(): Promise<ProviderId | null> {
 /* ---------------- asking ---------------- */
 
 async function ask(body: AskRequest, onDelta: (full: string) => void, onStatus: (s: AskStatus) => void, signal?: AbortSignal): Promise<string> {
-  const id = body.provider && PROVIDER_IDS.includes(body.provider) ? body.provider : await activeId();
+  const id = isProviderId(body.provider) ? body.provider : await activeId();
   if (!id) throw new Error("No reasoning core is connected.");
   const c = await connected(id);
   if (!c) throw new Error(`${PROVIDERS[id].name} isn't connected.`);

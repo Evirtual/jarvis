@@ -46,7 +46,7 @@ the web version answers the same API calls in the browser
 | `src/shared/weather.ts` | The weather from open-meteo, for both versions |
 | `src/server/index.ts` | The PC's HTTP server: the console's API, the live-readings stream, static files |
 | `src/server/services.ts`, `config.ts` | The services with a validation cache; keys and choices in `config.json` |
-| `src/server/system.ts`, `scan.ts`, `world.ts` | Machine telemetry, the network sweep, the uplink and weather |
+| `src/server/system.ts`, `scan.ts`, `world.ts`, `exec.ts` | Machine telemetry, the network sweep, the uplink and weather; running the system commands they read |
 | `src/client/main.ts` | Boot only: imports the modules below in order and starts them |
 | `src/client/state.ts` | The singletons every module shares (stage, workspace, panels, voice, connections) |
 | `src/client/server.ts` | Which version this is: the PC with its server, or the web page on its own |
@@ -68,7 +68,7 @@ the web version answers the same API calls in the browser
 | `src/client/threads.ts`, `links.ts`, `web.ts` | The Threads list; which threads are about the same things; the context web |
 | `src/client/deck.ts`, `panels.ts`, `drawer.ts` | The deck and title row; the instrument panels; the configuration drawer |
 | `src/client/say.ts`, `address.ts` | Notices, lines in a window, his status word; sir or ma'am |
-| `src/client/canvas.ts`, `core-draw.ts`, `icons.ts`, `stack.ts` | The canvases, JARVIS drawn, every icon, one stacking order |
+| `src/client/radar.ts`, `core-draw.ts`, `icons.ts`, `stack.ts`, `motion.ts` | The Perimeter radar, JARVIS drawn, every icon, one stacking order, whether to hold still |
 | `src/client/styles.css` | Ends with the two shared materials, `.glass` (every box) and `.veil` (behind anything modal); use the class rather than restyling an element |
 | `src/client/public/` | The logo, app icons, manifest, the service worker that makes it installable, robots and sitemap |
 | `scripts/icons.mjs` | Renders every icon size and the social preview image from `icon.svg` |

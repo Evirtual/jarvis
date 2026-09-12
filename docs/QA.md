@@ -810,3 +810,42 @@ Found and fixed:
     showed it: that window only redrew when its message count changed, and the
     move restored the count it had last drawn. Removing messages (a move, a
     clear) now redraws the window.
+
+### 2026-09-12 — repo recheck: leftovers and duplicates
+
+Nothing a person uses changed; each removal was checked before it went.
+Typecheck clean with `noUnusedLocals` and `noUnusedParameters` now on for both
+builds; 57 tests pass; both versions rebuilt and reloaded with no failed
+requests; the radar sweeps; the PC's telemetry (GPU, the Windows probe) and
+network sweep work through the one `exec`.
+
+- **Unused code:** 128 lines of unused imports; `nearestOnRect`; `askCore`'s
+  unused parameter; the reactor drawing in `canvas.ts`, which nothing gave a
+  canvas to, with `flash`, `amplitude`, `activity` and `telemetry`, which only
+  it read. What was left is the radar, so the file is now `radar.ts`
+  (`Radar`, `radar`).
+- **Unused styles:** the old chat log (`.log`, `.msg`), the reactor bay, the
+  voice bars (`.vox`), `.stage-empty` (which pointed at an animation that no
+  longer existed), `.cw-confirm`, `.cw-msg.alert` and `.tool`, `.menu-sep`,
+  `.caret-dn`, `.kv .v.red` and `.green`, and `--gap`, about 4 K characters.
+  The three page ids no script uses stay: `aria-controls` and
+  `aria-labelledby` point screen readers at them.
+- **One copy each:** `pace` (both voices) in `common.ts`; `maskKey` there too,
+  for the PC and the web; `isProviderId` beside `PROVIDER_IDS` in `types.ts`;
+  `exec` in `server/exec.ts` for the telemetry, the sweep and the uplink; the
+  reduced-motion check in `client/motion.ts` (not in `dom.ts`, which the tests
+  load outside a browser).
+- **Surplus `export`:** removed from 21 functions only their own file uses.
+- **Stale words:** the Pages workflow still named Anthropic; `.gitignore` kept
+  the old speech-model folders; `PLAN-connection-core.md` described the
+  in-between plan (device voice by default, Kokoro offline on the PC). It now
+  records what was built, and the setup guide still to build.
+
+Found and fixed:
+
+86. The radar's hover label tested the address with `/^d+.d+.d+.d+$/`, its
+    backslashes lost, so it never matched an IP address. It now shows the
+    last number of a LAN address, as intended.
+87. With reduced motion asked for, the radar drew one frame and stopped; if
+    the Perimeter panel was closed at that moment it stayed blank. It now
+    keeps drawing while open, with the sweep held still.

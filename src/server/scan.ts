@@ -15,16 +15,9 @@
 
 import os from "node:os";
 import dns from "node:dns/promises";
-import { execFile } from "node:child_process";
 
 import type { ScanResponse } from "../shared/types.js";
-
-const exec = (cmd: string, args: string[], timeout = 5000): Promise<string> =>
-  new Promise((resolve) => {
-    execFile(cmd, args, { windowsHide: true, timeout, maxBuffer: 1 << 22 }, (err, stdout) =>
-      resolve(err ? "" : String(stdout)),
-    );
-  });
+import { exec } from "./exec.js";
 
 /** Common home-network OUI prefixes. Enough to name most things on a LAN. */
 const OUI: Record<string, string> = {
@@ -83,7 +76,7 @@ function vendorFor(mac: string | null): string | null {
 /** Every IPv4 /24 this machine sits on, plus our own address. */
 interface Subnet { iface: string; address: string; mac: string; base: string; }
 
-export function localSubnets(): Subnet[] {
+function localSubnets(): Subnet[] {
   const out: Subnet[] = [];
   for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
     for (const a of addrs || []) {

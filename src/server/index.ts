@@ -25,15 +25,13 @@ import type {
   StatusResponse,
   TelemetryResponse,
 } from "../shared/types.js";
-import { PROVIDER_IDS } from "../shared/types.js";
+import { PROVIDER_IDS, isProviderId } from "../shared/types.js";
 
 import {
-  ROOT,
   clearKey,
   getActive,
   getModel,
   loadConfig,
-  maskKey,
   resolveKey,
   setActive,
   setKey,
@@ -46,6 +44,7 @@ import {
   connected,
   hearWith,
   humanise,
+  maskKey,
   personaFor,
   prepareTurns,
   serviceFor,
@@ -126,10 +125,6 @@ async function readJson<T>(req: http.IncomingMessage, limit?: number): Promise<T
   } catch {
     return null;
   }
-}
-
-function isProviderId(v: unknown): v is ProviderId {
-  return typeof v === "string" && (PROVIDER_IDS as readonly string[]).includes(v);
 }
 
 /* ------------------------------------------------------------------ *

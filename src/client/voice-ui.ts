@@ -3,20 +3,9 @@
  * away, Esc, and the voice controls in Configuration.
  */
 
-import type { ProviderId, ScanResponse, TelemetryResponse, VoiceOption, WorldResponse } from "../shared/types.js";
-import { api } from "./api.js";
-import {
-  NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type Action, type ConfigTab, type ParseContext, type ProviderWord,
-} from "./commands.js";
 import { addressed, getAddress, setAddress, type Address } from "./address.js";
-import { ICON, instrumentIcon as icon } from "./icons.js";
-import { $, esc, fmtRate, gib, gib0, hhmm, recall, setMeter, setPill, store } from "./dom.js";
-import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
-import { type PanelName } from "./panels.js";
-import { line, type Thread } from "./stage.js";
-import { clip, editDistance } from "./text.js";
-import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
-import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
+import { $, recall, store } from "./dom.js";
+import { graph, input, panels, voice } from "./state.js";
 import { announce, busy, paintCoreState, sys } from "./say.js";
 import { answerConfirm, pendingConfirm } from "./confirm.js";
 import { T } from "./readings.js";
@@ -47,8 +36,6 @@ document.addEventListener("keydown", (e) => {
 requestAnimationFrame(function pumpGlobe(): void {
   graph.amplitude = voice.amplitude;
   graph.activity = busy ? "thinking" : voice.listening ? "listening" : voice.speaking ? "speaking" : "idle";
-  hud.amplitude = graph.amplitude;
-  hud.activity = graph.activity;
   // Read through a call: this loop is scheduled, not immediate, but control-flow
   // analysis sees the IIFE run while T is still null and would narrow to never.
   const cur = T;
@@ -97,7 +84,7 @@ export function showKeyboard(on: boolean): void {
   }
 }
 
-export function setTapSpeaks(on: boolean): void {
+function setTapSpeaks(on: boolean): void {
   tapSpeaks = on;
   store("jarvis.tapSpeaks", on ? "1" : "0");
   $<HTMLInputElement>("tapSpeaks").checked = on;

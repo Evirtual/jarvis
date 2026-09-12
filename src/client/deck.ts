@@ -3,20 +3,10 @@
  * sheets, the phone/desktop layout switch.
  */
 
-import type { ProviderId, ScanResponse, TelemetryResponse, VoiceOption, WorldResponse } from "../shared/types.js";
-import { api } from "./api.js";
-import {
-  NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type Action, type ConfigTab, type ParseContext, type ProviderWord,
-} from "./commands.js";
-import { addressed, getAddress, setAddress, type Address } from "./address.js";
 import { ICON, instrumentIcon as icon } from "./icons.js";
-import { $, esc, fmtRate, gib, gib0, hhmm, recall, setMeter, setPill, store } from "./dom.js";
-import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
+import { $, esc } from "./dom.js";
 import { type PanelName } from "./panels.js";
-import { line, type Thread } from "./stage.js";
-import { clip, editDistance } from "./text.js";
-import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
-import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
+import { graph, radar, panels } from "./state.js";
 import { paintThreadList, paintThreadName } from "./threads.js";
 import { paintTelemetry } from "./readings.js";
 
@@ -27,7 +17,7 @@ document.querySelectorAll<HTMLElement>("[data-open]").forEach((b) => {
 panels.onChange = (): void => {
   document.querySelectorAll<HTMLElement>("[data-open]").forEach((b) => b.classList.toggle("on", panels.isOpen(b.dataset.open as PanelName)));
   if (panels.isOpen("threads")) paintThreadList();
-  hud.visible = panels.isOpen("perimeter");
+  radar.visible = panels.isOpen("perimeter");
   // a panel's body is painted only while it is open — fill it the moment it opens
   paintTelemetry();
 };
@@ -71,7 +61,7 @@ export function menuOpen(s?: Side): boolean {
 }
 
 /** One sheet at a time: opening one side's More closes the other's. */
-export function setMenu(s: Side, open: boolean): void {
+function setMenu(s: Side, open: boolean): void {
   if (open) for (const other of SIDES) if (other !== s) setMenu(other, false);
   menuOf(s).hidden = !open;
   moreBtnOf(s).setAttribute("aria-expanded", String(open));
@@ -82,7 +72,7 @@ export function closeMenus(): void {
   for (const s of SIDES) setMenu(s, false);
 }
 
-export function renderDockMenu(s: Side): void {
+function renderDockMenu(s: Side): void {
   const all = chipsOf(s);
   const items = folded[s]
     .slice()
@@ -143,7 +133,7 @@ function fitSide(s: Side): void {
   if (menuOpen(s)) renderDockMenu(s);
 }
 
-export function fitDock(): void {
+function fitDock(): void {
   for (const s of SIDES) fitSide(s);
 }
 

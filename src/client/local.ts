@@ -2,20 +2,9 @@
  * Questions answered from live readings, never from a model.
  */
 
-import type { ProviderId, ScanResponse, TelemetryResponse, VoiceOption, WorldResponse } from "../shared/types.js";
-import { api } from "./api.js";
-import {
-  NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type Action, type ConfigTab, type ParseContext, type ProviderWord,
-} from "./commands.js";
-import { addressed, getAddress, setAddress, type Address } from "./address.js";
-import { ICON, instrumentIcon as icon } from "./icons.js";
-import { $, esc, fmtRate, gib, gib0, hhmm, recall, setMeter, setPill, store } from "./dom.js";
-import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
-import { type PanelName } from "./panels.js";
-import { line, type Thread } from "./stage.js";
-import { clip, editDistance } from "./text.js";
-import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
-import { conn, graph, hud, input, panels, reduceMotion, voice, ws } from "./state.js";
+import { gib, hhmm } from "./dom.js";
+import { reduceMotion } from "./motion.js";
+import { voice } from "./state.js";
 import { addMsg, jarvis } from "./say.js";
 import { S, T, W } from "./readings.js";
 import { SERVERLESS } from "./server.js";
@@ -82,7 +71,6 @@ export function localCommand(raw: string): boolean {
     return true;
   }
   if (short && /\b(?:status|diagnostics?|systems? check|how are (?:you|the systems))\b/.test(q)) {
-    hud.flash();
     if (T?.web) {
       const w = T.web;
       const bits = [`This device is at ${w.load ?? 0} percent load${w.cores ? ` across ${w.cores} cores` : ""}`];
@@ -104,7 +92,6 @@ export function localCommand(raw: string): boolean {
     return true;
   }
   if (short && /\b(?:power|battery|thermals?|temps?|gpu temp(?:erature)?)\b/.test(q)) {
-    hud.flash();
     // no readings yet is not the same as no battery
     if (!T) { jarvis("Telemetry hasn't attached yet, sir. Give me a moment."); return true; }
     let l = T.battery

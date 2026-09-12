@@ -4,8 +4,8 @@
  * streaming; speaking and hearing are single requests, made with fetch.
  */
 
-import type { Catalogue, VoiceOption } from "../types.js";
-import { HEARING_HINT, MANNER, PERSONA, bytesOf, httpError, rankModels, type Service } from "./common.js";
+import type { VoiceOption } from "../types.js";
+import { HEARING_HINT, MANNER, PERSONA, bytesOf, httpError, pace, rankModels, type Service } from "./common.js";
 
 const API = "https://api.openai.com/v1";
 
@@ -149,10 +149,3 @@ export const openai: Service = {
     return (body.text ?? "").trim();
   },
 };
-
-/** The Cadence slider, said in words for a model that takes instructions rather than a figure. */
-function pace(speed: number): string {
-  if (speed >= 1.15) return "Speak briskly.";
-  if (speed <= 0.85) return "Speak slowly and deliberately.";
-  return "Speak at an easy, natural pace.";
-}

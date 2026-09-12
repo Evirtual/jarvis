@@ -4,8 +4,8 @@
  * chat model itself does the hearing: Gemini takes audio as it takes text.
  */
 
-import type { Catalogue, VoiceOption } from "../types.js";
-import { HEARING_HINT, MANNER, PERSONA, eventsOf, fromBase64, httpError, rankModels, toBase64, type Service } from "./common.js";
+import type { VoiceOption } from "../types.js";
+import { HEARING_HINT, MANNER, PERSONA, eventsOf, fromBase64, httpError, pace, rankModels, toBase64, type Service } from "./common.js";
 
 const API = "https://generativelanguage.googleapis.com/v1beta";
 
@@ -220,10 +220,3 @@ export const gemini: Service = {
     return (res.candidates?.[0]?.content?.parts ?? []).map((p) => p.audioTranscription?.text ?? p.text ?? "").join("").trim();
   },
 };
-
-/** The Cadence slider, as an instruction. */
-function pace(speed: number): string {
-  if (speed >= 1.15) return "Speak briskly.";
-  if (speed <= 0.85) return "Speak slowly and deliberately.";
-  return "Speak at an easy, natural pace.";
-}

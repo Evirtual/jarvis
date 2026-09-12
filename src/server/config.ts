@@ -14,11 +14,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { KeySource, ProviderId } from "../shared/types.js";
-import { PROVIDER_IDS } from "../shared/types.js";
+import { isProviderId } from "../shared/types.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // dist/server/config.js and src/server/config.ts both resolve to the project root.
-export const ROOT = path.resolve(HERE, "..", "..");
+const ROOT = path.resolve(HERE, "..", "..");
 const CONFIG_PATH = path.join(ROOT, "config.json");
 
 const ENV_VAR: Record<ProviderId, string> = {
@@ -44,10 +44,6 @@ interface StoredConfig {
 }
 
 let cache: StoredConfig = { providers: {}, active: null };
-
-function isProviderId(v: unknown): v is ProviderId {
-  return typeof v === "string" && (PROVIDER_IDS as readonly string[]).includes(v);
-}
 
 export function loadConfig(): StoredConfig {
   try {
@@ -88,12 +84,6 @@ export function resolveKey(id: ProviderId): { key: string; source: KeySource } |
   const fromEnv = process.env[envName];
   if (fromEnv && !cache.providers[id]?.ignoreEnv) return { key: fromEnv, source: "environment" };
   return null;
-}
-
-export function maskKey(key: string): string {
-  const tail = key.slice(-4);
-  const head = key.slice(0, Math.min(7, Math.max(0, key.length - 4)));
-  return `${head}…${tail}`;
 }
 
 export async function setKey(id: ProviderId, apiKey: string): Promise<void> {

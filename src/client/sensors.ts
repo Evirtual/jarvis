@@ -250,7 +250,9 @@ async function measureAnchors(): Promise<void> {
 
 /* ---------------- the battery ---------------- */
 
+/** Kept current by the browser's battery events, which `startSensors` listens to. */
 let battery: BatteryReading | null = null;
+
 /* ---------------- perimeter: the services JARVIS relies on ---------------- */
 
 const SERVICES: { name: string; role: string; probe: Probe; self?: boolean }[] = [

@@ -85,6 +85,20 @@ export const MANNER = "A calm, precise British butler: Received Pronunciation, u
 export const HEARING_HINT =
   "JARVIS, sir. Services: Gemini, ChatGPT. Commands: new thread, close thread, sweep the network, status, uplink, locate me, drive mode, desktop mode, tidy up.";
 
+/** The Cadence slider, in words: both voices take instructions rather than a figure. */
+export function pace(speed: number): string {
+  if (speed >= 1.15) return "Speak briskly.";
+  if (speed <= 0.85) return "Speak slowly and deliberately.";
+  return "Speak at an easy, natural pace.";
+}
+
+/** A key as it may be shown: enough to recognise it, never enough to use it. */
+export function maskKey(key: string): string {
+  const tail = key.slice(-4);
+  const head = key.slice(0, Math.min(7, Math.max(0, key.length - 4)));
+  return `${head}…${tail}`;
+}
+
 /* ------------------------------------------------------------------ *
  * Models
  * ------------------------------------------------------------------ */

@@ -25,6 +25,7 @@
  */
 
 import { recall, store } from "./dom.js";
+import { reduceMotion } from "./motion.js";
 import { CORE_R, DESIGN_R, drawAurora, drawCore } from "./core-draw.js";
 import { ICON } from "./icons.js";
 import { ContextWeb } from "./web.js";
@@ -34,7 +35,6 @@ import { averageHues, GENERAL_ID, Workspace, migrate, THREAD_HUES, threadRef, ty
 export type { Thread, Group } from "./workspace.js";
 export type Activity = "idle" | "listening" | "speaking" | "thinking";
 
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 /** How big JARVIS is on screen, and the size the core was drawn at. */
 const CORE_BOTTOM_GAP = 20;
 /** The deck at the bottom: readings, JARVIS, controls. */
@@ -1599,23 +1599,6 @@ export function line(kind: "user" | "jarvis" | "sys", text: string): HTMLElement
   }
   row.append(document.createTextNode(text.slice(start)));
   return row;
-}
-
-/** The point on a rectangle's edge nearest to (x, y), pulled `inset` in from the corners. */
-function nearestOnRect(r: Rect, x: number, y: number, inset = 0): [number, number] {
-  const i = Math.min(inset, r.w / 2, r.h / 2);
-  const px = Math.max(r.x + i, Math.min(r.x + r.w - i, x));
-  const py = Math.max(r.y + i, Math.min(r.y + r.h - i, y));
-  // Inside the rectangle: go to the closest edge instead.
-  if (px > r.x && px < r.x + r.w && py > r.y && py < r.y + r.h) {
-    const d = [px - r.x, r.x + r.w - px, py - r.y, r.y + r.h - py];
-    const m = Math.min(...d);
-    if (m === d[0]) return [r.x, py];
-    if (m === d[1]) return [r.x + r.w, py];
-    if (m === d[2]) return [px, r.y];
-    return [px, r.y + r.h];
-  }
-  return [px, py];
 }
 
 function overlapArea(a: Rect, b: Rect, margin: number): number {
