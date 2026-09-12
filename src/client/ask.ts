@@ -10,7 +10,8 @@ import {
 } from "./commands.js";
 import { addressed, getAddress } from "./address.js";
 import { $, gib } from "./dom.js";
-import { line, type Thread } from "./stage.js";
+import { line } from "./message.js";
+import { type Thread } from "./stage.js";
 import { clip } from "./text.js";
 import { threadRef } from "./workspace.js";
 import { conn, graph, input, panels, voice, ws } from "./state.js";
@@ -57,7 +58,7 @@ function whereRunning(): string {
   if (SERVERLESS) {
     return "Running as: the web version — a page in the user's browser with no server of its own; keys are kept in that browser, and the readings are what a browser can measure of the device.";
   }
-  const os = { win32: "Windows", darwin: "macOS", linux: "Linux" }[T?.host.platform ?? ""] ?? T?.host.platform;
+  const os = { win32: "Windows", darwin: "macOS", linux: "Linux" }[T?.host.platform.split(" ")[0] ?? ""] ?? T?.host.platform;
   const machine = T?.host ? `${T.host.hostname}${os ? ` (${os})` : ""}` : "the user's computer";
   return `Running as: the PC version — the console's own server on ${machine}, which reads its sensors and can sweep the local network; keys stay on that machine.`;
 }
@@ -295,8 +296,19 @@ export function enqueue(text: string, threadId?: string, fromCore = false): void
   setTimeout(drainQueue, 260);
 }
 
+/** Since when the queue has been held for him to finish speaking. */
+let heldSince = 0;
+
 export function drainQueue(): void {
   if (busy || !queued.length) return;
+  // He finishes what he is saying before the next question is asked: an
+  // answer's text is done well before its voice is. Held for half a minute
+  // at most — a browser's own voice can fail to report the end of a long line.
+  if (voice.speaking) {
+    heldSince ||= Date.now();
+    if (Date.now() - heldSince < 30_000) { setTimeout(drainQueue, 300); return; }
+  }
+  heldSince = 0;
   const job = queued.shift()!;
   if (job.threadId && ws.thread(job.threadId) && !ws.thread(job.threadId)!.archivedAt) {
     graph.focus(job.threadId);

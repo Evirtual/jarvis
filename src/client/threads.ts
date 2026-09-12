@@ -8,9 +8,9 @@ import { $, esc } from "./dom.js";
 import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
 import { type Thread } from "./stage.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
-import { graph, input, panels, voice, ws } from "./state.js";
-import { announce, noteIn, sys } from "./say.js";
-import { confirmFirst, deleteGroup, lostWords } from "./confirm.js";
+import { graph, input, panels, ws } from "./state.js";
+import { announce, noteIn, toast } from "./say.js";
+import { deleteGroup, deleteThread } from "./confirm.js";
 import { runAction } from "./actions.js";
 import { mode } from "./deck.js";
 
@@ -66,15 +66,7 @@ graph.relatedFor = (id): { id: string; score: number; why: string[] }[] => relat
 graph.onDropDelete = (kind, id): void => {
   const note = kind === "group"
     ? (() => { const g = ws.group(id); return g ? deleteGroup(g) : null; })()
-    : (() => {
-        const t = ws.thread(id);
-        if (!t) return null;
-        return confirmFirst(
-          `Delete “${t.title}” for good? ${lostWords(t.turns.length)}`,
-          "Delete forever",
-          () => { ws.remove(t.id); graph.commit(); paintThread(); return `“${t.title}” is deleted, sir.`; },
-        );
-      })();
+    : (() => { const t = ws.thread(id); return t ? deleteThread(t) : null; })();
   if (note) announce(note);
 };
 
@@ -98,7 +90,7 @@ export function refreshLinks(announce = true): void {
       if (knownLinks.has(k) || !announce || l.manual) continue;
       const other = l.a === graph.activeId ? l.b : l.b === graph.activeId ? l.a : null;
       const t = other ? ws.thread(other) : null;
-      if (t) sys(`Related to “${t.title}” — both mention ${l.why.join(" and ")}. Press ⌗ to see the web.`);
+      if (t) toast(`Related to “${t.title}” — both mention ${l.why.join(" and ")}. Press ⌗ to see the web.`);
     }
     knownLinks = new Set(boardLinks.map(linkKey));
   }, 250);
@@ -199,12 +191,6 @@ $("threadList").addEventListener("click", (e) => {
   const act = (e.target as HTMLElement).closest<HTMLElement>("button[data-act]")?.dataset.act;
   if (act === "archive") graph.onArchive?.(t.id);
   else if (act === "restore") { ws.restore(t.id); graph.commit(); graph.focus(t.id); paintThread(); announce(`“${t.title}” is restored and open on the board, sir.`); }
-  else if (act === "delete") {
-    const note = confirmFirst(
-      `Delete “${t.title}” for good? ${lostWords(t.turns.length)}`,
-      "Delete forever",
-      () => { ws.remove(t.id); graph.commit(); paintThread(); return `“${t.title}” is deleted, sir.`; },
-    );
-    if (note) voice.speak("Delete it for good, sir?");
-  } else if (!t.archivedAt) { graph.focus(t.id); paintThread(); }
+  else if (act === "delete") deleteThread(t);
+  else if (!t.archivedAt) { graph.focus(t.id); paintThread(); }
 });

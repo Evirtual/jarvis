@@ -15,16 +15,12 @@ import { fileURLToPath } from "node:url";
 
 import type { KeySource, ProviderId } from "../shared/types.js";
 import { isProviderId } from "../shared/types.js";
+import { PROVIDERS } from "../shared/services/index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 // dist/server/config.js and src/server/config.ts both resolve to the project root.
 const ROOT = path.resolve(HERE, "..", "..");
 const CONFIG_PATH = path.join(ROOT, "config.json");
-
-const ENV_VAR: Record<ProviderId, string> = {
-  gemini: "GEMINI_API_KEY",
-  openai: "OPENAI_API_KEY",
-};
 
 interface StoredProvider {
   apiKey?: string;
@@ -80,8 +76,7 @@ async function persist(): Promise<void> {
 export function resolveKey(id: ProviderId): { key: string; source: KeySource } | null {
   const saved = cache.providers[id]?.apiKey;
   if (saved) return { key: saved, source: "saved" };
-  const envName = ENV_VAR[id];
-  const fromEnv = process.env[envName];
+  const fromEnv = process.env[PROVIDERS[id].envVar];
   if (fromEnv && !cache.providers[id]?.ignoreEnv) return { key: fromEnv, source: "environment" };
   return null;
 }
@@ -99,7 +94,7 @@ export async function clearKey(id: ProviderId): Promise<void> {
   const entry = cache.providers[id] ?? {};
   delete entry.apiKey;
   // A key from the environment would otherwise come straight back: ignore it.
-  if (process.env[ENV_VAR[id]]) entry.ignoreEnv = true;
+  if (process.env[PROVIDERS[id].envVar]) entry.ignoreEnv = true;
   cache.providers[id] = entry;
   if (cache.active === id) cache.active = null;
   await persist();

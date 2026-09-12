@@ -5,7 +5,7 @@
  * primitives are used, so the same code runs in Node and in a browser.
  */
 
-import type { AskEvent, Catalogue, ProviderMeta, Turn } from "../types.js";
+import type { Address, AskEvent, Catalogue, ProviderMeta, Turn } from "../types.js";
 
 /**
  * One connected service. The key is the user's own and is passed in with
@@ -34,9 +34,6 @@ export const SPEECH_RATE = 24000;
 /* ------------------------------------------------------------------ *
  * The persona
  * ------------------------------------------------------------------ */
-
-/** How JARVIS addresses the user. "sir" unless the console asks otherwise. */
-export type Address = "sir" | "madam";
 
 export const PERSONA = [
   "You are J.A.R.V.I.S., Tony Stark's onboard artificial intelligence, running on a HUD console.",

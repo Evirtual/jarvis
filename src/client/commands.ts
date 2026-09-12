@@ -14,9 +14,8 @@
  * ParseContext, so the rules can be tested on their own.
  */
 
+import type { ProviderId } from "../shared/types.js";
 import { PANEL_NAMES, type PanelName } from "./panels.js";
-
-export type ProviderWord = "gemini" | "openai";
 export type ConfigTab = "connections" | "voice" | "quick";
 
 export type Action =
@@ -46,7 +45,7 @@ export type Action =
   | { name: "expand_group"; group: string }
   | { name: "approve" }
   | { name: "deny" }
-  | { name: "switch_core"; provider: ProviderWord }
+  | { name: "switch_core"; provider: ProviderId }
   | { name: "set_model"; model: string }
   | { name: "set_voice"; voice: string }
   | { name: "set_speed"; delta?: number; value?: number }
@@ -73,12 +72,12 @@ export interface ParseContext {
 
 const NO_CONTEXT: ParseContext = { knowsThread: () => false, knowsGroup: () => false, pendingApproval: false };
 
-const CORE_NAMES: Record<string, ProviderWord> = {
+const CORE_NAMES: Record<string, ProviderId> = {
   chatgpt: "openai", "open ai": "openai", openai: "openai", gpt: "openai",
   gemini: "gemini", google: "gemini",
 };
 
-function coreFrom(word: string): ProviderWord | null {
+function coreFrom(word: string): ProviderId | null {
   const k = word.toLowerCase().replace(/\s+/g, " ").trim();
   return CORE_NAMES[k] ?? null;
 }

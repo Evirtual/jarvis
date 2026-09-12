@@ -8,9 +8,10 @@
  * as "Sir David" in a thread title is left alone.
  */
 
+import type { Address } from "../shared/types.js";
 import { recall, store } from "./dom.js";
 
-export type Address = "sir" | "madam";
+export type { Address } from "../shared/types.js";
 
 const KEY = "jarvis.address";
 

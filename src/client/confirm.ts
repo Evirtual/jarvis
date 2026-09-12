@@ -3,7 +3,7 @@
  */
 
 import { $ } from "./dom.js";
-import { type Group } from "./workspace.js";
+import { type Group, type Thread } from "./workspace.js";
 import { graph, ws } from "./state.js";
 import { announce, paintCoreState } from "./say.js";
 import { paintThread } from "./threads.js";
@@ -54,6 +54,15 @@ $("confirmCancel").addEventListener("click", () => {
   const note = answerConfirm(false);
   if (note) announce(note);
 });
+
+/** Delete one thread for good — always after asking. Its subthreads move up a level (workspace.remove). */
+export function deleteThread(t: Thread): string | null {
+  return confirmFirst(
+    `Delete “${t.title}” for good? ${lostWords(t.turns.length)}`,
+    "Delete forever",
+    () => { ws.remove(t.id); graph.commit(); paintThread(); return `“${t.title}” is deleted, sir.`; },
+  );
+}
 
 /** Delete a whole bubble and the threads in it — always after asking. */
 export function deleteGroup(g: Group): string | null {

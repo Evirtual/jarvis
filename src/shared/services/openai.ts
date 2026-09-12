@@ -52,6 +52,7 @@ export const openai: Service = {
   meta: {
     id: "openai",
     name: "ChatGPT",
+    envVar: "OPENAI_API_KEY",
     blurb: "OpenAI's GPT models, with the most natural voice. Billed per use.",
     keyUrl: "https://platform.openai.com/api-keys",
     keyHint: "Starts with sk-",

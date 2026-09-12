@@ -72,12 +72,13 @@ async function* checked(body: ReadableStream<Uint8Array>): AsyncIterable<GeminiR
   }
 }
 
-const url = (path: string, key: string): string => `${API}/${path}${path.includes("?") ? "&" : "?"}key=${encodeURIComponent(key)}`;
+/** The key travels in a header, never in the address: addresses end up in logs, headers don't. */
+const headers = (key: string): Record<string, string> => ({ "x-goog-api-key": key, "content-type": "application/json" });
 
 async function generate(key: string, model: string, body: unknown, signal?: AbortSignal): Promise<GeminiResponse> {
-  const r = await fetch(url(`models/${encodeURIComponent(model)}:generateContent`, key), {
+  const r = await fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: headers(key),
     body: JSON.stringify(body),
     signal: signal ?? AbortSignal.timeout(30000),
   });
@@ -89,6 +90,7 @@ export const gemini: Service = {
   meta: {
     id: "gemini",
     name: "Gemini",
+    envVar: "GEMINI_API_KEY",
     blurb: "Google's Gemini: answers, hearing and a voice, all on a free tier. The way in for anyone new.",
     keyUrl: "https://aistudio.google.com/apikey",
     keyHint: "Starts with AIza",
@@ -98,7 +100,7 @@ export const gemini: Service = {
   },
 
   async catalogue(key) {
-    const r = await fetch(url("models?pageSize=200", key), { signal: AbortSignal.timeout(15000) });
+    const r = await fetch(`${API}/models?pageSize=200`, { headers: headers(key), signal: AbortSignal.timeout(15000) });
     if (!r.ok) throw httpError("Gemini", r.status, await r.text());
     const body = (await r.json()) as { models?: GeminiModel[] };
     const ids = (body.models ?? [])
@@ -127,9 +129,9 @@ export const gemini: Service = {
     }));
 
     const call = (withSearch: boolean): Promise<Response> =>
-      fetch(url(`models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, key), {
+      fetch(`${API}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: headers(key),
         body: JSON.stringify({
           contents,
           systemInstruction: { parts: [{ text: persona }] },
@@ -143,9 +145,10 @@ export const gemini: Service = {
       });
 
     let r = await call(true);
-    if (!r.ok) {
-      // Grounding isn't offered on every model, and has its own allowance on
-      // the free tier: answer without it rather than fail.
+    if (r.status === 400 || r.status === 429) {
+      // Grounding isn't offered on every model (400), and has its own, smaller
+      // allowance on the free tier (429): answer without it rather than fail.
+      // A rejected key or a missing model would only be refused again.
       emit({ t: "status", status: "thinking" });
       r = await call(false);
     }
@@ -175,9 +178,9 @@ export const gemini: Service = {
     // follows. The newest speech model sends the audio as it is made
     // ("audio/L16;codec=pcm;rate=24000" — raw samples); an older one sends it
     // whole, as a single piece, through the same stream.
-    const r = await fetch(url(`models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, key), {
+    const r = await fetch(`${API}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: headers(key),
       body: JSON.stringify({
         contents: [{ parts: [{ text: `${MANNER} ${pace(speed)} Say: ${text}` }] }],
         generationConfig: {

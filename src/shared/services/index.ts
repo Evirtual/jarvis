@@ -16,14 +16,10 @@ import type { Service } from "./common.js";
 
 export {
   MANNER, PERSONA, SPEECH_RATE, bytesOf, maskKey, personaFor, prepareTurns, rankModels,
-  type Address, type Service,
+  type Service,
 } from "./common.js";
 
-const SERVICES: Record<ProviderId, Service> = { gemini, openai };
-
-export function serviceFor(id: ProviderId): Service {
-  return SERVICES[id];
-}
+export const SERVICES: Record<ProviderId, Service> = { gemini, openai };
 
 export const PROVIDERS: Record<ProviderId, ProviderMeta> = { gemini: gemini.meta, openai: openai.meta };
 
@@ -49,10 +45,10 @@ function usable(models: string[]): string[] {
 }
 
 /** Speech through the first of the account's speech models that answers. */
-export async function* speakWith(id: ProviderId, key: string, models: string[], text: string, voice: string, speed: number): AsyncIterable<Uint8Array> {
-  let last: unknown = new Error(`${PROVIDERS[id].name} has no speech model on this account.`);
+export async function* speakWith(service: Service, key: string, models: string[], text: string, voice: string, speed: number): AsyncIterable<Uint8Array> {
+  let last: unknown = new Error(`${service.meta.name} has no speech model on this account.`);
   for (const model of usable(models)) {
-    const pieces = serviceFor(id).speak(key, model, text, voice, speed)[Symbol.asyncIterator]();
+    const pieces = service.speak(key, model, text, voice, speed)[Symbol.asyncIterator]();
     let first: IteratorResult<Uint8Array>;
     try {
       first = await pieces.next();
@@ -73,11 +69,11 @@ export async function* speakWith(id: ProviderId, key: string, models: string[], 
 }
 
 /** What was said, through the first of the account's hearing models that answers. */
-export async function hearWith(id: ProviderId, key: string, models: string[], audio: Blob): Promise<string> {
-  let last: unknown = new Error(`${PROVIDERS[id].name} has no hearing model on this account.`);
+export async function hearWith(service: Service, key: string, models: string[], audio: Blob): Promise<string> {
+  let last: unknown = new Error(`${service.meta.name} has no hearing model on this account.`);
   for (const model of usable(models)) {
     try {
-      return await serviceFor(id).hear(key, model, audio);
+      return await service.hear(key, model, audio);
     } catch (err) {
       if (exhausted(err)) spent.set(model, Date.now() + REST);
       last = err;

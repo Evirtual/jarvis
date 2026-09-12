@@ -21,6 +21,14 @@ export let W: WorldResponse = { uplink: null, weather: null, error: null, at: 0 
 export let S: ScanResponse = { running: false, at: 0, durationMs: 0, subnet: null, self: null, gateway: null, hosts: [] };
 
 let coreCells: { box: HTMLElement; fill: HTMLElement }[] = [];
+/** The last reading the round-trip trace took a point from, so a repeated one isn't drawn twice. */
+let lastRttAt = 0;
+
+/** A meter's class for how full it is: nothing until three quarters, then warn, then crit. */
+const levelClass = (pct: number): string => (pct >= 90 ? " crit" : pct >= 75 ? " warn" : "");
+
+/** A panel's body is painted only while it is open. */
+const openPanels = () => ({ compute: panels.isOpen("compute"), graphics: panels.isOpen("graphics"), storage: panels.isOpen("storage"), uplink: panels.isOpen("uplink") });
 
 function buildCores(n: number): void {
   const wrap = $("cores");
@@ -68,7 +76,7 @@ export function paintTelemetry(): void {
   if (T.web) { paintWeb(T); fitDockIfChanged(); return; }
   // The readings in the deck are always painted; a panel's body only while
   // it is open (and again the moment it opens — see deck.ts).
-  const open = { compute: panels.isOpen("compute"), graphics: panels.isOpen("graphics"), storage: panels.isOpen("storage"), uplink: panels.isOpen("uplink") };
+  const open = openPanels();
 
   if (T.cpu) {
     $("pCpu").textContent = `${T.cpu.avg}%`;
@@ -127,7 +135,7 @@ export function paintTelemetry(): void {
     if (open.storage) $("disks").innerHTML = T.disks
       .map((d) => {
         const pct = d.totalBytes ? (d.usedBytes / d.totalBytes) * 100 : 0;
-        const cls = pct >= 90 ? " crit" : pct >= 75 ? " warn" : "";
+        const cls = levelClass(pct);
         return (
           `<div class="meter"><div class="row"><span class="nm">${esc(d.id)}</span>` +
           `<span class="nu">${gib0(d.usedBytes)} / ${gib0(d.totalBytes)}<span class="u">GB</span></span></div>` +
@@ -177,7 +185,7 @@ const fmtBytes = (b: number | null | undefined): string =>
 /** The same instruments, from what the browser measures (see sensors.ts). */
 function paintWeb(t: TelemetryResponse): void {
   const w = t.web!;
-  const open = { compute: panels.isOpen("compute"), graphics: panels.isOpen("graphics"), storage: panels.isOpen("storage"), uplink: panels.isOpen("uplink") };
+  const open = openPanels();
 
   // compute
   if (w.load != null) {
@@ -235,7 +243,7 @@ function paintWeb(t: TelemetryResponse): void {
     ];
     $("disks").innerHTML = rows.map(([name, used, total]) => {
       const pct = used != null && total ? (used / total) * 100 : 0;
-      const cls = pct >= 90 ? " crit" : pct >= 75 ? " warn" : "";
+      const cls = levelClass(pct);
       return `<div class="meter"><div class="row"><span class="nm">${esc(name)}</span>` +
         `<span class="nu">${fmtBytes(used)} / ${fmtBytes(total)}</span></div>` +
         `<div class="track"><div class="fill${cls}" style="width:${Math.max(pct, used ? 0.5 : 0).toFixed(1)}%"></div></div></div>`;
@@ -279,7 +287,6 @@ function paintWeb(t: TelemetryResponse): void {
           : "Located by IP address";
   ($("locateBtn") as HTMLButtonElement).hidden = !!loc || w.locationState === "asking";
 }
-let lastRttAt = 0;
 
 function paintWorld(): void {
   if (W.uplink) {

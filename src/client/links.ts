@@ -103,6 +103,27 @@ function termsOf(turns: Turn[]): Map<string, Term> {
 }
 
 /**
+ * What two threads have in common, most telling first — "Vilnius" and
+ * "Vilnius Old Town" counted once, as the phrase — and its weight in all.
+ */
+function shared(mine: Map<string, Term>, theirs: Map<string, Term>, common: (k: string) => boolean): { kept: { t: Term; w: number }[]; score: number } {
+  const all: { t: Term; w: number }[] = [];
+  for (const [k, t] of mine) {
+    const u = theirs.get(k);
+    if (!u || common(k)) continue;
+    all.push({ t, w: Math.min(t.weight, u.weight) });
+  }
+  all.sort((x, y) => y.w - x.w || y.t.show.length - x.t.show.length);
+  const kept: typeof all = [];
+  for (const s of all) {
+    const k = s.t.key;
+    if (kept.some((q) => q.t.key.includes(k) || k.includes(q.t.key))) continue;
+    kept.push(s);
+  }
+  return { kept, score: kept.reduce((sum, s) => sum + s.w, 0) };
+}
+
+/**
  * How every other thread relates to this one, strongest first — no limit on
  * how many, because this is what the context web shows when you open a thread.
  * Score is the weight of what they share; `why` names it.
@@ -130,22 +151,9 @@ export function relatedness(threads: LinkThread[], id: string): { id: string; sc
   const out: { id: string; score: number; why: string[] }[] = [];
   for (const other of live) {
     if (other.id === id) continue;
-    const theirs = terms.get(other.id)!;
-    const shared: { t: Term; w: number }[] = [];
-    for (const [k, t] of mine) {
-      const u = theirs.get(k);
-      if (!u || common(k)) continue;
-      shared.push({ t, w: Math.min(t.weight, u.weight) });
-    }
-    shared.sort((x, y) => y.w - x.w || y.t.show.length - x.t.show.length);
-    const kept: typeof shared = [];
-    for (const s of shared) {
-      const k = s.t.key;
-      if (kept.some((q) => q.t.key.includes(k) || k.includes(q.t.key))) continue;
-      kept.push(s);
-    }
-    let score = kept.reduce((sum, s) => sum + s.w, 0);
-    const why = kept.slice(0, 3).map((s) => s.t.show);
+    const both = shared(mine, terms.get(other.id)!, common);
+    let score = both.score;
+    const why = both.kept.slice(0, 3).map((s) => s.t.show);
     // A branch and a deliberate connection are relationships in their own right.
     if (other.parentId === id || me.parentId === other.id) { score += 3; why.unshift("branch"); }
     const onPurpose = tied.get(other.id);
@@ -191,22 +199,7 @@ function computeAutoLinks(threads: LinkThread[]): Link[] {
       const A = live[i]!, B = live[j]!;
       // A branch is already tied to its parent; don't string it twice.
       if (A.parentId === B.id || B.parentId === A.id) continue;
-      const ta = terms.get(A.id)!, tb = terms.get(B.id)!;
-      const shared: { t: Term; w: number }[] = [];
-      for (const [k, t] of ta) {
-        const u = tb.get(k);
-        if (!u || common(k)) continue;
-        shared.push({ t, w: Math.min(t.weight, u.weight) });
-      }
-      // Collapse "Vilnius" + "Vilnius Old Town" into the phrase, so one idea isn't counted twice.
-      shared.sort((x, y) => y.w - x.w || y.t.show.length - x.t.show.length);
-      const kept: typeof shared = [];
-      for (const s of shared) {
-        const k = s.t.key;
-        if (kept.some((q) => q.t.key.includes(k) || k.includes(q.t.key))) continue;
-        kept.push(s);
-      }
-      const score = kept.reduce((sum, s) => sum + s.w, 0);
+      const { kept, score } = shared(terms.get(A.id)!, terms.get(B.id)!, common);
       if (score >= 1) {
         candidates.push({ a: A.id, b: B.id, score, why: kept.slice(0, 2).map((s) => s.t.show) });
       }

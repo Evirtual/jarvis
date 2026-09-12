@@ -6,21 +6,18 @@ import type { ProviderId } from "../shared/types.js";
 import type { NeuralVoice } from "./voice.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
-import {
-  NEEDS_CONFIRMATION, type Action, type ParseContext, type ProviderWord,
-} from "./commands.js";
-import { $ } from "./dom.js";
+import { NEEDS_CONFIRMATION, type Action, type ParseContext } from "./commands.js";
 import { type Thread } from "./stage.js";
 import { editDistance } from "./text.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { conn, graph, panels, voice, ws } from "./state.js";
 import { announce, sys } from "./say.js";
-import { answerConfirm, confirmFirst, deleteGroup, lostWords, pendingConfirm } from "./confirm.js";
+import { answerConfirm, confirmFirst, deleteGroup, deleteThread, lostWords, pendingConfirm } from "./confirm.js";
 import { paintThread, refreshLinks } from "./threads.js";
 import { enqueue } from "./ask.js";
 import { sweep } from "./readings.js";
 import { mode } from "./deck.js";
-import { applyAddress, setVoiceOut } from "./voice-ui.js";
+import { applyAddress, setRate, setVoiceOut } from "./voice-ui.js";
 import { setDrawer } from "./drawer.js";
 
 /* ===================================================================== *
@@ -32,7 +29,7 @@ import { setDrawer } from "./drawer.js";
  * something waits for the user to confirm.
  * ===================================================================== */
 
-function coreLabel(p: ProviderWord): string {
+function coreLabel(p: ProviderId): string {
   return PROVIDERS[p].name;
 }
 
@@ -139,12 +136,7 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
         if (typeof r === "string") return r;
         t = r;
       }
-      const target = t;
-      return confirmFirst(
-        `Delete “${target.title}” for good? ${lostWords(target.turns.length)}`,
-        "Delete forever",
-        () => { ws.remove(target.id); graph.commit(); paintThread(); return `“${target.title}” is deleted, sir.`; },
-      );
+      return deleteThread(t);
     }
     case "switch_thread": {
       const r = resolve(a.title);
@@ -335,10 +327,7 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       return `Voice set to ${v.voice.name}, sir.`;
     }
     case "set_speed": {
-      const next = Math.max(0.7, Math.min(1.3, a.value ?? voice.rateValue + (a.delta ?? 0)));
-      voice.setRate(next);
-      ($("rateSl") as HTMLInputElement).value = String(next);
-      $("rateN").textContent = next.toFixed(2);
+      const next = setRate(a.value ?? voice.rateValue + (a.delta ?? 0));
       return next > 1 ? "A little brisker, sir." : "Taking my time, sir.";
     }
     case "mute":

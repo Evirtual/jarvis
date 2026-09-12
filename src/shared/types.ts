@@ -25,6 +25,8 @@ export interface ProviderMeta {
   id: ProviderId;
   /** What a person calls it. */
   name: string;
+  /** The environment variable the PC's server also reads a key from. */
+  envVar: string;
   /** One line under the name in the Connections screen. */
   blurb: string;
   /** Where to get a key, linked directly from the setup card. */
@@ -114,13 +116,15 @@ export interface Turn {
   content: string;
 }
 
+/** How JARVIS addresses the user: "sir" unless asked otherwise ("madam" is said as “ma'am”). */
+export type Address = "sir" | "madam";
+
 export interface AskRequest {
   turns: Turn[];
   /** Live machine readings, injected as context for the current question only. */
   context?: string;
   provider?: ProviderId;
-  /** How JARVIS addresses the user: "sir" (default) or "madam" (said as “ma'am”). */
-  address?: "sir" | "madam";
+  address?: Address;
 }
 
 /**

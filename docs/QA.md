@@ -849,3 +849,69 @@ Found and fixed:
 87. With reduced motion asked for, the radar drew one frame and stopped; if
     the Perimeter panel was closed at that moment it stayed blank. It now
     keeps drawing while open, with the sweep held still.
+
+### 2026-09-12 — third pass: one back end for both versions, and the bugs the review found
+
+The connection layer existed twice — once for the server, once for the web
+page — and had drifted. It is now one module, `shared/services/console.ts`,
+given only where the keys are kept; the server and the browser each hand it
+theirs. It takes its services as a parameter, so `tests/console.test.ts`
+drives it with fake ones (10 tests, no network, no credit). 67 tests pass;
+typecheck clean; both versions rebuilt. Net −400 lines.
+
+Run in the Browser pane with the harness. The web tab's storage had been
+reset, and keys can't be moved into it by the assistant, so the web column
+covers what needs no key; its connected paths are the same core the PC
+column exercised, plus the unit tests. Gemini's free tier ran out during
+the pass (grounding first, then the voice): the questions marked † fell back
+to ChatGPT, as designed, and cost a few cents.
+
+| Area | PC | Web |
+| --- | --- | --- |
+| Connections screen through the core: both cards ready, masked keys, the env-var label, voices and hearing | Pass | — (no keys) |
+| "switch to Gemini" → Canberra/Sydney question † → "Is Sintra worth a day trip?" (new subject → its own thread) | Pass | — |
+| Two questions sent while the first is answered: answered in order, and **neither started while he was still speaking** (fix 88) | Pass — 0 violations in 100 ms polling | — |
+| Grounding allowance spent → answered without web search rather than refused (fix 94, after a regression caught in this pass) | Pass | — |
+| Pictures: "Eiffel Tower at night" † | Pass — 2 images, 2 links | — |
+| "use the Kore voice" → spoken by Gemini's Kore; "which voice are you using?" names Gemini's voices (fix 92) | Pass | "No service is connected…", no stale names |
+| Listening (fake microphone): heard by Gemini in 2.7 s → answered † | Pass | — |
+| Gemini's voice allowance spent → device voice, said once | Pass | — |
+| Snapshot says "the PC version … (Windows)" (fix 91) | Pass | — |
+| Local commands: status, time, weather, uplink, help, thanks | — | Pass |
+| Threads: named new thread, rename, close, restore, delete (no → yes), connect two, collapse/expand, tidy, list | — | Pass |
+| Panels: show the radar, close all; sweep (7 services) | — | Pass |
+| "Related to…" notice shown as a toast and **not spoken** over the answer (fix 89) | — | Pass — 0 spoken |
+| "speak a little faster" moves the slider (setRate) ; mute/unmute | — | Pass (1.06) |
+| Phone layout 375 × 812: compact, Threads sheet in the stage, no sideways scroll, voice note painted (fix 96) | — | Pass |
+| Reload: threads, groups, speed, voice kept | Pass | Pass |
+| "switch to ChatGPT" → its 13 voices, Fable speaks the line | Pass | — |
+
+Found and fixed:
+
+88. A question queued behind an answer was asked the moment the answer's
+    text finished, cutting its speech off mid-sentence. The queue now waits
+    until he has finished speaking (for up to half a minute, in case a
+    browser's own voice never reports the end of a line).
+89. "Related to …" was spoken the moment an answer finished — over the
+    answer. It is shown under the core instead.
+90. A plain `http://` address was linked in one of two copies of the
+    link-making code, against the https-only promise. One copy now, in
+    `message.ts`.
+91. The console snapshot's OS label never read "Windows": the platform is
+    "win32 10.0.26200", and only its first word names it.
+92. "Which voice are you using?" and `help` still offered George, Lewis and
+    Emma — device voices from the old speech engine. He names the connected
+    service's voices now.
+93. Gemini's key travelled in the request address, where proxies and servers
+    log it. It goes in a header now.
+94. Gemini retried without web search after *every* refusal, a rejected key
+    included, doubling the calls. Now only when grounding is refused (400,
+    not offered; 429, its allowance spent) — the first cut retried on 400
+    alone and this pass caught the 429 case straight away.
+95. The web version re-checked a failed key on every question, and neither
+    clamped the speech speed nor cut an over-long line as the server did.
+    One core, so one behaviour.
+96. In a browser with no voices of its own and nothing connected, the Voice
+    tab said "Scanning installed voices…" for ever: nothing painted the note
+    once. It is painted on the first frame now — deferred, because painting
+    it during module loading tripped an import cycle (caught in this pass).

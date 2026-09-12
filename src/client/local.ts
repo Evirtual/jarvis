@@ -41,7 +41,7 @@ const HELP = [
   "  new thread … · branch off … (a subthread) · close this chat (put away) · restore … · go back to …",
   "  connect A with B (puts them in one bubble) · move A into Travel · new group called … · collapse Research",
   "  show the radar · open the weather · show the threads · close all panels",
-  "  switch to Gemini / ChatGPT · use the Lewis voice · speak faster · mute / unmute",
+  "  switch to Gemini / ChatGPT · use the Charon voice · speak faster · mute / unmute",
   "  paste an API key here and I'll connect it — it never reaches a model",
   "Anything else goes to the connected service, with live readings and web search.",
 ].join("\n");
@@ -157,7 +157,8 @@ export function localCommand(raw: string): boolean {
     return true;
   }
   if (short && /\b(?:your voice|which voice|what voice)\b/.test(q)) {
-    jarvis(`${voice.describe().text} Ask me for another by name — George, Fable, Lewis, Daniel, Emma — or say "speak faster".`);
+    const others = voice.neuralVoices().map((v) => v.voice.name).slice(0, 5);
+    jarvis(`${voice.describe().text}${others.length ? ` Ask me for another by name — ${others.join(", ")} — or say "speak faster".` : ""}`);
     return true;
   }
   if (words <= 4 && /\b(?:thank|thanks|cheers)\b/.test(q)) { jarvis("Always a pleasure, sir."); return true; }

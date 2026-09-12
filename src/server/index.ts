@@ -14,43 +14,16 @@ import { fileURLToPath } from "node:url";
 import type {
   AskEvent,
   AskRequest,
-  ConnectionsResponse,
-  ProviderId,
-  ProviderStatus,
-  ProviderView,
   SaveKeyRequest,
   SelectModelRequest,
   SetActiveRequest,
   SpeakRequest,
-  StatusResponse,
   TelemetryResponse,
 } from "../shared/types.js";
-import { PROVIDER_IDS, isProviderId } from "../shared/types.js";
+import { isProviderId } from "../shared/types.js";
 
-import {
-  clearKey,
-  getActive,
-  getModel,
-  loadConfig,
-  resolveKey,
-  setActive,
-  setKey,
-  setModel,
-} from "./config.js";
-import {
-  PROVIDERS,
-  SPEECH_RATE,
-  cachedValidation,
-  connected,
-  hearWith,
-  humanise,
-  maskKey,
-  personaFor,
-  prepareTurns,
-  serviceFor,
-  speakWith,
-  validate,
-} from "./services.js";
+import { clearKey, loadConfig, setActive, setKey, setModel } from "./config.js";
+import { CoreError, SPEECH_RATE, core } from "./services.js";
 import { gateway, snapshot, startSampler } from "./system.js";
 import { runScan, scanState } from "./scan.js";
 import { refreshWorld, startWorld, world } from "./world.js";
@@ -77,30 +50,26 @@ const MIME: Record<string, string> = {
   ".xml": "application/xml; charset=utf-8",
 };
 
+/** The status each of the core's refusals is sent with. */
+const STATUS_OF: Record<CoreError["code"], number> = {
+  no_provider: 503, no_key: 503, no_hearing: 503, no_voice: 503,
+  no_turns: 400, unknown_voice: 400, empty_text: 400,
+  ask_failed: 502, hear_failed: 502, speak_failed: 502,
+};
+
 function json(res: http.ServerResponse, code: number, obj: unknown): void {
   const body = JSON.stringify(obj);
   res.writeHead(code, { "content-type": "application/json; charset=utf-8" });
   res.end(body);
 }
 
-async function readBody(req: http.IncomingMessage, limit = 64 * 1024): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let size = 0;
-    const parts: Buffer[] = [];
-    req.on("data", (c: Buffer) => {
-      size += c.length;
-      if (size > limit) {
-        reject(new Error("body too large"));
-        req.destroy();
-        return;
-      }
-      parts.push(c);
-    });
-    req.on("end", () => resolve(Buffer.concat(parts).toString("utf8")));
-    req.on("error", reject);
-  });
+/** The core said no: its reason, in the user's words, with the status that fits. */
+function refuse(res: http.ServerResponse, err: unknown): void {
+  if (err instanceof CoreError) json(res, STATUS_OF[err.code], { error: err.code, message: err.message });
+  else throw err;
 }
 
+/** The whole request body, up to a limit — rejected, and the connection dropped, past it. */
 async function readRaw(req: http.IncomingMessage, limit: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     let size = 0;
@@ -119,64 +88,12 @@ async function readRaw(req: http.IncomingMessage, limit: number): Promise<Buffer
   });
 }
 
-async function readJson<T>(req: http.IncomingMessage, limit?: number): Promise<T | null> {
+async function readJson<T>(req: http.IncomingMessage, limit = 64 * 1024): Promise<T | null> {
   try {
-    return JSON.parse(await readBody(req, limit)) as T;
+    return JSON.parse((await readRaw(req, limit)).toString("utf8")) as T;
   } catch {
     return null;
   }
-}
-
-/* ------------------------------------------------------------------ *
- * Connections
- * ------------------------------------------------------------------ */
-
-/**
- * The last account-level failure per service — out of credit, no access to the
- * model — so the Connections card can say "connected, but…". A key can list
- * models perfectly well on an account that can't answer a single question.
- * Cleared by the next answer that succeeds.
- */
-const lastProblem = new Map<ProviderId, string>();
-
-async function providerView(id: ProviderId, revalidate: boolean): Promise<ProviderView> {
-  const meta = PROVIDERS[id];
-  const resolved = resolveKey(id);
-  if (!resolved) return { ...meta, status: { state: "unconfigured" } };
-
-  const masked = maskKey(resolved.key);
-  const v = revalidate
-    ? await validate(id, resolved.key, true)
-    : (cachedValidation(id, resolved.key) ?? (await validate(id, resolved.key)));
-
-  const status: ProviderStatus = v.ok && v.catalogue
-    ? {
-        state: "ready",
-        maskedKey: masked,
-        source: resolved.source,
-        models: v.catalogue.chat,
-        // a model chosen earlier that the account no longer lists gives way to the newest
-        model: ((chosen) => (chosen && v.catalogue.chat.includes(chosen) ? chosen : v.catalogue.chat[0] ?? ""))(getModel(id)),
-        voices: v.catalogue.voices,
-        hears: v.catalogue.hearing.length > 0,
-        ...(lastProblem.has(id) ? { problem: lastProblem.get(id)! } : {}),
-      }
-    : {
-        state: "error",
-        maskedKey: masked,
-        message: v.message ?? "Unknown error",
-        source: resolved.source,
-      };
-  return { ...meta, status };
-}
-
-async function connections(revalidate = false): Promise<ConnectionsResponse> {
-  const providers = await Promise.all(PROVIDER_IDS.map((id) => providerView(id, revalidate)));
-  let active = getActive();
-  // Never advertise a core that cannot answer.
-  const ready = providers.filter((p) => p.status.state === "ready").map((p) => p.id);
-  if (!active || !ready.includes(active)) active = ready[0] ?? null;
-  return { providers, active };
 }
 
 /** The machine's readings right now, as the console shows them. */
@@ -225,18 +142,13 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
 
   /* ---- status ---- */
   if (p === "/api/status") {
-    const conn = await connections();
-    const body: StatusResponse = {
-      active: conn.active,
-      anyProviderReady: conn.providers.some((x) => x.status.state === "ready"),
-    };
-    json(res, 200, body);
+    json(res, 200, await core.status());
     return;
   }
 
   /* ---- connections ---- */
   if (p === "/api/connections" && req.method === "GET") {
-    json(res, 200, await connections(url.searchParams.has("revalidate")));
+    json(res, 200, await core.connections(url.searchParams.has("revalidate")));
     return;
   }
 
@@ -249,7 +161,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       return;
     }
     await setActive(body.provider);
-    json(res, 200, await connections());
+    json(res, 200, await core.connections());
     return;
   }
 
@@ -267,18 +179,19 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
         json(res, 400, { error: "missing_key", message: "Paste the key first." });
         return;
       }
-      const v = await validate(id, apiKey, true);
+      const v = await core.validate(id, apiKey, true);
       if (!v.ok) {
         json(res, 400, { error: "invalid_key", message: v.message });
         return;
       }
       await setKey(id, apiKey);
-      json(res, 200, await connections());
+      json(res, 200, await core.connections());
       return;
     }
     if (req.method === "DELETE") {
       await clearKey(id);
-      json(res, 200, await connections());
+      core.forget(id);
+      json(res, 200, await core.connections());
       return;
     }
   }
@@ -296,9 +209,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       return;
     }
     await setModel(id, body.model);
-    // a different model may be usable; out of credit is account-wide and stays
-    if (lastProblem.get(id)?.includes("can't use that model")) lastProblem.delete(id);
-    json(res, 200, await connections());
+    core.modelChanged(id);
+    json(res, 200, await core.connections());
     return;
   }
 
@@ -357,13 +269,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
 
   /* ---- hearing: through the active service ---- */
   if (p === "/api/transcribe" && req.method === "POST") {
-    const conn = await connections();
-    const id = conn.active;
-    const c = id ? await connected(id) : null;
-    if (!id || !c || !c.catalogue.hearing.length) {
-      json(res, 503, { error: "no_hearing", message: "I've no way to hear you yet, sir — connect Gemini or ChatGPT in Configuration, or type instead." });
-      return;
-    }
     let audio: Buffer;
     try {
       audio = await readRaw(req, 12 * 1024 * 1024);
@@ -377,13 +282,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     }
     const t0 = Date.now();
     try {
-      const text = await hearWith(id, c.key, c.catalogue.hearing, new Blob([audio], { type: String(req.headers["content-type"] ?? "audio/webm") }));
-      console.log(`[hear] ${id} ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 60)}"`);
-      json(res, 200, { text });
+      const heard = await core.hear(new Blob([audio], { type: String(req.headers["content-type"] ?? "audio/webm") }));
+      console.log(`[hear] ${heard.via} ${((Date.now() - t0) / 1000).toFixed(2)}s "${heard.text.slice(0, 60)}"`);
+      json(res, 200, { text: heard.text });
     } catch (err) {
-      const message = humanise(id, err);
-      console.error(`[hear] ${id}: ${message}`);
-      json(res, 502, { error: "hear_failed", message });
+      if (err instanceof CoreError && err.code === "hear_failed") console.error(`[hear] ${err.message}`);
+      refuse(res, err);
     }
     return;
   }
@@ -395,41 +299,25 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       json(res, 400, { error: "bad_json" });
       return;
     }
-    const text = String(body.text ?? "").trim().slice(0, 800);
-    const speed = Math.min(1.4, Math.max(0.6, Number(body.speed) || 1));
-    if (!text) {
-      json(res, 400, { error: "empty_text" });
-      return;
-    }
-    if (!isProviderId(body.via)) {
-      json(res, 400, { error: "unknown_voice" });
-      return;
-    }
-    const c = await connected(body.via);
-    if (!c || !c.catalogue.speech.length) {
-      json(res, 503, { error: "no_voice", message: `${PROVIDERS[body.via].name} can't speak from here.` });
-      return;
-    }
-    // the voice chosen in Configuration → Voice, or the service's first if it isn't one of this service's
-    const voice = c.catalogue.voices.some((v) => v.id === body.voice) ? body.voice : c.catalogue.voices[0]?.id ?? "";
     // The samples go to the page as the service makes them: the first arrive
     // within a second, and he starts talking while the rest is still coming.
     const t0 = Date.now();
     let first: number | null = null;
     try {
-      for await (const bytes of speakWith(body.via, c.key, c.catalogue.speech, text, voice, speed)) {
+      const said = await core.speak(body);
+      for await (const bytes of said.pieces) {
         if (first === null) {
           first = Date.now() - t0;
           res.writeHead(200, { "content-type": `audio/L16; rate=${SPEECH_RATE}`, "cache-control": "no-store", "x-content-type-options": "nosniff" });
         }
         res.write(Buffer.from(bytes));
       }
-      console.log(`[speak] ${body.via} ${voice} first sound ${((first ?? 0) / 1000).toFixed(2)}s, done ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 48)}${text.length > 48 ? "…" : ""}"`);
+      const text = String(body.text ?? "").trim();
+      console.log(`[speak] ${said.via} ${said.voice} first sound ${((first ?? 0) / 1000).toFixed(2)}s, done ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 48)}${text.length > 48 ? "…" : ""}"`);
       res.end();
     } catch (err) {
-      const message = humanise(body.via, err);
-      console.error(`[speak] ${body.via}: ${message}`);
-      if (first === null) json(res, 502, { error: "speak_failed", message });
+      if (err instanceof CoreError && err.code === "speak_failed") console.error(`[speak] ${err.message}`);
+      if (first === null) refuse(res, err);
       else res.end(); // what was made has been played; the rest is lost, and the page says so
     }
     return;
@@ -444,24 +332,11 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       json(res, 400, { error: "bad_json" });
       return;
     }
-
-    const conn = await connections();
-    const id = isProviderId(body.provider) ? body.provider : conn.active;
-    if (!id) {
-      json(res, 503, { error: "no_provider", message: "No reasoning core is connected." });
-      return;
-    }
-    const c = await connected(id);
-    if (!c) {
-      json(res, 503, { error: "no_key", message: `${PROVIDERS[id].name} isn't connected.` });
-      return;
-    }
-    const model = c.model;
-
-    // Live readings ride along with the newest question only, never the history.
-    const turns = prepareTurns(body.turns, body.context);
-    if (!turns) {
-      json(res, 400, { error: "no_turns" });
+    let q;
+    try {
+      q = await core.prepare(body);
+    } catch (err) {
+      refuse(res, err);
       return;
     }
 
@@ -485,23 +360,18 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
 
     try {
       send({ t: "status", status: "thinking" });
-      await serviceFor(id).chat(c.key, model, turns, send, ac.signal, personaFor(body.address === "madam" ? "madam" : "sir"));
-      console.log(
-        `[${id}] ${model} ${((Date.now() - t0) / 1000).toFixed(1)}s ${wrote} chars${searched ? " (web)" : ""}`,
-      );
-      lastProblem.delete(id);
+      await core.answer(q, send, ac.signal);
+      console.log(`[${q.id}] ${q.model} ${((Date.now() - t0) / 1000).toFixed(1)}s ${wrote} chars${searched ? " (web)" : ""}`);
       send({ t: "done" });
-      res.end();
     } catch (err) {
-      const message = humanise(id, err);
-      if (/out of credit|can't use that model/.test(message)) lastProblem.set(id, message);
-      // The friendly line goes to the console; the provider's own words stay in
+      const message = err instanceof Error ? err.message : String(err);
+      // The friendly line goes to the console; the service's own words stay in
       // this log (keys are never part of them), for working out what went wrong.
-      const raw = (err instanceof Error ? err.message : String(err)).slice(0, 300);
-      console.error(`[${id}] ${model}: ${message}${raw && raw !== message ? `\n  ↳ ${raw}` : ""}`);
+      const raw = err instanceof Error && err.cause !== undefined ? String(err.cause instanceof Error ? err.cause.message : err.cause).slice(0, 300) : "";
+      console.error(`[${q.id}] ${q.model}: ${message}${raw && raw !== message ? `\n  ↳ ${raw}` : ""}`);
       send({ t: "error", message });
-      res.end();
     }
+    res.end();
     return;
   }
 
@@ -561,7 +431,7 @@ server.listen(PORT, () => {
   console.log(`  http://localhost:${PORT}`);
   console.log("");
 
-  void connections().then((c) => {
+  void core.connections().then((c) => {
     for (const prov of c.providers) {
       const mark = prov.status.state === "ready" ? "●" : "○";
       const detail =

@@ -53,8 +53,7 @@ paintThread();
 // A greeting, but never a thread the user didn't ask for: on a clean screen it
 // is simply said under the core.
 const opening = `Good ${partOfDay()}, sir. Bringing the sensors up now.`;
-if (!graph.active) toast(opening);
-else if (!graph.active.turns.length) toast(opening);
+if (!graph.active?.turns.length) toast(opening);
 refreshLinks(false);
 if (mode === "desk") input.focus();
 paintHosts();

@@ -57,6 +57,9 @@ voice.onState = (): void => {
   note.textContent = d.text;
   renderVoiceSelect();
 };
+// Painted once on the next frame, when every module has loaded: a browser with
+// no voices of its own and nothing connected would otherwise never say so.
+requestAnimationFrame(() => voice.onState?.());
 voice.onRecognised = (text, final): void => {
   if (typing_) { input.value = text; return; }
   if (final && text) setTimeout(() => submit(text), 120);
@@ -201,10 +204,15 @@ pitchSl.addEventListener("input", () => {
   voice.setPitch(Number(pitchSl.value));
   $("pitchN").textContent = voice.pitchValue.toFixed(2);
 });
-rateSl.addEventListener("input", () => {
-  voice.setRate(Number(rateSl.value));
-  $("rateN").textContent = voice.rateValue.toFixed(2);
-});
+/** The Cadence: a value within the slider's range, shown on it and kept. Returns what was set. */
+export function setRate(value: number): number {
+  const next = Math.max(0.7, Math.min(1.3, value));
+  voice.setRate(next);
+  rateSl.value = String(next);
+  $("rateN").textContent = next.toFixed(2);
+  return next;
+}
+rateSl.addEventListener("input", () => setRate(Number(rateSl.value)));
 $("testVoice").addEventListener("click", () => {
   voice.markUserActed();
   voice.stop();

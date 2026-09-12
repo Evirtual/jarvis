@@ -13,9 +13,6 @@ import { api } from "./api.js";
 import { $, esc } from "./dom.js";
 import { SERVERLESS } from "./server.js";
 
-/** Where a key "from the environment" came from, named so it can be found. */
-const ENV_VARS: Record<ProviderId, string> = { gemini: "GEMINI_API_KEY", openai: "OPENAI_API_KEY" };
-
 export class Connections {
   private root: HTMLElement;
   private hint: HTMLElement;
@@ -218,7 +215,7 @@ export class Connections {
       head +
       `<div class="keyline">` +
       `<span class="mask">${esc(st.maskedKey)}</span>` +
-      `<span class="src"${st.source === "environment" ? ` title="Disconnect makes JARVIS stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${ENV_VARS[p.id]}` : "saved here"}</span>` +
+      `<span class="src"${st.source === "environment" ? ` title="Disconnect makes JARVIS stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${p.envVar}` : "saved here"}</span>` +
       `</div>` +
       (st.problem ? `<p class="err">${esc(st.problem)}</p>` : "") +
       `<p class="hint">${st.hears ? "Answers and hears" : "Answers"} through this key${st.voices.length ? `, and offers ${st.voices.length} voices in Voice` : ""}.</p>` +

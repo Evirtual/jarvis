@@ -26,14 +26,15 @@
 
 import { recall, store } from "./dom.js";
 import { reduceMotion } from "./motion.js";
-import { CORE_R, DESIGN_R, drawAurora, drawCore } from "./core-draw.js";
+import { CORE_R, DESIGN_R, drawAurora, drawCore, type Activity } from "./core-draw.js";
 import { ICON } from "./icons.js";
+import { line } from "./message.js";
 import { ContextWeb } from "./web.js";
 import { forget, raise, stackKey, track } from "./stack.js";
 import { averageHues, GENERAL_ID, Workspace, migrate, THREAD_HUES, threadRef, type Group, type Thread } from "./workspace.js";
 
 export type { Thread, Group } from "./workspace.js";
-export type Activity = "idle" | "listening" | "speaking" | "thinking";
+export type { Activity } from "./core-draw.js";
 
 /** How big JARVIS is on screen, and the size the core was drawn at. */
 const CORE_BOTTOM_GAP = 20;
@@ -1483,122 +1484,6 @@ export class Stage {
   }
 
 
-}
-
-/**
- * The picture to show for an image result. A Wikimedia original can be
- * several thousand pixels and megabytes — and Wikimedia rate-limits
- * originals linked from other sites — so its standard 960-pixel preview is
- * shown instead (other widths are refused). The link still opens the original.
- */
-function previewOf(src: string): string {
-  const original = /^https:\/\/upload\.wikimedia\.org\/wikipedia\/([\w-]+)\/([0-9a-f])\/([0-9a-f]{2})\/([^/?#]+\.(?:jpe?g|png|webp|gif))$/i.exec(src);
-  if (original) {
-    const [, wiki, a, ab, file] = original;
-    return `https://upload.wikimedia.org/wikipedia/${wiki}/thumb/${a}/${ab}/${file}/960px-${file}`;
-  }
-  if (/^https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\//i.test(src) && !/[?&]width=/.test(src)) {
-    return `${src}${src.includes("?") ? "&" : "?"}width=960`;
-  }
-  return src;
-}
-
-export function line(kind: "user" | "jarvis" | "sys", text: string): HTMLElement {
-  const row = document.createElement("div");
-  row.className = `cw-msg ${kind}`;
-  const addText = (value: string): void => {
-    // https only, as docs/HOW-IT-WORKS.md promises: a plain http address is shown, not linked
-    const url = /https:\/\/[^\s<>()\[\]]+/g;
-    let start = 0;
-    for (const match of value.matchAll(url)) {
-      const index = match.index ?? 0;
-      row.append(document.createTextNode(value.slice(start, index)));
-      const link = document.createElement("a");
-      link.href = match[0];
-      link.textContent = match[0];
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.className = "cw-link";
-      row.append(link);
-      start = index + match[0].length;
-    }
-    row.append(document.createTextNode(value.slice(start)));
-  };
-  const media = /\[\[media:(image|video)\s+(https:\/\/[^\]\s]+)\]\]/gi;
-  let cursor = 0;
-  for (const match of text.matchAll(media)) {
-    const index = match.index ?? 0;
-    addText(text.slice(cursor, index));
-    const type = match[1]!.toLowerCase();
-    const source = match[2]!;
-    const card = document.createElement("figure");
-    card.className = `cw-media ${type}`;
-    let embedded = false;
-    try {
-      const parsed = new URL(source);
-      if (type === "image" && /\.(?:avif|gif|jpe?g|png|webp)(?:$|\?)/i.test(parsed.pathname)) {
-        const image = document.createElement("img");
-        const preview = previewOf(source);
-        // should a preview not exist, the original is the next best thing
-        if (preview !== source) image.addEventListener("error", () => { image.src = source; }, { once: true });
-        image.src = preview; image.alt = "Research image result"; image.loading = "lazy";
-        image.referrerPolicy = "no-referrer";
-        const imageLink = document.createElement("a");
-        imageLink.href = source; imageLink.target = "_blank"; imageLink.rel = "noopener noreferrer";
-        imageLink.title = "Open image source";
-        imageLink.append(image);
-        card.append(imageLink);
-        embedded = true;
-      } else if (type === "video") {
-        const youtubeId = parsed.hostname.includes("youtu") ? (parsed.searchParams.get("v") ?? parsed.pathname.split("/").filter(Boolean).pop()) : null;
-        const vimeoId = parsed.hostname.includes("vimeo.com") ? parsed.pathname.split("/").filter(Boolean).findLast((part) => /^\d+$/.test(part)) : null;
-        if (youtubeId && /^[\w-]{6,}$/.test(youtubeId)) {
-          const frame = document.createElement("iframe");
-          // credentialless (set before it loads): the page may be cross-origin isolated (see sw.js)
-          frame.setAttribute("credentialless", "");
-          frame.src = `https://www.youtube-nocookie.com/embed/${youtubeId}`;
-          frame.title = "Research video result";
-          frame.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
-          frame.allowFullscreen = true;
-          card.append(frame);
-          embedded = true;
-        } else if (vimeoId) {
-          const frame = document.createElement("iframe");
-          frame.setAttribute("credentialless", "");
-          frame.src = `https://player.vimeo.com/video/${vimeoId}`;
-          frame.title = "Research video result";
-          frame.allow = "autoplay; fullscreen; picture-in-picture";
-          frame.allowFullscreen = true;
-          card.append(frame);
-          embedded = true;
-        }
-      }
-    } catch { /* malformed media remains an ordinary safe link */ }
-    // Media is its own source. Do not add a written fallback link; an invalid
-    // result is omitted instead of leaving a duplicate text control.
-    if (embedded) row.append(card);
-    cursor = index + match[0].length;
-  }
-  if (cursor) { addText(text.slice(cursor)); return row; }
-  // Messages are always rendered as text first. Only explicit http(s) URLs
-  // become anchors, avoiding HTML injection while keeping research sources
-  // usable after a thread is reopened.
-  const url = /https?:\/\/[^\s<>()\[\]]+/g;
-  let start = 0;
-  for (const match of text.matchAll(url)) {
-    const index = match.index ?? 0;
-    row.append(document.createTextNode(text.slice(start, index)));
-    const link = document.createElement("a");
-    link.href = match[0];
-    link.textContent = match[0];
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    link.className = "cw-link";
-    row.append(link);
-    start = index + match[0].length;
-  }
-  row.append(document.createTextNode(text.slice(start)));
-  return row;
 }
 
 function overlapArea(a: Rect, b: Rect, margin: number): number {

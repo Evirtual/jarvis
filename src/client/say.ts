@@ -6,7 +6,7 @@
 import { addressed } from "./address.js";
 import { $ } from "./dom.js";
 import { reduceMotion } from "./motion.js";
-import { line } from "./stage.js";
+import { line } from "./message.js";
 import { graph, voice } from "./state.js";
 import { drainQueue, queued } from "./ask.js";
 import { pendingConfirm } from "./confirm.js";
