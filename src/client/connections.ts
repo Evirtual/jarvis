@@ -147,10 +147,10 @@ export class Connections {
     } else {
       const active = this.data.providers.find((p) => p.id === this.data.active);
       const ready = active?.status.state === "ready" ? active.status : null;
-      const does = ready ? ["answering", ...(ready.hears ? ["hearing"] : []), ...(SERVERLESS && ready.voices.length ? ["speaking"] : [])].join(", ") : "answering";
+      const does = ready?.hears ? "answering and hearing" : "answering";
       this.hint.className = "hint";
       this.hint.innerHTML =
-        `<b>${esc(this.activeName())}</b> is ${does}. ` +
+        `<b>${esc(this.activeName())}</b> is ${does}; which voice speaks is chosen in Voice. ` +
         (SERVERLESS
           ? "Keys are kept in this browser on this device, and go only to the service they belong to."
           : "Keys are stored on this machine only and are never sent to the browser.");
@@ -221,7 +221,7 @@ export class Connections {
       `<span class="src"${st.source === "environment" ? ` title="Disconnect makes JARVIS stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${ENV_VARS[p.id]}` : "saved here"}</span>` +
       `</div>` +
       (st.problem ? `<p class="err">${esc(st.problem)}</p>` : "") +
-      `<p class="hint">${st.hears ? "Answers, hears" : "Answers"}${st.voices.length ? (SERVERLESS ? " and speaks" : ", and speaks in the web version") : ""} through this key.</p>` +
+      `<p class="hint">${st.hears ? "Answers and hears" : "Answers"} through this key${st.voices.length ? `, and offers ${st.voices.length} voices in Voice` : ""}.</p>` +
       `<div class="ctl"><span class="ctl-k"><span>Model</span><span class="n">${st.models.length} available</span></span>` +
       `<select class="sel" data-model="${p.id}" aria-label="${esc(p.name)} model">${models}</select></div>` +
       `<div class="row">` +

@@ -155,8 +155,8 @@ setVoiceOut(recall("jarvis.voiceOn") !== "0");
 voiceOut.addEventListener("change", () => setVoiceOut(voiceOut.checked));
 
 /* ---------------------------------------------------------------------
- * The voice list: the device's own voices first — the default — then each
- * connected service's neural voices. Rebuilt whenever the voice's state
+ * The voice list: the AI voices of the service in use; the device's own
+ * only when nothing is connected. Rebuilt whenever the voice's state
  * changes (onState).
  * --------------------------------------------------------------------- */
 
@@ -164,20 +164,20 @@ const voiceSel = $<HTMLSelectElement>("voiceSel");
 function renderVoiceSelect(): void {
   const want = voice.selectionValue;
   const groups: { label: string; options: { value: string; text: string }[] }[] = [];
-  if (voice.deviceSpeaks) {
+  const neural = voice.neuralVoices();
+  for (const via of new Set(neural.map((n) => n.via))) {
     groups.push({
-      label: "This device · instant, free",
+      label: `AI voices · ${voice.sourceLabel(via)}`,
+      options: neural.filter((n) => n.via === via).map((n) => ({ value: `${via}:${n.voice.id}`, text: `${n.voice.name}  ·  ${n.voice.note}` })),
+    });
+  }
+  if (!neural.length && voice.deviceSpeaks) {
+    groups.push({
+      label: "This device · until a service is connected",
       // a browser that won't name its voices (Brave) still speaks with its default
       options: voice.systemVoices.length
         ? voice.systemVoices.map((v) => ({ value: `device:${v.name}`, text: voice.labelFor(v) }))
         : [{ value: "device:", text: "This device's voice" }],
-    });
-  }
-  const neural = voice.neuralVoices();
-  for (const via of new Set(neural.map((n) => n.via))) {
-    groups.push({
-      label: `Neural · ${voice.sourceLabel(via)}`,
-      options: neural.filter((n) => n.via === via).map((n) => ({ value: `${via}:${n.voice.id}`, text: `${n.voice.name}  ·  ${n.voice.note}` })),
     });
   }
   const shape = JSON.stringify(groups);

@@ -650,3 +650,21 @@ service's audio actually starts.
 | Charon chosen with Gemini's voice spent: notice "Gemini's voice has used today's free allowance, sir — it comes back tomorrow. I'll speak with this device's voice meanwhile."; no click | Pass |
 | A second line straight after: no request to Gemini, device voice at once | Pass |
 | PC: the same | Pass |
+
+**The AI voice, always.** 72. The user's rule: the service in use speaks
+with its own AI voice — ChatGPT's when on ChatGPT, Gemini's when on Gemini —
+and the device's voice only when nothing is connected or the service's voice
+is refused. The Voice list shows only the service's voices (the device's
+only with nothing connected); the voice picked for each service is kept for
+it. A refusal rests that service's voice alone, so Gemini's spent allowance
+never silences ChatGPT. 73. On the PC, choosing a service did nothing:
+`/api/connections/active` was caught by the per-service key route as a
+service called "active" (404). The route now comes first.
+
+| Area | Result |
+| --- | --- |
+| PC: switch Gemini → ChatGPT with Use | Pass (was 404) |
+| PC on ChatGPT: list "AI voices · through ChatGPT (13)", Fable chosen, Test voice → `/api/speak` openai:fable 200 | Pass |
+| ChatGPT voice through the PC, 7 s of speech: first sound 1.9–2.2 s, done 3.0 s; "Voice profile set, sir." first sound 1.1 s | Measured |
+| ChatGPT hearing through the PC: "Good evening, sir." in 0.70 s, exact | Pass |
+| Web on Gemini, voice spent: list "AI voices · through Gemini (20)", the reason shown once, device voice speaks | Pass |

@@ -59,9 +59,9 @@ if (mode === "desk") input.focus();
 paintHosts();
 
 /* ---------------------------------------------------------------------
- * The service that answers is also the one that hears, and the one whose
- * voices are offered as his neural voice (Configuration → Voice). The
- * device's own voice speaks unless one of those is chosen.
+ * The service in use answers, hears, and offers its voices in
+ * Configuration → Voice: connected to ChatGPT, ChatGPT's voices; to Gemini,
+ * Gemini's. The device's own voice speaks unless one of them is chosen.
  * --------------------------------------------------------------------- */
 
 conn.onChange = (c): void => {

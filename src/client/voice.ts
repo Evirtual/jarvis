@@ -132,11 +132,12 @@ export class Voice {
   private neural = new Map<ProviderId, VoiceOption[]>();
   private chosen: Selection | null = null;
   /**
-   * Set when the chosen neural voice was refused (a spent allowance, no
-   * credit): why, and until when the device's voice speaks instead. Cleared
-   * by the next line the service does speak.
+   * Services whose voice was refused (a spent allowance, no credit): why, and
+   * until when the device's voice speaks instead. Each service rests on its
+   * own — Gemini's limit never keeps ChatGPT quiet — and is cleared by the
+   * next line it does speak.
    */
-  private resting: { until: number; reason: string } | null = null;
+  private resting = new Map<ProviderId, { until: number; reason: string }>();
 
   private seq = 0;
 
@@ -197,20 +198,27 @@ export class Voice {
 
   /* ---------------- which voice ----------------
    *
-   * The device's own voice is the default — instant, and free. A connected
-   * service's neural voice is used only when chosen in Configuration → Voice.
-   * A choice is remembered as "<source>:<id>" ("device:<name>", or "device:"
-   * for the browser's default) and holds whenever that source is there.
+   * The service in use speaks, always, with its own AI voice: connected to
+   * ChatGPT, ChatGPT's; to Gemini, Gemini's (main.ts offers only the service
+   * in use). The voice picked for each service in Configuration → Voice is
+   * remembered for it; until one is picked, the service's first voice.
+   *
+   * The device's own voice speaks only when there is no service to speak —
+   * nothing connected — or while the service's voice is refused (a spent
+   * allowance, no credit; see rest()).
    */
 
   /** The voices one service can speak with now — an empty list when it has gone. */
   setNeuralVoices(via: ProviderId, list: VoiceOption[]): void {
+    const was = this.neural.get(via) ?? [];
+    if (was.length === list.length && was.every((v, i) => v.id === list[i]?.id)) return;
     if (list.length) this.neural.set(via, list);
     else this.neural.delete(via);
     this.choose();
+    this.onState?.(); // the list of voices on offer has changed, even if the choice hasn't
   }
 
-  /** Every neural voice available. */
+  /** Every neural voice on offer. */
   neuralVoices(): NeuralVoice[] {
     return PROVIDER_IDS.flatMap((via) => (this.neural.get(via) ?? []).map((voice) => ({ via, voice })));
   }
@@ -235,19 +243,23 @@ export class Voice {
     this.choose();
   }
 
-  /** The remembered choice while its source is there; otherwise the device's voice. */
+  /** The service's voice when a service offers voices; the device's otherwise. */
   private choose(): void {
     const before = this.selectionValue;
-    const saved = parseSelection(recall("jarvis.voice") ?? "");
-    this.chosen = saved && this.available(saved) ? saved : this.deviceDefault();
-    const name = this.chosen?.kind === "device" ? this.chosen.name : null;
+    // The device voice — speaking now, or standing by for when the service can't.
+    const name = recall("jarvis.voice.device");
     this.systemVoice = (name && this.systemList.find((v) => v.name === name)) || (this.systemList[0] ?? null);
-    if (this.selectionValue !== before) this.onState?.();
-  }
 
-  /** The device's best voice by name, or its default where it names none; null if it can't speak. */
-  private deviceDefault(): Selection | null {
-    return this.synth ? { kind: "device", name: this.systemList[0]?.name ?? null } : null;
+    const offered = this.neuralVoices();
+    const via = offered[0]?.via;
+    if (via) {
+      const wanted = recall(`jarvis.voice.${via}`);
+      const pick = offered.find((v) => v.voice.id === wanted) ?? offered[0]!;
+      this.chosen = { kind: "neural", via, id: pick.voice.id };
+    } else {
+      this.chosen = this.synth ? { kind: "device", name: this.systemVoice?.name ?? null } : null;
+    }
+    if (this.selectionValue !== before) this.onState?.();
   }
 
   private available(s: Selection): boolean {
@@ -255,12 +267,14 @@ export class Voice {
     return this.synth !== null && (s.name === null || this.systemList.some((v) => v.name === s.name));
   }
 
-  /** Choose by value: "<service>:<voice>" or "device:<name>". */
+  /** Choose by value — "<service>:<voice>", or "device:<name>" when no service is connected — and remember it. */
   select(value: string): boolean {
     const s = parseSelection(value);
     if (!s || !this.available(s)) return false;
-    store("jarvis.voice", value);
-    this.resting = null; // chosen again: worth asking again
+    if (s.kind === "neural") {
+      store(`jarvis.voice.${s.via}`, s.id);
+      this.resting.delete(s.via); // chosen again: worth asking again
+    } else if (s.name) store("jarvis.voice.device", s.name);
     this.choose();
     this.onState?.();
     return true;
@@ -279,18 +293,25 @@ export class Voice {
     return voice ? { via: s.via, voice } : null;
   }
 
+  /** Why the chosen neural voice is resting after a refusal, or null if it isn't. */
+  private restingReason(): string | null {
+    const n = this.current();
+    const rest = n ? this.resting.get(n.via) : undefined;
+    return rest && Date.now() < rest.until ? rest.reason : null;
+  }
+
   /** The neural voice to speak with now: the chosen one, unless it is resting after a refusal. */
   private neuralNow(): NeuralVoice | null {
-    return this.resting && Date.now() < this.resting.until ? null : this.current();
+    return this.restingReason() === null ? this.current() : null;
   }
 
   /**
    * The chosen neural voice was refused: say why, once, and let the device's
    * voice speak for a while rather than wait on a refusal every sentence.
    */
-  private rest(reason: string): void {
-    const first = this.resting === null;
-    this.resting = { until: Date.now() + REST_MS, reason };
+  private rest(via: ProviderId, reason: string): void {
+    const first = !this.resting.has(via);
+    this.resting.set(via, { until: Date.now() + REST_MS, reason });
     if (first) this.onNotice?.(`${reason} I'll speak with this device's voice meanwhile.`);
     this.onState?.();
   }
@@ -302,16 +323,12 @@ export class Voice {
 
   describe(): { text: string; warn: boolean } {
     const n = this.current();
-    if (n && this.resting && Date.now() < this.resting.until) {
-      return { text: `${n.voice.name}, ${this.sourceLabel(n.via)}, is unavailable: ${this.resting.reason} This device's voice speaks meanwhile.`, warn: true };
-    }
-    if (n) return { text: `Neural voice — ${n.voice.name} (${n.voice.note}), ${this.sourceLabel(n.via)}.`, warn: false };
-    if (!this.synth) return { text: "This browser can't speak. Connect a service and pick one of its voices, and he will.", warn: true };
-    if (!this.systemVoice) return { text: "This device's own voice. The browser doesn't name its voices, so it can't be chosen by name here.", warn: false };
-    return {
-      text: `This device's voice — ${shortName(this.systemVoice)} (${this.systemVoice.lang}).`,
-      warn: !/^en-GB/i.test(this.systemVoice.lang),
-    };
+    const resting = this.restingReason();
+    if (n && resting) return { text: `${n.voice.name}, ${this.sourceLabel(n.via)}, is unavailable: ${resting} This device's voice speaks meanwhile.`, warn: true };
+    if (n) return { text: `AI voice — ${n.voice.name} (${n.voice.note}), ${this.sourceLabel(n.via)}.`, warn: false };
+    if (!this.synth) return { text: "No service is connected and this browser can't speak. Connect Gemini or ChatGPT and he will.", warn: true };
+    const which = this.systemVoice ? ` — ${shortName(this.systemVoice)} (${this.systemVoice.lang})` : "";
+    return { text: `No service is connected, so this device's voice speaks${which}. Connect Gemini or ChatGPT for his AI voice.`, warn: true };
   }
 
   /** One line for the console snapshot the reasoning core is shown. */
@@ -538,11 +555,11 @@ export class Voice {
       if (r.neural) {
         try {
           await this.play(r, id, text, await pieces);
-          this.resting = null; // it spoke: whatever stopped it has passed
+          this.resting.delete(n.via); // it spoke: whatever stopped it has passed
           return;
         } catch (err) {
           if (this.seq !== id) return;
-          this.rest(err instanceof Error ? err.message : String(err));
+          this.rest(n.via, err instanceof Error ? err.message : String(err));
           r.neural = false;
           // let what the service did say finish before the device's voice takes over
           await this.untilPlayed(r);

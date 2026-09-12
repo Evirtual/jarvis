@@ -245,6 +245,19 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     return;
   }
 
+  // Before the per-service routes: "/api/connections/active" would otherwise
+  // read as a key for a service called "active".
+  if (p === "/api/connections/active" && req.method === "POST") {
+    const body = await readJson<SetActiveRequest>(req);
+    if (!body || !isProviderId(body.provider)) {
+      json(res, 400, { error: "unknown_provider" });
+      return;
+    }
+    await setActive(body.provider);
+    json(res, 200, await connections());
+    return;
+  }
+
   const keyMatch = p.match(/^\/api\/connections\/([a-z]+)$/);
   if (keyMatch) {
     const id = keyMatch[1];
@@ -290,17 +303,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     await setModel(id, body.model);
     // a different model may be usable; out of credit is account-wide and stays
     if (lastProblem.get(id)?.includes("can't use that model")) lastProblem.delete(id);
-    json(res, 200, await connections());
-    return;
-  }
-
-  if (p === "/api/connections/active" && req.method === "POST") {
-    const body = await readJson<SetActiveRequest>(req);
-    if (!body || !isProviderId(body.provider)) {
-      json(res, 400, { error: "unknown_provider" });
-      return;
-    }
-    await setActive(body.provider);
     json(res, 200, await connections());
     return;
   }
