@@ -235,21 +235,18 @@ answer gets through.
 
 ## The voice
 
-[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (Apache 2.0) via
-[`kokoro-js`](https://www.npmjs.com/package/kokoro-js), running locally on CPU.
-Default is **`bm_george`** — British male, Received Pronunciation.
+By default JARVIS speaks with the device's own voice — the best British one
+the browser has (on Windows, a "Natural" en-GB voice where one is installed) —
+which is instant and costs nothing. Under **Config → Voice** you can choose a
+**neural voice from the connected service** instead: Gemini's or ChatGPT's
+voices, each told to sound like a calm British butler. Timbre and cadence
+sliders apply to both (timbre to the device's voices only, which take a pitch).
 
-Eight British voices plus American ones live under **Config → Voice**, with
-timbre and cadence sliders. Replies are split into sentences so the first phrase
-starts playing while the rest is still generating, and repeated lines are cached.
-
-`KOKORO_DTYPE=fp32` for higher fidelity (~326 MB, slower), `q4` for smaller and
-rougher. Default `q8`. If the model fails to load, the console says so and falls
-back to your browser's own voices rather than going silent.
-
-In the web version there is no server to run Kokoro, so the connected service
-speaks instead — Gemini's or ChatGPT's voices, each told to sound like a calm
-British butler — and you pick among them under **Config → Voice** as on the PC.
+Replies are split into sentences so the first phrase starts playing while the
+rest is still being made, and the silence a service leaves round each piece
+is trimmed so they join without dead air. The console carries no speech
+engine of its own: nothing is downloaded, and the PC and the web speak the
+same way.
 
 Hearing is the connected service's, everywhere: the mic records in the page and
 the recording goes to Gemini or ChatGPT, primed with the console's vocabulary so
@@ -343,8 +340,7 @@ it, but it is deliberately unfriendly to anything else:
 
 **On your PC**, with its own server (`npm run serve`): the readings are the
 machine's own — CPU per core, GPU load and temperature, disks, the devices on
-your network — the neural voice runs locally, and API keys stay in
-`config.json`, never reaching the browser.
+your network — and API keys stay in `config.json`, never reaching the browser.
 
 **As a web page**, with no server at all: [jarvis.edgarasneverdauskas.com](https://jarvis.edgarasneverdauskas.com/),
 published by [`pages.yml`](.github/workflows/pages.yml) on every push to
@@ -375,14 +371,12 @@ What differs is where the work happens:
 
   The battery ring shows the real battery where the browser shares it (not on
   iPhone). Readings pause while the page is out of sight.
-- **Voice and hearing** come from the connected service, the same as its
-  answers: nothing is downloaded and nothing runs in the browser, so a phone
-  is as quick as a laptop. Sentences are requested as they arrive and played
-  back to back, so he starts within about a second. (A model running in the
-  browser was tried first — Kokoro and Moonshine in workers — and was five to
-  ten times too slow on a phone or in Brave to be worth keeping.) With nothing
-  connected he speaks with the device's own voices, and listens through the
-  browser's dictation where it has one.
+- **Voice and hearing** are the same as on the PC: the device's own voice by
+  default, the connected service's neural voice as a choice, and the
+  connected service's hearing. Nothing is downloaded and nothing runs in the
+  browser, so a phone is as quick as a laptop. With nothing connected he
+  speaks with the device's voice and listens through the browser's dictation
+  where it has one.
 
 A custom domain: set the repository variable `JARVIS_SITE_URL` (so the page
 is built for `/` rather than `/jarvis/`) and add the domain under
@@ -420,7 +414,6 @@ the types are broken.
 | `src/client/server.ts` | Which of the two it is: the PC with its server, or the web page on its own (`VITE_JARVIS_SERVERLESS`) |
 | `src/client/browser-core.ts` | The web version's back end: keys kept on the device, and the same connections, asking, hearing and speech the server offers |
 | `src/client/sensors.ts` | The web version's instruments: what a browser can genuinely measure of its device |
-| `src/shared/voices.ts` | The Kokoro voices and the WAV writer, for the PC's own voice |
 | `src/client/say.ts` | How JARVIS speaks to you: notices, lines in a window, his status word, busy |
 | `src/client/ask.ts` | The command line, the queue, what the core is told, the streamed answer |
 | `src/client/actions.ts` | Carrying out every action, by you or by the core's directives |
@@ -439,7 +432,7 @@ the types are broken.
 | `src/client/styles.css` | Ends with the two shared materials, `.glass` (every box) and `.veil` (behind anything modal); use the class rather than restyling an element |
 | `src/shared/services/` | The two services behind one interface — `common.ts` (the interface, the persona, the helpers), `gemini.ts`, `openai.ts` — each answering, hearing and speaking; used by the server, and by the browser in the web version |
 | `src/shared/weather.ts` | The weather from open-meteo, for both |
-| `src/server/` | HTTP, credential store, the services with a validation cache, telemetry, scan, world, Kokoro |
+| `src/server/` | HTTP, credential store, the services with a validation cache, telemetry, scan, world |
 | `tests/` | Node's test runner over the pure modules |
 | `src/client/public/` | The logo (`icon.svg`, JARVIS's core simplified), app icons, manifest, the do-nothing service worker that makes it installable, robots and sitemap |
 | `scripts/icons.mjs` | Renders every icon size and the social preview image from `icon.svg` — run it after changing the logo |
@@ -475,8 +468,8 @@ and a re-render layer would add weight without buying anything.
 
 - `POST /api/speak` returns 16-bit PCM WAV at 24 kHz. Requests are serialised
   (single ONNX session) and LRU-cached.
-- Kokoro's pitch is fixed per voice, so **Timbre** applies only to system
-  voices; **Cadence** maps to Kokoro's `speed` either way.
+- A service's voice has its pitch fixed, so **Timbre** applies only to the
+  device's own voices; **Cadence** reaches both (a service is told the pace).
 - Everything on the board lives in this browser's storage. Clearing site data
   clears the board; the keys and the voice live on the server instead.
 - Positions are saved from the board's top-left corner. Saves from before that

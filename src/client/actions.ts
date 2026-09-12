@@ -2,7 +2,8 @@
  * Carrying out what was asked — by you, or by the reasoning core's directives.
  */
 
-import type { ProviderId, ScanResponse, TelemetryResponse, VoiceOption, WorldResponse } from "../shared/types.js";
+import type { ProviderId, ScanResponse, TelemetryResponse, WorldResponse } from "../shared/types.js";
+import type { NeuralVoice } from "./voice.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
 import {
@@ -23,7 +24,7 @@ import { paintThread, refreshLinks } from "./threads.js";
 import { enqueue } from "./ask.js";
 import { sweep } from "./readings.js";
 import { mode } from "./deck.js";
-import { applyAddress, renderVoiceSelect, setVoiceOut, showKeyboard } from "./voice-ui.js";
+import { applyAddress, setVoiceOut, showKeyboard } from "./voice-ui.js";
 import { setDrawer } from "./drawer.js";
 
 /* ===================================================================== *
@@ -39,15 +40,16 @@ export function coreLabel(p: ProviderWord): string {
   return PROVIDERS[p].name;
 }
 
-export function findVoice(name: string): VoiceOption | null {
+export function findVoice(name: string): NeuralVoice | null {
   const n = name.toLowerCase();
+  const all = voice.neuralVoices();
   return (
-    voice.voiceOptions.find((v) => v.name.toLowerCase() === n) ??
+    all.find((v) => v.voice.name.toLowerCase() === n) ??
     // Spoken names come back spelled however the transcriber guesses —
     // "Louis" for Lewis — so match by closeness, not equality.
-    voice.voiceOptions
-      .map((v) => ({ v, d: editDistance(v.name.toLowerCase(), n) }))
-      .filter((x) => x.d <= 2 && x.d <= Math.ceil(x.v.name.length * 0.4))
+    all
+      .map((v) => ({ v, d: editDistance(v.voice.name.toLowerCase(), n) }))
+      .filter((x) => x.d <= 2 && x.d <= Math.ceil(x.v.voice.name.length * 0.4))
       .sort((a, b) => a.d - b.d)[0]?.v ??
     null
   );
@@ -313,10 +315,9 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
     }
     case "set_voice": {
       const v = findVoice(a.voice);
-      if (!v) return `I've no voice called ${a.voice}, sir. I have ${voice.voiceOptions.map((x) => x.name).slice(0, 6).join(", ")}.`;
-      voice.select(`k:${v.id}`);
-      renderVoiceSelect();
-      return `Voice set to ${v.name}, sir.`;
+      if (!v) return `I've no voice called ${a.voice}, sir. I have ${voice.neuralVoices().map((x) => x.voice.name).slice(0, 6).join(", ")}.`;
+      voice.select(`${v.via}:${v.voice.id}`);
+      return `Voice set to ${v.voice.name}, sir.`;
     }
     case "set_speed": {
       const next = Math.max(0.7, Math.min(1.3, a.value ?? voice.rateValue + (a.delta ?? 0)));

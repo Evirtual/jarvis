@@ -2,8 +2,8 @@
  * J.A.R.V.I.S. Console — server.
  *
  * Serves the built client, brokers the connected services — answers, hearing
- * and speech — so API keys never reach the browser, runs the PC's own voice
- * (Kokoro), and exposes real machine and network telemetry.
+ * and speech — so API keys never reach the browser, and exposes real machine
+ * and network telemetry.
  */
 
 import http from "node:http";
@@ -31,14 +31,12 @@ import {
   ROOT,
   clearKey,
   getActive,
-  getKokoroVoice,
   getModel,
   loadConfig,
   maskKey,
   resolveKey,
   setActive,
   setKey,
-  setKokoroVoice,
   setModel,
 } from "./config.js";
 import {
@@ -51,7 +49,6 @@ import {
   serviceFor,
   validate,
 } from "./services.js";
-import { DEFAULT_VOICE, hasVoice, kokoro, loadKokoro, synthesize, voices } from "./kokoro.js";
 import { gateway, snapshot, startSampler } from "./system.js";
 import { runScan, scanState } from "./scan.js";
 import { refreshWorld, startWorld, world } from "./world.js";
@@ -160,7 +157,8 @@ async function providerView(id: ProviderId, revalidate: boolean): Promise<Provid
         maskedKey: masked,
         source: resolved.source,
         models: v.catalogue.chat,
-        model: getModel(id) ?? v.catalogue.chat[0] ?? "",
+        // a model chosen earlier that the account no longer lists gives way to the newest
+        model: ((chosen) => (chosen && v.catalogue.chat.includes(chosen) ? chosen : v.catalogue.chat[0] ?? ""))(getModel(id)),
         voices: v.catalogue.voices,
         hears: v.catalogue.hearing.length > 0,
         ...(lastProblem.has(id) ? { problem: lastProblem.get(id)! } : {}),
@@ -231,7 +229,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   if (p === "/api/status") {
     const conn = await connections();
     const body: StatusResponse = {
-      kokoro: { state: kokoro.state, error: kokoro.error, voices: voices() },
       active: conn.active,
       anyProviderReady: conn.providers.some((x) => x.status.state === "ready"),
     };
@@ -392,7 +389,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     return;
   }
 
-  /* ---- speech: through a service, or the PC's own voice ---- */
+  /* ---- speech: through a connected service ---- */
   if (p === "/api/speak" && req.method === "POST") {
     const body = await readJson<SpeakRequest>(req);
     if (!body) {
@@ -405,34 +402,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       json(res, 400, { error: "empty_text" });
       return;
     }
-    const t0 = Date.now();
-    const send = (wav: ArrayBuffer | Buffer, who: string): void => {
-      console.log(`[speak] ${who} ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 48)}${text.length > 48 ? "…" : ""}"`);
-      const bytes = Buffer.isBuffer(wav) ? wav : Buffer.from(wav);
-      res.writeHead(200, { "content-type": "audio/wav", "content-length": bytes.length, "cache-control": "no-store" });
-      res.end(bytes);
-    };
-
-    if (body.via === "kokoro") {
-      if (kokoro.state !== "ready") {
-        json(res, 503, { error: kokoro.state === "loading" ? "model_loading" : "model_failed" });
-        return;
-      }
-      const voice = String(body.voice ?? DEFAULT_VOICE);
-      if (!hasVoice(voice)) {
-        json(res, 400, { error: "unknown_voice" });
-        return;
-      }
-      if (voice !== getKokoroVoice()) void setKokoroVoice(voice);
-      try {
-        send(await synthesize(text, voice, speed), voice);
-      } catch (err) {
-        console.error("[kokoro] synthesis failed:", err);
-        json(res, 500, { error: "synthesis_failed" });
-      }
-      return;
-    }
-
     if (!isProviderId(body.via)) {
       json(res, 400, { error: "unknown_voice" });
       return;
@@ -445,8 +414,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     }
     // the voice chosen in Configuration → Voice, or the service's first if it isn't one of this service's
     const voice = c.catalogue.voices.some((v) => v.id === body.voice) ? body.voice : c.catalogue.voices[0]?.id ?? "";
+    const t0 = Date.now();
     try {
-      send(await serviceFor(body.via).speak(c.key, model, text, voice, speed), `${body.via} ${voice}`);
+      const wav = Buffer.from(await serviceFor(body.via).speak(c.key, model, text, voice, speed));
+      console.log(`[speak] ${body.via} ${voice} ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 48)}${text.length > 48 ? "…" : ""}"`);
+      res.writeHead(200, { "content-type": "audio/wav", "content-length": wav.length, "cache-control": "no-store" });
+      res.end(wav);
     } catch (err) {
       const message = humanise(body.via, err);
       console.error(`[speak] ${body.via}: ${message}`);
@@ -600,9 +573,6 @@ server.listen(PORT, () => {
   // Seed the perimeter panel as soon as the console comes online. Later sweeps
   // remain on demand, so the network is not polled continuously.
   void runScan(gateway()).catch((e: unknown) => console.error("[scan]", e));
-
-  // the PC's own voice loads in the background, once
-  void loadKokoro();
 });
 
 process.on("SIGINT", () => {

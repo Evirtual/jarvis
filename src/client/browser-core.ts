@@ -5,8 +5,7 @@
  * It answers exactly as the server does (the same shapes, the same messages),
  * using the same services (shared/services). The difference is where the
  * keys live: in this browser's storage, on the user's own device, sent to
- * nobody but the service they belong to. There is no Kokoro here — the
- * connected service speaks.
+ * nobody but the service they belong to.
  */
 
 import type {
@@ -96,7 +95,8 @@ async function view(id: ProviderId, revalidate: boolean): Promise<ProviderView> 
   const status: ProviderStatus = v.ok && v.catalogue
     ? {
         state: "ready", maskedKey: mask(p.key), source: "saved",
-        models: v.catalogue.chat, model: p.model ?? v.catalogue.chat[0] ?? "",
+        // a model chosen earlier that the account no longer lists (or that is no longer for chat) gives way to the newest
+        models: v.catalogue.chat, model: p.model && v.catalogue.chat.includes(p.model) ? p.model : v.catalogue.chat[0] ?? "",
         voices: v.catalogue.voices, hears: v.catalogue.hearing.length > 0,
         ...(lastProblem.has(id) ? { problem: lastProblem.get(id)! } : {}),
       }
@@ -197,7 +197,6 @@ async function transcribe(audio: Blob): Promise<string> {
 }
 
 async function speak(body: SpeakRequest): Promise<Blob> {
-  if (body.via === "kokoro") throw new Error("The PC's own voice isn't available in the web version.");
   const id = body.via;
   const c = await connected(id);
   const model = c?.catalogue.speech[0];
@@ -215,7 +214,6 @@ async function speak(body: SpeakRequest): Promise<Blob> {
 async function status(): Promise<StatusResponse> {
   const conn = await connections();
   return {
-    kokoro: { state: "absent", error: null, voices: [] },
     active: conn.active,
     anyProviderReady: conn.providers.some((p) => p.status.state === "ready"),
   };

@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Real-telemetry HUD console with a local neural voice, for desktop, mobile and the car",
+  "description": "Real-telemetry HUD console that answers, hears and speaks through one connected service, for desktop, mobile and the car",
   "engines": {
     "node": ">=20.11"
   },
@@ -20,8 +20,6 @@
     "test": "node --import tsx --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
-    "@huggingface/transformers": "^3.8.1",
-    "kokoro-js": "^1.2.1",
     "openai": "^7.2.0"
   },
   "devDependencies": {

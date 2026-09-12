@@ -41,8 +41,6 @@ interface StoredProvider {
 interface StoredConfig {
   providers: Partial<Record<ProviderId, StoredProvider>>;
   active: ProviderId | null;
-  /** The PC's own voice (Kokoro), last used. */
-  voice?: string;
 }
 
 let cache: StoredConfig = { providers: {}, active: null };
@@ -68,7 +66,6 @@ export function loadConfig(): StoredConfig {
     cache = {
       providers,
       active: isProviderId(parsed.active) ? parsed.active : null,
-      ...(typeof parsed.voice === "string" ? { voice: parsed.voice } : {}),
     };
   } catch {
     cache = { providers: {}, active: null };
@@ -135,15 +132,6 @@ export function getActive(): ProviderId | null {
 
 export async function setActive(id: ProviderId | null): Promise<void> {
   cache.active = id;
-  await persist();
-}
-
-export function getKokoroVoice(): string | null {
-  return cache.voice ?? null;
-}
-
-export async function setKokoroVoice(voice: string): Promise<void> {
-  cache.voice = voice;
   await persist();
 }
 

@@ -23,7 +23,6 @@ import { T } from "./readings.js";
 import { submit } from "./ask.js";
 import { closeMenus, menuOpen } from "./deck.js";
 import { setDrawer } from "./drawer.js";
-import { PROVIDERS } from "../shared/services/index.js";
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
@@ -155,35 +154,41 @@ export function setVoiceOut(on: boolean): void {
 setVoiceOut(recall("jarvis.voiceOn") !== "0");
 voiceOut.addEventListener("change", () => setVoiceOut(voiceOut.checked));
 
+/* ---------------------------------------------------------------------
+ * The voice list: every neural voice by where it is made, then the
+ * browser's own. Rebuilt whenever the voice's state changes (onState).
+ * --------------------------------------------------------------------- */
+
 const voiceSel = $<HTMLSelectElement>("voiceSel");
-export function renderVoiceSelect(): void {
+function renderVoiceSelect(): void {
   const want = voice.selectionValue;
-  if (voiceSel.dataset.built === "1" && voiceSel.value === want) return;
-  voiceSel.replaceChildren();
-  if (voice.voiceOptions.length) {
-    const g = document.createElement("optgroup");
-    g.label = voice.via === "kokoro" ? "Neural · Kokoro, on this PC" : `Neural · through ${PROVIDERS[voice.via].name}`;
-    for (const v of voice.voiceOptions) {
-      const o = document.createElement("option");
-      o.value = `k:${v.id}`;
-      o.textContent = `${v.name}  ·  ${v.note}`;
-      g.append(o);
-    }
-    voiceSel.append(g);
+  const groups: { label: string; options: { value: string; text: string }[] }[] = [];
+  const neural = voice.neuralVoices();
+  for (const via of new Set(neural.map((n) => n.via))) {
+    groups.push({
+      label: `Neural · ${voice.sourceLabel(via)}`,
+      options: neural.filter((n) => n.via === via).map((n) => ({ value: `${via}:${n.voice.id}`, text: `${n.voice.name}  ·  ${n.voice.note}` })),
+    });
   }
   if (voice.systemVoices.length) {
-    const g = document.createElement("optgroup");
-    g.label = "System voices (browser)";
-    for (const v of voice.systemVoices) {
-      const o = document.createElement("option");
-      o.value = `s:${v.name}`;
-      o.textContent = voice.labelFor(v);
-      g.append(o);
+    groups.push({ label: "System voices (browser)", options: voice.systemVoices.map((v) => ({ value: `system:${v.name}`, text: voice.labelFor(v) })) });
+  }
+  const shape = JSON.stringify(groups);
+  if (voiceSel.dataset.shape === shape && voiceSel.value === want) return;
+  voiceSel.replaceChildren();
+  for (const g of groups) {
+    const el = document.createElement("optgroup");
+    el.label = g.label;
+    for (const o of g.options) {
+      const opt = document.createElement("option");
+      opt.value = o.value;
+      opt.textContent = o.text;
+      el.append(opt);
     }
-    voiceSel.append(g);
+    voiceSel.append(el);
   }
   voiceSel.value = want;
-  voiceSel.dataset.built = "1";
+  voiceSel.dataset.shape = shape;
 }
 voiceSel.addEventListener("change", () => {
   if (!voice.select(voiceSel.value)) return;
@@ -212,9 +217,3 @@ $("testVoice").addEventListener("click", () => {
   voice.speak("All systems are online and operating within normal parameters, sir.");
 });
 
-if (window.speechSynthesis) {
-  window.speechSynthesis.addEventListener("voiceschanged", () => {
-    voice.refreshSystemList();
-    renderVoiceSelect();
-  });
-}

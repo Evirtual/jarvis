@@ -86,7 +86,7 @@ export function appSnapshot(): string {
   if (ws.archived.length) out.push(`Put away (restorable): ${ws.archived.slice(0, 8).map((t) => `“${t.title} #${threadRef(t)}”`).join(", ")}.`);
   out.push(
     `Setup: layout ${mode}; open panels: ${panels.openNames.length ? panels.openNames.join(", ") : "none"}; ` +
-    `voice ${voice.engine === "neural" ? `neural ${voice.voiceOptions.find((v) => v.id === voice.neuralVoice)?.name ?? voice.neuralVoice}` : "browser"}, speed ${voice.rateValue.toFixed(2)}, spoken replies ${voice.enabled ? "on" : "off"}; ` +
+    `voice ${voice.summary()}, speed ${voice.rateValue.toFixed(2)}, spoken replies ${voice.enabled ? "on" : "off"}; ` +
     `reasoning core ${conn.activeName()}${conn.activeModel() ? ` (${conn.activeModel()})` : ""}; connected: ${conn.readyNames().join(", ") || "none"}.]`,
   );
   return out.join("\n");

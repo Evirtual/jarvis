@@ -608,3 +608,18 @@ isolation that only those needed. Kokoro stays on the PC as its own voice.
 | PC: Voice tab reads "Neural voice — George … Kokoro, on this PC" | Pass |
 | Web: no console errors; CSP without huggingface/jsdelivr/anthropic/openrouter | Pass |
 | Gemini free tier hearing and voice, real key; ChatGPT voice latency | Not yet — no key on the PC, no credit on OpenAI; the user tests on the live site |
+
+Later the same day: **no speech engine of its own.** Kokoro removed from the
+PC too (the user's call: one way of speaking everywhere, and two heavy
+dependencies fewer); the device's voice is the default, the service's neural
+voice a choice in Configuration → Voice. Gemini's model list ranked properly
+(`gemini-3.8-flash` first; deep-research, antigravity, gemma and dated
+previews no longer outrank it), `gemini-3.5-transcribe` read from the field it
+answers in, and a model chosen before a change falls back to the newest.
+
+| Area | Result |
+| --- | --- |
+| Gemini voice, whole-line request, on the PC: 2.5-flash-tts 4.7 s for 2.1 s of speech, 6.6 s for 7.1 s; 3.1-flash-tts 2.6 s for 2.0 s, 5.8–10.8 s for 6–8 s; pro-tts not on the free tier (429) | Measured — too slow whole; **3.1 streams: first sound 1.1 s**, done 3.5 s for 7.9 s → next step is streamed playback |
+| Gemini hearing: `gemini-3.5-transcribe`, a 2 s line, 1.8–1.9 s, word-perfect; answers in `audioTranscription.text`; refuses `thinkingConfig` (400) — not sent to it | Pass after the fix |
+| `gemini-2.5-flash` "no longer available to new users" (404) — the chat list now ranks 3.8-flash first anyway | Noted |
+| Voice tab: device voices listed and one chosen even when the browser hands them over late; "no voices" only when there truly are none | Pass |

@@ -34,7 +34,7 @@ export interface ProviderMeta {
   free: boolean;
 }
 
-/** A voice a service (or the PC's own Kokoro) can speak with. */
+/** A voice a service can speak with. */
 export interface VoiceOption {
   id: string;
   name: string;
@@ -136,26 +136,16 @@ export type AskEvent =
  * Speech
  * ------------------------------------------------------------------ */
 
-/**
- * Who makes the speech: a connected service, or "kokoro" — the PC's own
- * voice, run by its server, which the web version doesn't have.
- */
-export type SpeakVia = ProviderId | "kokoro";
-
 export interface SpeakRequest {
   text: string;
-  via: SpeakVia;
+  /** The connected service that makes the speech. */
+  via: ProviderId;
   voice: string;
   /** 1 is natural; the Cadence slider in Configuration → Voice. */
   speed: number;
 }
 
-/** The PC's own voice: "absent" on the web, where there is no server to run it. */
-export type KokoroState = "loading" | "ready" | "failed" | "absent";
-
 export interface StatusResponse {
-  /** The PC's own voice, Kokoro. */
-  kokoro: { state: KokoroState; error: string | null; voices: VoiceOption[] };
   active: ProviderId | null;
   anyProviderReady: boolean;
 }

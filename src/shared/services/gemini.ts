@@ -33,8 +33,12 @@ const VOICES: VoiceOption[] = [
   { id: "Zephyr", name: "Zephyr", note: "female · bright" },
 ];
 
-// Listed with the chat models, but not for chat: speech, pictures, live audio, embeddings.
-const NOT_CHAT = /tts|image|live|audio|embedding|aqa|imagen|veo|lyria/i;
+/**
+ * Only the Gemini models proper are for chat: not speech, pictures, live
+ * audio, embeddings, nor the agents and research models listed beside them.
+ */
+const CHAT = /^gemini-\d/;
+const NOT_CHAT = /tts|transcribe|image|live|audio|embedding|computer-use|robotics|customtools|-exp\b/i;
 
 interface GeminiModel {
   name?: string;
@@ -43,7 +47,14 @@ interface GeminiModel {
 
 interface GeminiResponse {
   candidates?: {
-    content?: { parts?: { text?: string; inlineData?: { mimeType?: string; data?: string } }[] };
+    content?: {
+      parts?: {
+        text?: string;
+        inlineData?: { mimeType?: string; data?: string };
+        /** How a transcription model answers. */
+        audioTranscription?: { text?: string };
+      }[];
+    };
     groundingMetadata?: unknown;
   }[];
 }
@@ -81,12 +92,17 @@ export const gemini: Service = {
       .filter((m) => (m.supportedGenerationMethods ?? []).includes("generateContent"))
       .map((m) => (m.name ?? "").replace(/^models\//, ""))
       .filter(Boolean);
-    const chat = rankModels(ids.filter((id) => !NOT_CHAT.test(id)));
+    const chat = rankModels(ids.filter((id) => CHAT.test(id) && !NOT_CHAT.test(id)));
     return {
       chat,
       speech: rankModels(ids.filter((id) => /tts/.test(id))),
-      // A Flash model hears a short command in well under a second; Lite hears less well.
-      hearing: chat.filter((id) => /flash/.test(id) && !/lite/.test(id)).concat(chat.filter((id) => !/flash/.test(id) || /lite/.test(id))),
+      // A model made for transcription first, where the account has one; then
+      // a Flash model, which hears a short command in well under a second.
+      hearing: [
+        ...rankModels(ids.filter((id) => /transcribe/.test(id))),
+        ...chat.filter((id) => /flash/.test(id) && !/lite/.test(id)),
+        ...chat.filter((id) => !/flash/.test(id) || /lite/.test(id)),
+      ],
       voices: VOICES,
     };
   },
@@ -167,28 +183,27 @@ export const gemini: Service = {
 
   async hear(key, model, audio) {
     const data = toBase64(new Uint8Array(await audio.arrayBuffer()));
+    const parts = [
+      { text: `Transcribe this recording word for word and reply with the transcript only — no quotes, no commentary. It may use these words: ${HEARING_HINT}` },
+      { inlineData: { mimeType: audio.type || "audio/webm", data } },
+    ];
+    // A transcription model just transcribes. A chat model would deliberate
+    // first unless told not to — and not every one lets it be switched off.
+    const transcriber = /transcribe/.test(model);
     const request = (thinking: boolean): unknown => ({
-      contents: [{
-        parts: [
-          { text: `Transcribe this recording word for word and reply with the transcript only — no quotes, no commentary. It may use these words: ${HEARING_HINT}` },
-          { inlineData: { mimeType: audio.type || "audio/webm", data } },
-        ],
-      }],
-      generationConfig: {
-        temperature: 0,
-        maxOutputTokens: 300,
-        // A transcript needs no deliberation; not every model lets it be switched off.
-        ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }),
-      },
+      contents: [{ parts }],
+      ...(transcriber ? {} : {
+        generationConfig: { temperature: 0, maxOutputTokens: 300, ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }) },
+      }),
     });
     let res: GeminiResponse;
     try {
       res = await generate(key, model, request(false));
     } catch (err) {
-      if ((err as { status?: number }).status !== 400) throw err;
+      if (transcriber || (err as { status?: number }).status !== 400) throw err;
       res = await generate(key, model, request(true));
     }
-    return (res.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
+    return (res.candidates?.[0]?.content?.parts ?? []).map((p) => p.audioTranscription?.text ?? p.text ?? "").join("").trim();
   },
 };
 

@@ -86,14 +86,16 @@ export const HEARING_HINT =
 export function rankModels(ids: string[]): string[] {
   const score = (id: string): number => {
     let s = 0;
-    // Strip a trailing date first — otherwise "gpt-5-2025-08-07" reads as
-    // version 5.2025 and every stale snapshot outranks the current model.
-    const dated = /\d{4}-\d{2}-\d{2}$|\d{8}$/.test(id);
-    const base = id.replace(/-?\d{4}-\d{2}-\d{2}$/, "").replace(/-?\d{8}$/, "");
+    // Strip a trailing date first — "2025-08-07", "20250807" or "12-2025" —
+    // otherwise "gpt-5-2025-08-07" reads as version 5.2025 and every stale
+    // snapshot outranks the current model.
+    const dated = /(\d{4}-\d{2}-\d{2}|\d{2}-\d{4}|\d{8})$/.test(id);
+    const base = id.replace(/-?(\d{4}-\d{2}-\d{2}|\d{2}-\d{4}|\d{8})$/, "");
     const m = base.match(/(\d+)(?:\.(\d+))?/);
     if (m?.[1]) s += Number(m[1]) * 100 + Number(m[2] ?? 0) * 10;
     if (/chat-latest|-latest/.test(base)) s += 40;
     if (dated) s -= 200; // a pinned snapshot is never the sensible default
+    if (/preview/.test(base)) s -= 8; // the released one, when there is a choice
     if (/pro/.test(base)) s -= 15; // slower and dearer for a chat console
     if (/nano|lite/.test(base)) s -= 25;
     if (/mini|flash/.test(base)) s -= 5;

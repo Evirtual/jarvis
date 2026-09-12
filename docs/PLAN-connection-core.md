@@ -9,11 +9,14 @@ the Max plan counts; Codex on a ChatGPT plan joins it there later. OpenRouter
 goes: 50 free questions a day and then credit anyway, for a second sign-in
 path and a set of confusing errors.
 
-**Settled with the user, later the same day:** Moonshine (hearing) goes
-everywhere — the connection hears. Kokoro stays **on the PC only**, because
-the user wants George's voice there and on the PC it is quick; on the web the
-connection speaks, in the closest British voice each service has. Nothing is
-ever downloaded by the browser.
+**Settled with the user, later the same day:** no speech engine of its own,
+anywhere. Moonshine (hearing) and Kokoro (voice) both go, PC included, and
+their dependencies with them. The **device's own voice is the default** —
+instant, free, the same on the PC and the web — and the connected service's
+neural voice is offered as a choice in Configuration → Voice. The service
+hears everywhere. (Kokoro on the web was briefly rebuilt as an optional
+download on the graphics chip, and dropped the same hour to keep the app to
+one way of speaking.)
 
 ## Why
 
