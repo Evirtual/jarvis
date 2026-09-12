@@ -50,13 +50,26 @@ interface GeminiResponse {
     content?: {
       parts?: {
         text?: string;
+        /** The model's own deliberation, when it shares it — never shown or spoken. */
+        thought?: boolean;
         inlineData?: { mimeType?: string; data?: string };
         /** How a transcription model answers. */
         audioTranscription?: { text?: string };
       }[];
     };
     groundingMetadata?: unknown;
+    finishReason?: string;
   }[];
+  /** A stream that started well can still fail part-way; it says so in an event like this. */
+  error?: { code?: number; message?: string; status?: string };
+}
+
+/** Each event of a stream, failing loudly on an error the service sends inside it. */
+async function* checked(body: ReadableStream<Uint8Array>): AsyncIterable<GeminiResponse> {
+  for await (const ev of eventsOf<GeminiResponse>(body)) {
+    if (ev.error) throw httpError("Gemini", ev.error.code ?? 500, JSON.stringify(ev.error));
+    yield ev;
+  }
 }
 
 const url = (path: string, key: string): string => `${API}/${path}${path.includes("?") ? "&" : "?"}key=${encodeURIComponent(key)}`;
@@ -120,7 +133,9 @@ export const gemini: Service = {
         body: JSON.stringify({
           contents,
           systemInstruction: { parts: [{ text: persona }] },
-          generationConfig: { maxOutputTokens: 800 },
+          // Room for the model's own deliberation as well as the answer: the
+          // newest models think first, and a tight limit left nothing to say.
+          generationConfig: { maxOutputTokens: 4096 },
           // Google Search grounding — Gemini's own live-information tool.
           ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
         }),
@@ -129,23 +144,30 @@ export const gemini: Service = {
 
     let r = await call(true);
     if (!r.ok) {
-      // Grounding is not offered on every model; answer without it rather than fail.
+      // Grounding isn't offered on every model, and has its own allowance on
+      // the free tier: answer without it rather than fail.
       emit({ t: "status", status: "thinking" });
       r = await call(false);
     }
     if (!r.ok || !r.body) throw httpError("Gemini", r.status, await r.text());
 
     let grounded = false;
-    for await (const ev of eventsOf<GeminiResponse>(r.body)) {
+    let wrote = false;
+    let finish = "";
+    for await (const ev of checked(r.body)) {
       const cand = ev.candidates?.[0];
       if (cand?.groundingMetadata && !grounded) {
         grounded = true;
         emit({ t: "status", status: "searching" });
       }
       for (const part of cand?.content?.parts ?? []) {
-        if (part.text) emit({ t: "text", delta: part.text });
+        if (part.text && !part.thought) { wrote = true; emit({ t: "text", delta: part.text }); }
       }
+      finish = cand?.finishReason ?? finish;
     }
+    // Nothing written is a failure, not an answer — say why, so the console can
+    // try the other service rather than print "nothing useful".
+    if (!wrote) throw Object.assign(new Error(`Gemini returned no answer${finish ? ` (${finish})` : ""}.`), { status: 502 });
   },
 
   async *speak(key, model, text, voice, speed) {
@@ -166,7 +188,7 @@ export const gemini: Service = {
       signal: AbortSignal.timeout(30000),
     });
     if (!r.ok || !r.body) throw httpError("Gemini", r.status, await r.text());
-    for await (const ev of eventsOf<GeminiResponse>(r.body)) {
+    for await (const ev of checked(r.body)) {
       for (const part of ev.candidates?.[0]?.content?.parts ?? []) {
         if (part.inlineData?.data) yield fromBase64(part.inlineData.data);
       }

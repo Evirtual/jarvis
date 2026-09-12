@@ -26,8 +26,13 @@ const VOICES: VoiceOption[] = [
   { id: "alloy", name: "Alloy", note: "neutral" },
 ];
 
-// Listed alongside the chat models, but not for chat.
-const NOT_CHAT = /audio|realtime|image|tts|transcribe|embed|moderation|search|codex|dall|whisper|sora|veo|imagen|guard|instruct/i;
+/**
+ * Listed alongside the chat models, but not for chat — including the
+ * "chat-latest" names, which point at the ChatGPT app's model and which the
+ * API refuses ("does not exist or you do not have access"), and the live
+ * speech models.
+ */
+const NOT_CHAT = /audio|realtime|live|image|tts|transcribe|embed|moderation|search|codex|dall|whisper|sora|veo|imagen|guard|instruct|chat-latest/i;
 
 /**
  * The hearing models, quickest and cheapest first: for a spoken command the

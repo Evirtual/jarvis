@@ -308,6 +308,7 @@ export class Stage {
       .replace(/^the\s+/i, "")
       .replace(/[.?!]+$/, "")
       .trim() || text;
+    if (!/[\p{L}\p{N}]/u.test(name)) return; // nothing to name it after yet
     name = name.charAt(0).toUpperCase() + name.slice(1);
     t.title = name.length > 30 ? `${name.slice(0, 28).trim()}…` : name;
     t.named = true;
@@ -1467,6 +1468,24 @@ export class Stage {
 
 }
 
+/**
+ * The picture to show for an image result. A Wikimedia original can be
+ * several thousand pixels and megabytes — and Wikimedia rate-limits
+ * originals linked from other sites — so its standard 960-pixel preview is
+ * shown instead (other widths are refused). The link still opens the original.
+ */
+function previewOf(src: string): string {
+  const original = /^https:\/\/upload\.wikimedia\.org\/wikipedia\/([\w-]+)\/([0-9a-f])\/([0-9a-f]{2})\/([^/?#]+\.(?:jpe?g|png|webp|gif))$/i.exec(src);
+  if (original) {
+    const [, wiki, a, ab, file] = original;
+    return `https://upload.wikimedia.org/wikipedia/${wiki}/thumb/${a}/${ab}/${file}/960px-${file}`;
+  }
+  if (/^https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\//i.test(src) && !/[?&]width=/.test(src)) {
+    return `${src}${src.includes("?") ? "&" : "?"}width=960`;
+  }
+  return src;
+}
+
 export function line(kind: "user" | "jarvis" | "sys", text: string): HTMLElement {
   const row = document.createElement("div");
   row.className = `cw-msg ${kind}`;
@@ -1502,7 +1521,10 @@ export function line(kind: "user" | "jarvis" | "sys", text: string): HTMLElement
       const parsed = new URL(source);
       if (type === "image" && /\.(?:avif|gif|jpe?g|png|webp)(?:$|\?)/i.test(parsed.pathname)) {
         const image = document.createElement("img");
-        image.src = source; image.alt = "Research image result"; image.loading = "lazy";
+        const preview = previewOf(source);
+        // should a preview not exist, the original is the next best thing
+        if (preview !== source) image.addEventListener("error", () => { image.src = source; }, { once: true });
+        image.src = preview; image.alt = "Research image result"; image.loading = "lazy";
         image.referrerPolicy = "no-referrer";
         const imageLink = document.createElement("a");
         imageLink.href = source; imageLink.target = "_blank"; imageLink.rel = "noopener noreferrer";

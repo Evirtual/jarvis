@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type ParseContext } from "../src/client/commands.ts";
+import { rankModels } from "../src/shared/services/common.ts";
 
 const threads = ["General", "Lithuania", "Trip planning", "Cambodia news"];
 const groups = ["Research", "Travel"];
@@ -79,6 +80,25 @@ test("close means archive; only an explicit phrase deletes", () => {
   assert.deepEqual(intentOf("restore the Cambodia thread", ctx()), { name: "restore_thread", title: "Cambodia" });
 });
 
+test("a question about the voice is not a request to change it", () => {
+  assert.equal(intentOf("which voice are you speaking with", ctx()), null);
+  assert.equal(intentOf("what voice is that", ctx()), null);
+  assert.deepEqual(intentOf("use the Fable voice", ctx()), { name: "set_voice", voice: "fable" });
+  assert.deepEqual(intentOf("change the voice to Ash", ctx()), { name: "set_voice", voice: "ash" });
+  assert.deepEqual(intentOf("set voice George", ctx()), { name: "set_voice", voice: "george" });
+});
+
+test("what is left after the commands is only asked if it has words in it", () => {
+  assert.equal(parseUtterance("use the Fable voice.", ctx()).ask, "");
+  assert.equal(parseUtterance("use the Fable voice, ?", ctx()).ask, "");
+  assert.equal(parseUtterance("use the Fable voice and what time is it in Tokyo?", ctx()).ask, "what time is it in Tokyo?");
+});
+
+test("the newest model first, and a date or a 'latest' alias never outranks it", () => {
+  assert.deepEqual(rankModels(["gpt-5.3-chat-latest", "gpt-6-astra", "gpt-5.5", "gpt-5-2025-08-07"]).slice(0, 2), ["gpt-6-astra", "gpt-5.5"]);
+  assert.equal(rankModels(["deep-research-pro-preview-12-2025", "gemini-3.8-flash"])[0], "gemini-3.8-flash");
+});
+
 test("services that aren't connections are not cores", () => {
   assert.equal(intentOf("use claude", ctx()), null);
 });
@@ -135,6 +155,8 @@ test("threads and groups are opened, folded and renamed by name, without asking 
   assert.deepEqual(intentOf("rename Trip planning to Summer in Vilnius.", ctx()), { name: "rename_thread", target: "trip planning", title: "Summer in Vilnius" });
   assert.deepEqual(intentOf("rename the Research group to Deep Dive", ctx()), { name: "rename_group", group: "research", title: "Deep Dive" });
   assert.deepEqual(intentOf("rename this to Budget.", ctx()), { name: "rename_thread", title: "Budget" });
+  assert.deepEqual(intentOf("rename this thread to Tokyo", ctx()), { name: "rename_thread", title: "Tokyo" });
+  assert.deepEqual(intentOf("call this chat Budget", ctx()), { name: "rename_thread", title: "Budget" });
   // moving into a group keeps the group's name intact
   assert.deepEqual(intentOf("move Lithuania into the Travel group", ctx()), { name: "move_thread", thread: "lithuania", group: "Travel" });
   // an unknown name is a question, not a command

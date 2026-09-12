@@ -119,6 +119,14 @@ export function humanise(id: ProviderId, err: unknown): string {
   if (/do(?:es)? not have access|not have access to it/i.test(raw)) {
     return `This ${name} account can't use that model — it may be retired, or the account may lack access or credit. Try another model, or check the account's billing.`;
   }
+  // The service's own side is overloaded, or sent nothing back: nothing wrong
+  // with the key or the account, and the other service can answer meanwhile.
+  if (status === 503 || /\b503\b|UNAVAILABLE|high demand|overloaded/i.test(raw)) {
+    return `${name} is busy at the moment, sir — high demand on its side. Try again in a minute.`;
+  }
+  if (/returned no answer/i.test(raw)) {
+    return `${name} is busy at the moment, sir — it sent back an empty answer. Try again in a minute.`;
+  }
   if (status === 404 || /404|deprecat|has been retired|model.*not found/i.test(raw)) {
     return "That model is no longer available. Pick another from the list.";
   }

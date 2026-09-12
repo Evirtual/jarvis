@@ -113,8 +113,10 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   if (/\b(?:open|show)\s+(?:me\s+)?(?:the\s+)?(?:config|configuration|settings|connections|preferences)\b|^(?:config|settings)$/.test(q)) return { name: "open_config", tab: "connections" };
   if (/\bclose\s+(?:the\s+)?(?:config|configuration|settings|drawer)\b/.test(q)) return { name: "close_config" };
 
-  // Voice
-  const vm = /\b(?:use|switch to|set|change(?: to)?|give me)\s+(?:the\s+)?([a-z]+)(?:'s)?\s+voice\b|\bvoice\s+(?:to\s+)?([a-z]+)\b/.exec(q);
+  // Voice — "use the Fable voice", "change the voice to Ash", "voice to Emma".
+  // Only as a request for the change, so "which voice are you using?" stays
+  // a question.
+  const vm = /\b(?:use|switch to|set|change(?: to)?|give me)\s+(?:the\s+)?(?!(?:the|your|my|a)\b)([a-z]+)(?:'s)?\s+voice\b|(?:\b(?:set|change|switch)\s+(?:the\s+|your\s+)?voice\s+(?:to\s+)?|^voice\s+to\s+)([a-z]+)\b/.exec(q);
   if (vm) {
     const nm = vm[1] ?? vm[2] ?? "";
     // words that follow "voice" without being a voice's name: "voice off", "voice settings"
@@ -209,7 +211,8 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   const rs = /\b(?:restore|reopen|bring back|unarchive)\s+(?:the\s+)?(.+?)(?:\s+(?:thread|chat|conversation))?$/.exec(q);
   if (rs?.[1]) return { name: "restore_thread", title: orig(rs[1]) };
   if (/^(?:clear|wipe)(?:\s+(?:this|the))?(?:\s+(?:thread|chat|window|conversation))?$/.test(q)) return { name: "clear_thread" };
-  const rn = /\b(?:rename|call|name)\s+(?:this|it|the thread|this thread|this chat)\s+(?:to\s+|as\s+)?["“]?(.+?)["”]?$/.exec(q);
+  // (the longer ways of saying "this" first, or "this thread to Tokyo" is read as "this" + "thread to Tokyo")
+  const rn = /\b(?:rename|call|name)\s+(?:this thread|this chat|this one|the thread|this|it)\s+(?:to\s+|as\s+)?["“]?(.+?)["”]?$/.exec(q);
   if (rn?.[1]) return { name: "rename_thread", title: orig(rn[1]) };
   const sw = /\b(?:switch|go|jump|move|get|focus|select)\s+(?:(?:back\s+)?to\s+)?(?:the\s+)?(.+?)(?:\s+(?:thread|chat|window|conversation))?$/.exec(q);
   if (sw?.[1] && ctx.knowsThread(sw[1])) return { name: "switch_thread", title: sw[1] };
@@ -264,7 +267,9 @@ export function parseUtterance(text: string, ctx: ParseContext = NO_CONTEXT): Pa
     if (!prev) seen.set(a.name, a);
     else if (a.name === "new_thread" && prev.name === "new_thread" && a.branch) prev.branch = true;
   }
-  return { actions: [...seen.values()], ask: ask.trim() };
+  // What's left once the commands are taken out is only a question if it has
+  // words in it: a stray "." or "?" is not something to send, or to name a thread after.
+  return { actions: [...seen.values()], ask: /[\p{L}\p{N}]/u.test(ask) ? ask.trim() : "" };
 }
 
 /* ===================================================================== *

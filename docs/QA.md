@@ -669,3 +669,60 @@ service called "active" (404). The route now comes first.
 | ChatGPT hearing through the PC: "Good evening, sir." in 0.70 s, exact | Pass |
 | Web on ChatGPT: list "AI voices · through ChatGPT (13)", Fable chosen, Test voice speaks with no refusal | Pass |
 | Web on Gemini with its voice spent: the reason once, then the device voice (verified before this change; the rest is now per service) | Pass |
+
+### 2026-09-12 — end-to-end pass, PC and web, after the connection refactor
+
+Driven in the app's preview, typing what would be said (the pane has no
+microphone) and, for listening, a fake microphone playing a real spoken
+command so recording, silence detection, hearing and the command all ran as
+they would. PC on 7823, web build on 4173, ChatGPT (gpt-6-astra) and Gemini
+(gemini-3.8-flash) connected on both.
+
+| Area | PC | Web |
+| --- | --- | --- |
+| Test voice through ChatGPT (Fable): each piece ready | 1.2 s | 0.9 s |
+| "What are you running on, which service, which voice, what's on my board?" | Pass — service, voice, speed, open and put-away threads | Pass |
+| "PC version or web version, and on what?" (new: the snapshot says which) | Pass — "the PC version … livingcell, Windows … Ryzen 7 8845HS, 15.3 GB, RTX 4060 Laptop" | Pass — "the web version, a page in Chrome … no server of its own, keys in this browser" |
+| Research: three threads, each asked, grouped "Japan trip" | Pass — answered in turn from the web, dated, sourced | — |
+| Pictures (Golden Pavilion, Northern Lights, Mount Fuji) | Pass — Wikimedia, credited | Pass (via ChatGPT when Gemini was down) |
+| Video (Shinkansen) | Pass — 2 YouTube embeds, both real (checked with YouTube) | — |
+| News with sources (Starship) | Pass — dated, 4 links, tentative dates called tentative | — |
+| Readings: status, weather, battery, radar | Pass with the tab in view (CPU, GPU, drizzle in Phnom Penh, 80% on mains) | — |
+| Voice commands: "use the Onyx voice", "speak a little faster", mute, unmute | Pass | — |
+| "Switch to Gemini": Gemini's voices listed, spent voice → reason once → device voice; answer from Gemini | Pass | Pass |
+| "Switch back to ChatGPT": Onyx remembered, speaks at once | Pass | Pass |
+| Listening: "Jarvis, open a new thread and tell me the time in Tokyo right now" | Pass — heard in 0.95 s, new thread "Time in Tokyo right now", 3:38 p.m. JST (correct) | Pass — heard in 1.2 s directly by OpenAI, 3:42 p.m. |
+| Hearing the same recording: ChatGPT / Gemini | 0.76 s / 2.4 s, word for word | — |
+| Follow-up "what's the weather like there?" in the Tokyo thread | Pass — Tokyo, live | — |
+| Tidy, close, restore by voice | Pass | — |
+| Gemini overloaded (503) and its search allowance spent (429): answers through ChatGPT and says so | Pass after fix 76 | Pass after fix 76 |
+
+Found and fixed:
+
+74. "Which voice are you speaking with?" changed the voice to Ash — "voice
+    are" was read as "voice <name>", and "are" is two letters from "Ash".
+    A voice change now needs a verb asking for it ("use", "set", "change").
+75. ChatGPT refused every question: the account lists `gpt-5.3-chat-latest`
+    and the rest of the `chat-latest` family, but the API refuses them for
+    everyone ("does not exist or you do not have access"); a "latest" bonus in
+    the ranking had picked one. They are no longer offered, and the bonus is
+    gone — the newest model that answers (gpt-6-astra) is chosen.
+76. Gemini, overloaded, answered "I've nothing useful on that": its stream
+    can carry an error after a good start, which was ignored, leaving an empty
+    reply. Errors inside a stream now surface; an empty answer is a failure;
+    503 "high demand" reads as "busy", which hands the question to ChatGPT
+    with the reason shown. The answer limit rose from 800 to 4,096 tokens so
+    the newest models' thinking can't crowd out the reply.
+77. A thread named "." — the leftover of fix 74's misreading. Leftover text
+    with no words in it is no longer asked, nor used as a name.
+78. "Rename this thread to Tokyo" named it "thread to Tokyo".
+79. With the readings not yet in (a tab opened in the background), "how's the
+    battery?" said "no battery here" and the weather "no uplink"; now "hasn't
+    attached yet".
+80. Wikimedia pictures loaded the original — 5,000 px, megabytes, and
+    rate-limited when linked (429). Their 960-px preview is shown; the link
+    opens the original.
+
+Observed, not changed (for the user to decide): a thread keeps its last 24
+messages, so a long one loses its oldest; and a question goes into the
+thread in front even when it's about something else.

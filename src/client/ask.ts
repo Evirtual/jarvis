@@ -25,6 +25,7 @@ import { localCommand } from "./local.js";
 import { mode } from "./deck.js";
 import { showKeyboard, tapSpeaks, typing_ } from "./voice-ui.js";
 import { setDrawer } from "./drawer.js";
+import { SERVERLESS } from "./server.js";
 
 /* ===================================================================== *
  * What the reasoning core is told
@@ -52,6 +53,16 @@ export function contextBlock(): string {
   if (!bits.length) return "";
   const where = w ? "the browser on the user's device you run in" : "the machine you run on";
   return `[Live readings from ${where}, use only if relevant: ${bits.join("; ")}. Do not recite these unless asked.]`;
+}
+
+/** Which of the two versions this is, and on what — so he can say where he is. */
+function whereRunning(): string {
+  if (SERVERLESS) {
+    return "Running as: the web version — a page in the user's browser with no server of its own; keys are kept in that browser, and the readings are what a browser can measure of the device.";
+  }
+  const os = { win32: "Windows", darwin: "macOS", linux: "Linux" }[T?.host.platform ?? ""] ?? T?.host.platform;
+  const machine = T?.host ? `${T.host.hostname}${os ? ` (${os})` : ""}` : "the user's computer";
+  return `Running as: the PC version — the console's own server on ${machine}, which reads its sensors and can sweep the local network; keys stay on that machine.`;
 }
 
 /**
@@ -84,6 +95,7 @@ export function appSnapshot(): string {
     .map((l) => `“${byId.get(l.a)!.title}” ⟷ “${byId.get(l.b)!.title}” (${l.manual ? "connected on purpose" : "shared"}: ${l.why.join(", ")})`);
   out.push(links.length ? `Connections: ${links.join("; ")}.` : "No connections between threads yet.");
   if (ws.archived.length) out.push(`Put away (restorable): ${ws.archived.slice(0, 8).map((t) => `“${t.title} #${threadRef(t)}”`).join(", ")}.`);
+  out.push(whereRunning());
   out.push(
     `Setup: layout ${mode}; open panels: ${panels.openNames.length ? panels.openNames.join(", ") : "none"}; ` +
     `voice ${voice.summary()}, speed ${voice.rateValue.toFixed(2)}, spoken replies ${voice.enabled ? "on" : "off"}; ` +
@@ -166,7 +178,8 @@ export async function askCore(question: string, thread: Thread): Promise<void> {
       const why = err instanceof Error ? err.message : String(err);
       const spare = conn.readyIds().find((p) => p !== conn.active);
       if (streamed || !spare || !/limit|out of credit|needs credit|busy|rate-limiting|quota/i.test(why)) throw err;
-      sys(`${conn.activeName()} can't answer right now — answering through ${conn.nameOf(spare)}.`);
+      // the service's own reason ("…busy at the moment…"), then what happens instead
+      sys(`${why} Meanwhile I'm answering through ${conn.nameOf(spare)}.`);
       raw = await askVia(spare);
     }
     const d = extractDirectives(raw);

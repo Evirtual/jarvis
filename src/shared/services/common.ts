@@ -101,7 +101,6 @@ export function rankModels(ids: string[]): string[] {
     const base = id.replace(/-?(\d{4}-\d{2}-\d{2}|\d{2}-\d{4}|\d{8})$/, "");
     const m = base.match(/(\d+)(?:\.(\d+))?/);
     if (m?.[1]) s += Number(m[1]) * 100 + Number(m[2] ?? 0) * 10;
-    if (/chat-latest|-latest/.test(base)) s += 40;
     if (dated) s -= 200; // a pinned snapshot is never the sensible default
     if (/preview/.test(base)) s -= 8; // the released one, when there is a choice
     if (/pro/.test(base)) s -= 15; // slower and dearer for a chat console

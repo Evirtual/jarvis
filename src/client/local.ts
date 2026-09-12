@@ -105,10 +105,12 @@ export function localCommand(raw: string): boolean {
   }
   if (short && /\b(?:power|battery|thermals?|temps?|gpu temp(?:erature)?)\b/.test(q)) {
     hud.flash();
-    let l = T?.battery
+    // no readings yet is not the same as no battery
+    if (!T) { jarvis("Telemetry hasn't attached yet, sir. Give me a moment."); return true; }
+    let l = T.battery
       ? `Battery is at ${T.battery.pct} percent, ${T.battery.onAc ? "running on mains" : "on the cell"}`
-      : T?.web ? "This browser doesn't share the battery with me, sir" : "No battery here, sir — running on mains";
-    if (T?.gpu) l += `. The graphics card is at ${T.gpu.tempC} degrees drawing ${T.gpu.powerW} watts`;
+      : T.web ? "This browser doesn't share the battery with me, sir" : "No battery here, sir — running on mains";
+    if (T.gpu) l += `. The graphics card is at ${T.gpu.tempC} degrees drawing ${T.gpu.powerW} watts`;
     jarvis(`${l}.`);
     return true;
   }
@@ -155,7 +157,11 @@ export function localCommand(raw: string): boolean {
   // question for the core and its web search.
   if (short && !elsewhere && !/\b(?:tomorrow|forecast|week|weekend)\b/.test(q) && /\b(?:weather|outside|raining|is it (?:hot|cold))\b/.test(q)) {
     const w = W.weather;
-    if (!w || w.tempC == null) { jarvis("No weather uplink at the moment, sir — I won't invent one."); return true; }
+    if (!w || w.tempC == null) {
+      // not asked yet is not the same as unavailable
+      jarvis(W.at === 0 ? "The weather hasn't come in yet, sir. Give me a moment." : "No weather uplink at the moment, sir — I won't invent one.");
+      return true;
+    }
     jarvis(
       `${w.text} in ${W.uplink?.city ?? "your area"}, ${Math.round(w.tempC)} degrees` +
       (w.feelsC != null && Math.abs(w.feelsC - w.tempC) > 1.5 ? `, though it feels like ${Math.round(w.feelsC)}` : "") +
