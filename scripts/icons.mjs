@@ -12,7 +12,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(ROOT, "src", "client", "public");
 const logo = await readFile(path.join(PUBLIC, "icon.svg"), "utf8");
 
-// The core alone (everything inside the rounded tile), to place on other grounds.
+// The core alone, to place on other grounds. The logo itself has no tile: the
+// favicon, the install icons and the README show the bare mark.
 const core = logo.slice(logo.indexOf('<g transform="translate(256 256)"'), logo.lastIndexOf("</g>") + 4);
 const defs = logo.slice(logo.indexOf("<defs>"), logo.indexOf("</defs>") + 7);
 
@@ -36,7 +37,7 @@ const og = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">${def
   <text x="600" y="270" fill="#d6f2fa" font-family="Chakra Petch, Segoe UI, Arial, sans-serif" font-size="78" font-weight="700" letter-spacing="14">J.A.R.V.I.S.</text>
   <text x="604" y="336" fill="#6ff0ff" font-family="Chakra Petch, Segoe UI, Arial, sans-serif" font-size="26" letter-spacing="6">A CONSOLE THAT TALKS BACK</text>
   <text x="604" y="398" fill="#9fc6d2" font-family="IBM Plex Mono, Consolas, monospace" font-size="22">Real machine and network readings,</text>
-  <text x="604" y="430" fill="#9fc6d2" font-family="IBM Plex Mono, Consolas, monospace" font-size="22">a neural voice run locally, and threads</text>
+  <text x="604" y="430" fill="#9fc6d2" font-family="IBM Plex Mono, Consolas, monospace" font-size="22">a voice, and threads of research</text>
   <text x="604" y="462" fill="#9fc6d2" font-family="IBM Plex Mono, Consolas, monospace" font-size="22">you run by talking.</text>
 </svg>`;
 
