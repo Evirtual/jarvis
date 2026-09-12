@@ -10,7 +10,7 @@ real weather where you actually are. It speaks with a neural voice generated on
 your own machine and answers through whichever AI service you connect.
 
 Runs on a desktop and on a phone. Or skip the install: the
-**[web version](https://evirtual.github.io/jarvis/)** runs entirely in the
+**[web version](https://jarvis.edgarasneverdauskas.com/)** runs entirely in the
 browser, with no server — see [Two ways to run it](#two-ways-to-run-it).
 
 ## Quick start
@@ -338,7 +338,7 @@ machine's own — CPU per core, GPU load and temperature, disks, the devices on
 your network — the neural voice runs locally, and API keys stay in
 `config.json`, never reaching the browser.
 
-**As a web page**, with no server at all: [evirtual.github.io/jarvis](https://evirtual.github.io/jarvis/),
+**As a web page**, with no server at all: [jarvis.edgarasneverdauskas.com](https://jarvis.edgarasneverdauskas.com/),
 published by [`pages.yml`](.github/workflows/pages.yml) on every push to
 `main`. Open it in any browser, or install it on a phone (Share → Add to
 Home Screen on an iPhone; Install in Chrome, Edge or Brave). Everything else is
