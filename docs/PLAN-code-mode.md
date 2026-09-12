@@ -24,7 +24,7 @@ a home-made loop, and approvals that can never be skipped.
 
 ## Where it runs: the PC only
 
-The console now runs two ways (README → *Two ways to run it*): on the PC with
+The console now runs two ways ([How it works → Two ways to run it](HOW-IT-WORKS.md#two-ways-to-run-it)): on the PC with
 its own server, and as a serverless web page. A coding agent needs the project's
 files and a shell, which only the PC's server has — so **code mode is a PC
 feature**. In the web version the switch is shown but says "Code mode runs on
@@ -140,7 +140,7 @@ type CodeEvent =
    - **Per task**: tokens used, on each code thread when it finishes.
 6. **Safety pass.** Branch per session, dirty-tree warning, read-only list, the
    tunnel/access rule, and tests for the approval gate with fake adapters.
-7. **Docs and QA.** README section, a code-mode section in `docs/QA.md`.
+7. **Docs and QA.** A code-mode section in `docs/GUIDE.md`, and one in `docs/QA.md`.
 
 ## Decisions to make first
 

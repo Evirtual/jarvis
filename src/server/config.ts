@@ -134,7 +134,3 @@ export async function setActive(id: ProviderId | null): Promise<void> {
   cache.active = id;
   await persist();
 }
-
-export function envVarName(id: ProviderId): string {
-  return ENV_VAR[id];
-}

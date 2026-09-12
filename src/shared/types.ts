@@ -349,12 +349,3 @@ export interface WorldResponse {
   error: string | null;
   at: number;
 }
-
-/* ------------------------------------------------------------------ *
- * Errors
- * ------------------------------------------------------------------ */
-
-export interface ApiError {
-  error: string;
-  message?: string;
-}

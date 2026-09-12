@@ -2,7 +2,7 @@
  * Everything beyond the front door: the public uplink, where it lands, real
  * latency to a few internet anchors, and the actual weather there.
  *
- * Two outbound services, both keyless, both named in the README because they
+ * Two outbound services, both keyless, both named in docs/HOW-IT-WORKS.md because they
  * see the machine's IP:
  *   • ip-api.com     — public IP, ISP, ASN, city, coordinates
  *   • open-meteo.com — weather and sun times for those coordinates

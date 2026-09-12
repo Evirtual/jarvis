@@ -1507,7 +1507,7 @@ export function line(kind: "user" | "jarvis" | "sys", text: string): HTMLElement
   const row = document.createElement("div");
   row.className = `cw-msg ${kind}`;
   const addText = (value: string): void => {
-    // https only, as the README promises: a plain http address is shown, not linked
+    // https only, as docs/HOW-IT-WORKS.md promises: a plain http address is shown, not linked
     const url = /https:\/\/[^\s<>()\[\]]+/g;
     let start = 0;
     for (const match of value.matchAll(url)) {
