@@ -39,7 +39,8 @@ function load(): Saved {
 }
 
 let saved = load();
-const persist = (): void => store(KEYS, JSON.stringify(saved));
+/** False when the browser refused to keep them (storage full, or a private window that blocks it). */
+const persist = (): boolean => store(KEYS, JSON.stringify(saved));
 
 function mask(key: string): string {
   const tail = key.slice(-4);
@@ -121,7 +122,8 @@ async function saveKey(id: ProviderId, apiKey: string): Promise<ConnectionsRespo
   const model = saved.providers[id]?.model;
   saved.providers[id] = { key, ...(model ? { model } : {}) };
   if (!saved.active) saved.active = id;
-  persist();
+  // a key that looks connected but is gone on the next visit would be worse than saying so now
+  if (!persist()) throw new Error("The key works, but this browser wouldn't keep it — its storage is full, or blocked in a private window.");
   return connections();
 }
 

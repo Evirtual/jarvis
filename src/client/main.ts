@@ -24,6 +24,7 @@ import { paintHosts, startReadings } from "./readings.js";
 import { partOfDay } from "./local.js";
 import { paintThread, refreshLinks } from "./threads.js";
 import "./voice-ui.js";
+import "./memory.js";
 import "./confirm.js";
 import "./actions.js";
 import "./ask.js";

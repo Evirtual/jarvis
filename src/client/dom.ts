@@ -6,11 +6,17 @@ export function $<T extends HTMLElement = HTMLElement>(id: string): T {
   return el as T;
 }
 
-export function store(k: string, v: string): void {
+/**
+ * Keep a value in this browser's storage. False when it was refused — the
+ * storage is full, or blocked (some private windows) — so a caller that
+ * matters can say so rather than lose it quietly.
+ */
+export function store(k: string, v: string): boolean {
   try {
     localStorage.setItem(k, v);
+    return true;
   } catch {
-    /* private mode */
+    return false;
   }
 }
 

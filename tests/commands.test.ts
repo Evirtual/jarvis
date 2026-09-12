@@ -80,6 +80,15 @@ test("close means archive; only an explicit phrase deletes", () => {
   assert.deepEqual(intentOf("restore the Cambodia thread", ctx()), { name: "restore_thread", title: "Cambodia" });
 });
 
+test("clearing the put-away threads is its own request, and always asks first", () => {
+  for (const q of ["clear the put-away threads", "delete all the put away threads", "empty the archive", "delete the archived chats"]) {
+    assert.deepEqual(intentOf(q, ctx()), { name: "clear_archived" }, q);
+  }
+  assert.deepEqual(intentOf("delete everything", ctx()), { name: "delete_all" }, "the whole board is still the whole board");
+  assert.ok(NEEDS_CONFIRMATION.has("clear_archived"));
+  assert.deepEqual(extractDirectives('[[do: clear_archived]]').actions, [], "and the model can't ask for it");
+});
+
 test("a question about the voice is not a request to change it", () => {
   assert.equal(intentOf("which voice are you speaking with", ctx()), null);
   assert.equal(intentOf("what voice is that", ctx()), null);

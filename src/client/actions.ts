@@ -267,6 +267,21 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
         },
       );
     }
+    case "clear_archived": {
+      const away = ws.archived;
+      if (!away.length) return "Nothing is put away, sir — there's nothing to clear.";
+      const messages = away.reduce((n, t) => n + t.turns.length, 0);
+      return confirmFirst(
+        `Delete the ${away.length} put-away thread${away.length === 1 ? "" : "s"}? ${lostWords(messages)}`,
+        "Delete them",
+        () => {
+          for (const t of [...ws.archived]) ws.remove(t.id);
+          graph.commit();
+          paintThread();
+          return `The put-away threads are gone, sir — ${away.length} of them. What's on the board is untouched.`;
+        },
+      );
+    }
     case "collapse_group":
     case "expand_group": {
       const fold = a.name === "collapse_group";

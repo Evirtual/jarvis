@@ -174,6 +174,7 @@ export function paintThreadList(): void {
       `<div class="tl-foot">` +
       (ws.live.length > 1 ? `<button type="button" data-all="tidy">Tidy up</button>` : "") +
       (ws.live.length ? `<button type="button" data-all="archive">Put all away</button>` : "") +
+      (away.length ? `<button type="button" class="del" data-all="clear-away">Delete put-away</button>` : "") +
       `<button type="button" class="del" data-all="delete">Delete everything</button></div>`,
     );
   }
@@ -192,7 +193,8 @@ export function paintThreadList(): void {
 $("threadList").addEventListener("click", (e) => {
   const all = (e.target as HTMLElement).closest<HTMLElement>("button[data-all]");
   if (all) {
-    const name = all.dataset.all === "delete" ? "delete_all" : all.dataset.all === "tidy" ? "tidy_board" : "archive_all";
+    const NAMES = { delete: "delete_all", "clear-away": "clear_archived", tidy: "tidy_board", archive: "archive_all" } as const;
+    const name = NAMES[all.dataset.all as keyof typeof NAMES] ?? "archive_all";
     void runAction({ name }).then((n) => {
       if (n) announce(n);
     });

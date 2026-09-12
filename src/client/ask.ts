@@ -342,8 +342,8 @@ export async function ask_(t: string): Promise<void> {
   // The server keeps 4,000 characters of a question; say so rather than cut quietly.
   if (t.length > 4000) { sys("That's over 4,000 characters, sir — I'll take the first 4,000."); t = t.slice(0, 4000); }
   addMsg("user", t, thread.id);
+  // Every message is kept; the service is sent only the last dozen (prepareTurns).
   thread.turns.push({ role: "user", content: t });
-  if (thread.turns.length > 24) thread.turns = thread.turns.slice(-24);
   graph.titleFrom(t, thread.id);
   graph.save();
   paintThreadName();

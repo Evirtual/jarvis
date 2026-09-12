@@ -37,6 +37,7 @@ export type Action =
   | { name: "archive_all" }
   | { name: "tidy_board" }
   | { name: "delete_all" }
+  | { name: "clear_archived" }
   | { name: "collapse_group"; group: string }
   | { name: "expand_group"; group: string }
   | { name: "approve" }
@@ -129,6 +130,11 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   if (/\b(?:speak|talk)\s+(?:a (?:bit|little) )?slower\b|\bslow (?:it )?down\b/.test(q)) return { name: "set_speed", delta: -0.1 };
   if (/\b(?:unmute|voice on|speak again|talk to me again|turn (?:the )?(?:voice|sound) (?:back )?on)\b/.test(q)) return { name: "unmute" };
   if (/\b(?:mute|voice off|stop talking|be quiet|silence|turn (?:the )?(?:voice|sound) off)\b/.test(q)) return { name: "mute" };
+
+  // The put-away threads only — making room, not clearing the board. Before
+  // the Threads list ("put away threads") and the whole-board rule ("delete
+  // all…"), so "delete all the put-away threads" means just those.
+  if (/\b(?:clear|delete|remove|empty|bin|get rid of|throw away)\s+(?:out\s+)?(?:all\s+)?(?:of\s+)?(?:the\s+|my\s+)?(?:put[- ]away|archived)(?:\s+(?:threads?|chats?|conversations?|ones))?\b|\bempty\s+the\s+archive\b/.test(q)) return { name: "clear_archived" };
 
   // Threads list — before panels, so "show me the threads" isn't a panel
   if (/\b(?:what|which|list|show)(?:\s+me)?\s+(?:all\s+)?(?:the\s+)?(?:threads|chats|conversations|windows|groups)\b|\bhow many (?:threads|chats)\b|\b(?:archived|put away) (?:threads|chats)\b/.test(q)) return { name: "list_threads" };
@@ -357,7 +363,7 @@ function directiveToAction(n: string, args: Record<string, string>): Action | nu
     case "hide_panel":
       return args.name === "all" || PANEL_NAMES.includes(args.name as PanelName)
         ? { name: "hide_panel", panel: args.name as PanelName | "all" } : null;
-    // Never from the model: delete_thread, delete_group, approve, deny, set_model.
+    // Never from the model: delete_thread, delete_group, clear_archived, approve, deny, set_model.
     default:
       return null;
   }
@@ -365,5 +371,5 @@ function directiveToAction(n: string, args: Record<string, string>): Action | nu
 
 /** Actions that destroy something and must be confirmed by the user first. */
 export const NEEDS_CONFIRMATION: ReadonlySet<ActionName> = new Set<ActionName>([
-  "clear_thread", "delete_thread", "delete_group", "delete_all",
+  "clear_thread", "delete_thread", "delete_group", "delete_all", "clear_archived",
 ]);

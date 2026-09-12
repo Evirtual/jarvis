@@ -746,3 +746,25 @@ with nothing new named stays. When in doubt, it stays. Ten unit cases.
 
 Also: "What's the latest news on X" names the thread "X" (it came out as
 "What's the latest news on Sp…").
+
+### 2026-09-12 — every message kept, and the storage ceiling in the open
+
+The user's decision: no per-thread limit for the local-storage demo. A
+thread kept only its last 24 messages; now every message stays (the service
+is still sent the last 12, so nothing costs more). The ceiling is the
+browser's storage — about 5 MB per site in most browsers; this one allowed
+over 20 million characters. `store()` now reports a refused save, and
+`memory.ts` speaks: once past 80% of 5 MB, and at once when a save is refused,
+then again when there's room. "Clear the put-away threads" / **Delete
+put-away** makes room, always asking first; the AI can't ask for it. On the
+web, a key the browser refuses to keep is reported instead of seeming saved.
+
+| Check (PC) | Result |
+| --- | --- |
+| 15 × "status report" into one thread | 30 messages kept (was capped at 24) |
+| Saving refused (setItem made to throw), two saves | one notice: "This browser's storage is full, sir — the latest changes aren't saved…" |
+| Saving allowed again | "There's room again, sir — everything is saved."; the messages from while it was full are in the save (36) |
+| A 4.1-million-character put-away thread planted | the 80% warning, once, not repeated on the next save |
+| "clear the put-away threads" → "yes" | dialog "Delete the 17 put-away threads? 66 messages will be gone…"; board 4.1 M → 6 K characters; the thread on the board untouched |
+| Web build: Threads list shows **Delete put-away** | Pass |
+| Unit: "clear the put-away threads", "delete all the put away threads", "empty the archive", "delete the archived chats" → clear_archived; "delete everything" still the whole board; needs confirming; not a directive the model can give | Pass (56 tests) |

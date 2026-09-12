@@ -103,6 +103,8 @@ export class Stage {
   onFocus: ((id: string) => void) | null = null;
   onChange: (() => void) | null = null;
   onCoreTap: (() => void) | null = null;
+  /** After every save of the board: whether the browser kept it, and its size in characters (memory.ts). */
+  onSaved: ((kept: boolean, size: number) => void) | null = null;
   onArchive: ((id: string) => void) | null = null;
   onBranch: ((id: string) => void) | null = null;
   onNewThread: ((groupId: string) => void) | null = null;
@@ -233,7 +235,8 @@ export class Stage {
   }
 
   save(): void {
-    store(STORE_KEY, JSON.stringify(this.ws.data));
+    const json = JSON.stringify(this.ws.data);
+    this.onSaved?.(store(STORE_KEY, json), json.length);
   }
 
   /**

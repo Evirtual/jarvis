@@ -178,6 +178,16 @@ Three different things, kept apart:
 | **Clear** ("clear this thread") | Empties the history, keeps the thread. Asks first. |
 | **Delete** (bin, Threads list, "delete this thread permanently") | Gone for good. Always asks first — and the AI can never do it. |
 | **Put all away / delete everything** ("close all threads", "delete everything", "start fresh") | The whole board at once. Putting away is recoverable; deleting asks first and takes the archive with it. |
+| **Delete put-away** (Threads list, "clear the put-away threads", "empty the archive") | Only what's been put away — the board is untouched. Asks first, saying how many messages go. |
+
+**Every message is kept.** A thread is as long as the conversation; the
+service is only ever sent its last dozen messages, so a long thread costs
+nothing extra. The board lives in this browser's own storage — about 5 MB per
+site in most browsers, thousands of messages. Past four fifths of that, JARVIS
+says so once; if the browser ever refuses a save, he says so at once (what's on
+screen stays until the page is closed) and again when there's room. He never
+trims or deletes anything on his own to make room — that's what **Delete
+put-away** is for.
 
 JARVIS's own remarks about the console ("Put that away, sir") are said as a notice
 and not written into any thread, so a thread holds only its own conversation.
@@ -429,6 +439,7 @@ the types are broken.
 | `src/client/threads.ts` | The Threads list, what the stage reports back, the links between threads |
 | `src/client/links.ts` | Which threads are about the same things, and why — the board's web |
 | `src/client/subject.ts` | Whether a question carries the thread in front on, or is a new subject that gets a thread of its own |
+| `src/client/memory.ts` | The board's room in the browser's storage: a word when it's nearly full, and at once if a save is refused |
 | `src/client/voice-ui.ts` | JARVIS as the microphone, the keyboard, Esc, the voice controls |
 | `src/client/drawer.ts` | The configuration drawer and its tabs |
 | `src/client/stage.ts` | The board: JARVIS, windows, bubbles, the bin, media in threads |
