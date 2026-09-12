@@ -65,7 +65,7 @@ Every figure on screen is measured, not simulated.
 | Memory | `os.totalmem/freemem` |
 | GPU util, temp, VRAM, watts, clock | `nvidia-smi` |
 | Wi-Fi SSID/signal/radio, throughput, disks, gateway, DNS | one PowerShell probe, every 20 s |
-| Battery | the same probe — shown as the arc around JARVIS, red when low and unplugged |
+| Battery | the same probe — ask "power" for it |
 | Perimeter radar | real ICMP sweep of your /24 — bearing is a stable hash of the address, **radius is genuine round-trip time** |
 | Device identity | ARP table + MAC OUI lookup, with randomised privacy MACs labelled as such |
 | Public IP, ISP, ASN, city | ip-api.com |
@@ -95,8 +95,8 @@ asked for from a hidden tab reports when you look again.
 | Uplink | Wi-Fi, gateway, throughput | the connection as the browser reports it, measured round trips, public IP and provider (GeoJS, ipwho.is) |
 | Environment | weather where the IP says | the same, or where GPS says once you press **Use GPS** |
 
-The battery ring shows the real battery where the browser shares it (not on
-iPhone). Readings pause while the page is out of sight. A panel's body is
+"power" gives the real battery where the browser shares it (not on iPhone).
+Readings pause while the page is out of sight. A panel's body is
 painted only while it is open, and JARVIS himself draws every frame while
 anything moves and every other frame at rest.
 

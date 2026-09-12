@@ -1,7 +1,7 @@
 /**
  * JARVIS himself, drawn: the aurora behind the board and the core — the logo,
- * live — with its spectrum and battery arc. Pure drawing — everything it shows is
- * handed in — so the stage decides what, and this decides how.
+ * live — with its spectrum and its outer ring. Pure drawing — everything it
+ * shows is handed in — so the stage decides what, and this decides how.
  */
 
 import { reduceMotion } from "./motion.js";
@@ -12,13 +12,11 @@ export const DESIGN_R = 74;
 
 export type Activity = "idle" | "listening" | "speaking" | "thinking";
 
-/** What the core reflects: the machine, the voice, and a pulse when a thread is focused. */
+/** What the core reflects: the machine's load, the voice, and a pulse when a thread is focused. */
 export interface CoreLook {
   activity: Activity;
   cpuLoad: number;
   gpuLoad: number;
-  battery: number;
-  onAc: boolean;
   pulse: number;
 }
 
@@ -56,7 +54,7 @@ export function drawAurora(ctx: CanvasRenderingContext2D, t: number, cx: number,
  * colours and triangle, in its proportions — its outer ring (196) is 60 here —
  * so a core at rest is the logo. What is live on top: the rings turn with the
  * CPU, the glow follows the GPU and the voice, and the spectrum, the thinking
- * arc and the battery arc are the console's own.
+ * arc and the outer ring are the console's own.
  */
 const LOGO = 60 / 196;
 const deg = (d: number): number => (d * Math.PI) / 180;
@@ -147,16 +145,12 @@ export function drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, a
   ctx.stroke();
   ctx.restore();
 
-  // outer arc = real battery charge
-  const low = !s.onAc && s.battery < 20;
-  ctx.save();
-  ctx.rotate(-Math.PI / 2);
+  // the outer ring: whole, dim at rest and lit while he is busy
   ctx.beginPath();
-  ctx.arc(0, 0, DESIGN_R + 6, 0, Math.PI * 2 * (s.battery / 100));
-  ctx.strokeStyle = low ? "#ff4f5f" : idle ? "#1d5468" : "#6ff0ff";
+  ctx.arc(0, 0, DESIGN_R + 6, 0, Math.PI * 2);
+  ctx.strokeStyle = idle ? "#1d5468" : "#6ff0ff";
   ctx.lineWidth = 2.4;
   ctx.stroke();
-  ctx.restore();
 }
 
 /** "#6ff0ff" at 40% → "rgba(111,240,255,.4)". */

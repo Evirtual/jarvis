@@ -96,8 +96,6 @@ export class Stage {
   streamingId: string | null = null;
   cpuLoad = 0;
   gpuLoad = 0;
-  battery = 100;
-  onAc = true;
   /** Phone layout: the bubbles become a list under the core. */
   compact = false;
 
@@ -930,7 +928,7 @@ export class Stage {
   private placeLabel(): void {
     const { cx, cy } = this.core();
     const s = this.root.style;
-    // The battery arc is his outermost ring.
+    // His outermost ring.
     const coreTop = cy - (CORE_R * (DESIGN_R + 8)) / DESIGN_R;
     s.setProperty("--core-x", `${cx}px`);
     s.setProperty("--core-y", `${cy}px`);
@@ -1326,7 +1324,7 @@ export class Stage {
     ctx.translate(cx, cy);
     ctx.scale(CORE_R / DESIGN_R, CORE_R / DESIGN_R);
     drawCore(ctx, t * spin, t, amp, idle, {
-      activity: this.activity, cpuLoad: this.cpuLoad, gpuLoad: this.gpuLoad, battery: this.battery, onAc: this.onAc, pulse: this.pulse,
+      activity: this.activity, cpuLoad: this.cpuLoad, gpuLoad: this.gpuLoad, pulse: this.pulse,
     });
     ctx.restore();
     if (this.pulse > 0) this.pulse -= 0.02;

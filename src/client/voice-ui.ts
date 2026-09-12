@@ -44,8 +44,6 @@ requestAnimationFrame(function pumpGlobe(): void {
   if (cur) {
     graph.cpuLoad = (cur.cpu?.avg ?? 0) / 100;
     graph.gpuLoad = (cur.gpu?.utilPct ?? 0) / 100;
-    graph.battery = cur.battery?.pct ?? 100;
-    graph.onAc = cur.battery?.onAc ?? true;
   }
   requestAnimationFrame(pumpGlobe);
 });
