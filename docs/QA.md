@@ -667,4 +667,5 @@ service called "active" (404). The route now comes first.
 | PC on ChatGPT: list "AI voices · through ChatGPT (13)", Fable chosen, Test voice → `/api/speak` openai:fable 200 | Pass |
 | ChatGPT voice through the PC, 7 s of speech: first sound 1.9–2.2 s, done 3.0 s; "Voice profile set, sir." first sound 1.1 s | Measured |
 | ChatGPT hearing through the PC: "Good evening, sir." in 0.70 s, exact | Pass |
-| Web on Gemini, voice spent: list "AI voices · through Gemini (20)", the reason shown once, device voice speaks | Pass |
+| Web on ChatGPT: list "AI voices · through ChatGPT (13)", Fable chosen, Test voice speaks with no refusal | Pass |
+| Web on Gemini with its voice spent: the reason once, then the device voice (verified before this change; the rest is now per service) | Pass |
