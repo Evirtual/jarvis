@@ -634,3 +634,19 @@ is used (`speakWith`; likewise `hearWith` for hearing).
 | --- | --- |
 | Gemini's newest voice on the free tier: **10 lines a day per model** (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`, limit 10) — spent by the day's tests; the older 2.5 voice took over, whole-line, 6.2 s for a 5 s line | Measured — Gemini's free voice is not enough to talk with; answers and hearing are fine on it. The neural voice needs ChatGPT with credit. |
 | "Neural voice unavailable — using a system voice": what the user heard as "the PC voice" with Charon selected — the quota fallback, said once; the message now names Gemini's allowance | Fixed wording |
+
+**The voice falls back cleanly.** 71. With Gemini's voice spent, every line
+waited for a refusal, then showed a generic "Neural voice unavailable" and
+played the radio click with nothing after it; and in Brave — which doesn't
+list its voices — Charon had been picked by default. Now: the device's voice
+is always the default (in Brave, "This device's voice", its unnamed default);
+a refused neural voice shows the service's own reason once and rests for ten
+minutes, the device's voice speaking meanwhile; the click plays only as the
+service's audio actually starts.
+
+| Area | Result |
+| --- | --- |
+| Web, no saved choice: "device:" chosen, list "This device · instant, free" then "Neural · through Gemini (20)" | Pass |
+| Charon chosen with Gemini's voice spent: notice "Gemini's voice has used today's free allowance, sir — it comes back tomorrow. I'll speak with this device's voice meanwhile."; no click | Pass |
+| A second line straight after: no request to Gemini, device voice at once | Pass |
+| PC: the same | Pass |

@@ -101,11 +101,11 @@ export function humanise(id: ProviderId, err: unknown): string {
   // Gemini's "quota" is the free tier's allowance, per minute and per day, and
   // the voice has a smaller one than the answers.
   if (id === "gemini" && (status === 429 || /quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(raw))) {
-    const daily = /per.?day|daily|PerDay/i.test(raw);
-    const voice = /tts|speech|audio/i.test(raw) ? "voice" : "free tier";
+    const daily = /PerDay|per.?day|daily/i.test(raw);
+    const what = /tts/i.test(raw) ? "Gemini's voice" : "Gemini's free tier";
     return daily
-      ? `Gemini's ${voice} has used today's free allowance, sir — it comes back overnight. Meanwhile the device's own voice speaks.`
-      : `Gemini's ${voice} is at its free-tier limit for the moment, sir — a minute's pause and it's back.`;
+      ? `${what} has used today's free allowance, sir — it comes back tomorrow.`
+      : `${what} is at its limit for the moment, sir — it's back within a minute.`;
   }
   // Out of credit is account-wide: switching to another of this service's models won't help.
   if (/no credits|credit balance|insufficient_quota|exceeded your current quota|billing|payment required/i.test(raw)) {

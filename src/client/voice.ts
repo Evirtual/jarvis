@@ -25,9 +25,9 @@ function parseSelection(value: string): Selection | null {
   const at = value.indexOf(":");
   if (at < 0) return null;
   const source = value.slice(0, at), id = value.slice(at + 1);
-  if (!id) return null;
-  if (source === "system") return { kind: "system", name: id };
-  if ((PROVIDER_IDS as readonly string[]).includes(source)) return { kind: "neural", via: source as ProviderId, id };
+  // "system:" is how a device voice was remembered before it was called one
+  if (source === "device" || source === "system") return { kind: "device", name: id || null };
+  if (id && (PROVIDER_IDS as readonly string[]).includes(source)) return { kind: "neural", via: source as ProviderId, id };
   return null;
 }
 
@@ -103,10 +103,17 @@ export interface NeuralVoice {
   voice: VoiceOption;
 }
 
-/** What is speaking: one of the neural voices, or one of the device's own. */
+/**
+ * What speaks: one of the connected service's neural voices, or one of the
+ * device's own. A device voice with no name is the browser's default — always
+ * there, even in a browser that won't list its voices by name (Brave).
+ */
 export type Selection =
   | { kind: "neural"; via: ProviderId; id: string }
-  | { kind: "system"; name: string };
+  | { kind: "device"; name: string | null };
+
+/** How long a refused neural voice is left alone before it is asked again. */
+const REST_MS = 10 * 60 * 1000;
 
 export class Voice {
   enabled = true;
@@ -118,14 +125,20 @@ export class Voice {
   private rate = 0.96;
 
   private synth: SpeechSynthesis | null = window.speechSynthesis ?? null;
+  /** The device voice in use — or the one to fall back to — when the browser names its voices; null means its default. */
   private systemVoice: SpeechSynthesisVoice | null = null;
   private systemList: SpeechSynthesisVoice[] = [];
   /** The neural voices available right now, by the service that makes them. */
   private neural = new Map<ProviderId, VoiceOption[]>();
   private chosen: Selection | null = null;
+  /**
+   * Set when the chosen neural voice was refused (a spent allowance, no
+   * credit): why, and until when the device's voice speaks instead. Cleared
+   * by the next line the service does speak.
+   */
+  private resting: { until: number; reason: string } | null = null;
 
   private seq = 0;
-  private warned = false;
 
   /* one audio graph for the whole session */
   private actx: AudioContext | null = null;
@@ -163,7 +176,10 @@ export class Voice {
   get pitchValue(): number { return this.pitch; }
   get rateValue(): number { return this.rate; }
   get selection(): Selection | null { return this.chosen; }
+  /** The device's voices the browser names, the most JARVIS-like first — empty where it names none. */
   get systemVoices(): SpeechSynthesisVoice[] { return this.systemList; }
+  /** Whether the device can speak at all. */
+  get deviceSpeaks(): boolean { return this.synth !== null; }
   get micAvailable(): boolean {
     return (this.serverStt && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined") || this.recog !== null;
   }
@@ -181,10 +197,10 @@ export class Voice {
 
   /* ---------------- which voice ----------------
    *
-   * The connected service's voices arrive as connections change (main.ts);
-   * the device's own are read from the browser. The device's is the default
-   * — instant, and free. Whatever is chosen is remembered as
-   * "<source>:<id>", and stays chosen for as long as that source is there.
+   * The device's own voice is the default — instant, and free. A connected
+   * service's neural voice is used only when chosen in Configuration → Voice.
+   * A choice is remembered as "<source>:<id>" ("device:<name>", or "device:"
+   * for the browser's default) and holds whenever that source is there.
    */
 
   /** The voices one service can speak with now — an empty list when it has gone. */
@@ -219,36 +235,32 @@ export class Voice {
     this.choose();
   }
 
-  /** Keep what's chosen while it exists; otherwise the remembered choice, the device's own voice, a service's — in that order. */
+  /** The remembered choice while its source is there; otherwise the device's voice. */
   private choose(): void {
     const before = this.selectionValue;
-    if (this.chosen && this.available(this.chosen)) { /* still there */ }
-    else {
-      const saved = parseSelection(recall("jarvis.voice") ?? "");
-      const first = this.neuralVoices()[0];
-      this.chosen =
-        saved && this.available(saved) ? saved
-        : this.systemList[0] ? { kind: "system", name: this.systemList[0].name }
-        : first ? { kind: "neural", via: first.via, id: first.voice.id }
-        : null;
-    }
-    if (this.chosen?.kind === "system") this.systemVoice = this.systemList.find((v) => v.name === (this.chosen as { name: string }).name) ?? null;
-    else this.systemVoice = this.systemList[0] ?? null; // the fallback, should the neural voice fail mid-reply
-    if (this.selectionValue !== before || !this.chosen) this.onState?.();
+    const saved = parseSelection(recall("jarvis.voice") ?? "");
+    this.chosen = saved && this.available(saved) ? saved : this.deviceDefault();
+    const name = this.chosen?.kind === "device" ? this.chosen.name : null;
+    this.systemVoice = (name && this.systemList.find((v) => v.name === name)) || (this.systemList[0] ?? null);
+    if (this.selectionValue !== before) this.onState?.();
+  }
+
+  /** The device's best voice by name, or its default where it names none; null if it can't speak. */
+  private deviceDefault(): Selection | null {
+    return this.synth ? { kind: "device", name: this.systemList[0]?.name ?? null } : null;
   }
 
   private available(s: Selection): boolean {
-    return s.kind === "neural"
-      ? (this.neural.get(s.via) ?? []).some((v) => v.id === s.id)
-      : this.systemList.some((v) => v.name === s.name);
+    if (s.kind === "neural") return (this.neural.get(s.via) ?? []).some((v) => v.id === s.id);
+    return this.synth !== null && (s.name === null || this.systemList.some((v) => v.name === s.name));
   }
 
-  /** Choose by value — "<source>:<id>" for a neural voice, "system:<name>" for the browser's. */
+  /** Choose by value: "<service>:<voice>" or "device:<name>". */
   select(value: string): boolean {
     const s = parseSelection(value);
     if (!s || !this.available(s)) return false;
-    this.chosen = s;
     store("jarvis.voice", value);
+    this.resting = null; // chosen again: worth asking again
     this.choose();
     this.onState?.();
     return true;
@@ -256,7 +268,7 @@ export class Voice {
 
   get selectionValue(): string {
     const s = this.chosen;
-    return !s ? "" : s.kind === "neural" ? `${s.via}:${s.id}` : `system:${s.name}`;
+    return !s ? "" : s.kind === "neural" ? `${s.via}:${s.id}` : `device:${s.name ?? ""}`;
   }
 
   /** The chosen neural voice's details, if a neural voice is chosen. */
@@ -267,6 +279,22 @@ export class Voice {
     return voice ? { via: s.via, voice } : null;
   }
 
+  /** The neural voice to speak with now: the chosen one, unless it is resting after a refusal. */
+  private neuralNow(): NeuralVoice | null {
+    return this.resting && Date.now() < this.resting.until ? null : this.current();
+  }
+
+  /**
+   * The chosen neural voice was refused: say why, once, and let the device's
+   * voice speak for a while rather than wait on a refusal every sentence.
+   */
+  private rest(reason: string): void {
+    const first = this.resting === null;
+    this.resting = { until: Date.now() + REST_MS, reason };
+    if (first) this.onNotice?.(`${reason} I'll speak with this device's voice meanwhile.`);
+    this.onState?.();
+  }
+
   /** Where a service's voices are made, in words. */
   sourceLabel(via: ProviderId): string {
     return `through ${PROVIDERS[via].name}`;
@@ -274,10 +302,14 @@ export class Voice {
 
   describe(): { text: string; warn: boolean } {
     const n = this.current();
+    if (n && this.resting && Date.now() < this.resting.until) {
+      return { text: `${n.voice.name}, ${this.sourceLabel(n.via)}, is unavailable: ${this.resting.reason} This device's voice speaks meanwhile.`, warn: true };
+    }
     if (n) return { text: `Neural voice — ${n.voice.name} (${n.voice.note}), ${this.sourceLabel(n.via)}.`, warn: false };
-    if (!this.systemVoice) return { text: "This browser has no voices of its own. Connect a service and pick one of its voices, and he'll speak.", warn: true };
+    if (!this.synth) return { text: "This browser can't speak. Connect a service and pick one of its voices, and he will.", warn: true };
+    if (!this.systemVoice) return { text: "This device's own voice. The browser doesn't name its voices, so it can't be chosen by name here.", warn: false };
     return {
-      text: `System voice — ${shortName(this.systemVoice)} (${this.systemVoice.lang}).`,
+      text: `This device's voice — ${shortName(this.systemVoice)} (${this.systemVoice.lang}).`,
       warn: !/^en-GB/i.test(this.systemVoice.lang),
     };
   }
@@ -286,7 +318,7 @@ export class Voice {
   summary(): string {
     const n = this.current();
     if (n) return `${n.voice.name} (${this.sourceLabel(n.via)})`;
-    return this.systemVoice ? `${shortName(this.systemVoice)} (browser)` : "none";
+    return this.systemVoice ? `${shortName(this.systemVoice)} (this device)` : "this device's default";
   }
 
   labelFor(v: SpeechSynthesisVoice): string {
@@ -402,7 +434,7 @@ export class Voice {
   beginStream(): void {
     this.stop();
     if (!this.enabled || !this.userActed) return;
-    const neural = this.current() !== null && this.graph() !== null;
+    const neural = this.neuralNow() !== null && this.graph() !== null;
     this.run = {
       id: this.seq, consumed: 0, chunks: 0, nextAt: 0,
       chain: Promise.resolve(), last: null, lastUtter: null, neural, ended: false,
@@ -455,7 +487,7 @@ export class Voice {
         this.run = null;
         this.sources = [];
         this.speaking = false;
-        if (r.neural) this.tone(false);
+        if (r.neural && r.last) this.tone(false);
         this.onState?.();
       };
       if (r.neural) {
@@ -482,26 +514,18 @@ export class Voice {
       .trim();
     if (!text || !/[A-Za-z0-9]/.test(text)) return;
 
-    const first = r.chunks === 0;
-    r.chunks += 1;
-    if (first) {
+    if (r.chunks === 0) {
       this.speaking = true;
-      if (r.neural) this.tone(true);
       this.onState?.();
     }
+    r.chunks += 1;
 
     if (!r.neural) {
-      if (!this.synth) return;
-      const u = new SpeechSynthesisUtterance(text);
-      if (this.systemVoice) { u.voice = this.systemVoice; u.lang = this.systemVoice.lang; }
-      u.rate = this.rate;
-      u.pitch = this.pitch;
-      r.lastUtter = u;
-      this.synth.speak(u); // the browser queues utterances in order by itself
+      this.sayOnDevice(r, text); // the browser queues utterances in order by itself
       return;
     }
 
-    const n = this.current();
+    const n = this.neuralNow();
     if (!this.graph() || !n) return;
     const id = r.id;
     // Ask for it now, so the samples are arriving while everything before it
@@ -511,25 +535,41 @@ export class Voice {
 
     r.chain = r.chain.then(async () => {
       if (this.seq !== id) return;
-      let stream: AsyncIterable<Uint8Array>;
-      try {
-        stream = await pieces;
-      } catch {
-        if (this.seq !== id) return;
-        if (!this.warned) {
-          this.warned = true;
-          this.onNotice?.("Neural voice unavailable — using a system voice.");
+      if (r.neural) {
+        try {
+          await this.play(r, id, text, await pieces);
+          this.resting = null; // it spoke: whatever stopped it has passed
+          return;
+        } catch (err) {
+          if (this.seq !== id) return;
+          this.rest(err instanceof Error ? err.message : String(err));
+          r.neural = false;
+          // let what the service did say finish before the device's voice takes over
+          await this.untilPlayed(r);
+          if (this.seq !== id) return;
         }
-        r.neural = false;
-        // hand this and any later sentences to the browser's voice
-        const u = new SpeechSynthesisUtterance(text);
-        if (this.systemVoice) u.voice = this.systemVoice;
-        r.lastUtter = u;
-        this.synth?.speak(u);
-        return;
       }
-      await this.play(r, id, text, stream);
+      // This line, and every later one in this reply, in the device's voice.
+      this.sayOnDevice(r, text);
     });
+  }
+
+  /** One line in the device's own voice — the one chosen, or the browser's default where it names none. */
+  private sayOnDevice(r: NonNullable<typeof this.run>, text: string): void {
+    if (!this.synth) return;
+    const u = new SpeechSynthesisUtterance(text);
+    if (this.systemVoice) { u.voice = this.systemVoice; u.lang = this.systemVoice.lang; }
+    else u.lang = "en-GB";
+    u.rate = this.rate;
+    u.pitch = this.pitch;
+    r.lastUtter = u;
+    this.synth.speak(u);
+  }
+
+  /** Resolves when the service's audio scheduled so far has played. */
+  private untilPlayed(r: NonNullable<typeof this.run>): Promise<void> {
+    const left = this.actx ? r.nextAt - this.actx.currentTime : 0;
+    return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, left * 1000)));
   }
 
   /**
@@ -556,6 +596,8 @@ export class Voice {
       const b = last ? speechEnd(samples) : samples.length;
       if (b <= a) return;
       started = true;
+      // the radio click, as his first words of a reply actually begin — never before a refusal
+      if (!r.last) this.tone(true);
       const buf = ac.createBuffer(1, b - a, SPEECH_RATE);
       const slice = new Float32Array(b - a);
       slice.set(samples.subarray(a, b));
@@ -589,8 +631,11 @@ export class Voice {
       }
       if (this.seq !== id) return;
       if (heldLength) schedule(joinFloat32(held), true);
-    } catch {
-      if (this.seq === id && !started) this.onNotice?.("The voice broke off, sir.");
+    } catch (err) {
+      // Refused before a sound: the caller hands the line to the device's
+      // voice. Cut off part-way: what was said has been heard; the rest is lost.
+      if (!started) throw err;
+      if (this.seq === id) this.onNotice?.("The voice broke off, sir.");
     }
     r.nextAt += /[.!?]["”’)]?$/.test(text.trim()) ? 0.3 : /[,;:—]$/.test(text.trim()) ? 0.12 : 0.18;
   }

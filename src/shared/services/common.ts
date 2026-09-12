@@ -191,7 +191,11 @@ export function fromBase64(b64: string): Uint8Array {
   return out;
 }
 
-/** An error that keeps the HTTP status, for `humanise` to read. */
+/**
+ * An error that keeps the HTTP status and enough of the body for `humanise`
+ * to tell one refusal from another — a quota's details (per day, which model)
+ * come well after its opening sentence.
+ */
 export function httpError(service: string, status: number, body: string): Error {
-  return Object.assign(new Error(`${service} returned ${status}: ${body.slice(0, 200)}`), { status });
+  return Object.assign(new Error(`${service} returned ${status}: ${body.slice(0, 1500)}`), { status });
 }
