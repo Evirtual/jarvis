@@ -123,6 +123,8 @@ export interface StatusResponse {
   anyProviderReady: boolean;
   /** True when the server can turn recorded speech into text. */
   transcription: boolean;
+  /** JARVIS's own hearing (Moonshine, on the device): "none" where it hasn't been downloaded. */
+  hearing: "none" | "loading" | "ready" | "failed";
 }
 
 /* ------------------------------------------------------------------ *

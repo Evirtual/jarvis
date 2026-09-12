@@ -16,6 +16,8 @@ import type { VoiceOption } from "../shared/types.js";
 import { api } from "./api.js";
 import { addressed } from "./address.js";
 import { recall, store } from "./dom.js";
+import { toWav16k } from "./audio.js";
+import { SERVERLESS } from "./server.js";
 
 type Engine = "kokoro" | "system";
 
@@ -48,6 +50,12 @@ function shortName(v: SpeechSynthesisVoice): string {
 
 const AudioCtor = (): typeof AudioContext | undefined =>
   window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+
+/** When the browser can't take dictation (Brave has none; Chrome's needs Google's service). */
+const NO_DICTATION = SERVERLESS
+  ? "This browser can't take dictation, sir. Download my hearing in Configuration → Voice — about 63 MB, once — and I'll listen myself."
+  : "This browser can't take dictation, and my own hearing is still loading, sir — a moment, or type instead.";
 
 export class Voice {
   enabled = true;
@@ -531,7 +539,8 @@ export class Voice {
     this.transcribing = true;
     this.onState?.();
     try {
-      const text = await api.transcribe(blob);
+      // as 16 kHz WAV: the form every transcriber here takes (audio.ts)
+      const text = await api.transcribe(await toWav16k(blob).catch(() => blob));
       if (text) this.onRecognised?.(text, true);
       else this.onNotice?.("I didn't catch that, sir.");
     } catch (err) {
@@ -567,10 +576,7 @@ export class Voice {
       } else if (c === "network") {
         // Deliberately no automatic retry: restarting the mic unasked is what
         // made it flick on and off.
-        this.onNotice?.(
-          "The browser's dictation relies on Google's speech service, which isn't reachable from here. " +
-          "Connect ChatGPT in Config and I'll transcribe your voice myself.",
-        );
+        this.onNotice?.(NO_DICTATION);
       } else if (c !== "aborted") {
         this.onNotice?.(`Voice input error: ${c}.`);
       }
@@ -580,7 +586,7 @@ export class Voice {
 
   private startRecognition(): void {
     if (!this.recog) {
-      this.onNotice?.("This browser has no voice input. Connect ChatGPT in Config and I'll transcribe for you.");
+      this.onNotice?.(NO_DICTATION);
       return;
     }
     try { this.recog.start(); } catch { /* already running */ }

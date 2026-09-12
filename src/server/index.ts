@@ -57,7 +57,7 @@ import { DEFAULT_VOICE, DTYPE, hasVoice, kokoro, loadKokoro, synthesize, voices 
 import { gateway, snapshot, startSampler } from "./system.js";
 import { runScan, scanState } from "./scan.js";
 import { refreshWorld, startWorld, world } from "./world.js";
-import { transcribe, transcriptionAvailable } from "./transcribe.js";
+import { hearing, loadHearing, transcribe, transcriptionAvailable } from "./transcribe.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 7823);
@@ -239,6 +239,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       active: conn.active,
       anyProviderReady: conn.providers.some((x) => x.status.state === "ready"),
       transcription: transcriptionAvailable(),
+      hearing: hearing.state,
     };
     json(res, 200, body);
     return;
@@ -392,7 +393,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   /* ---- speech to text ---- */
   if (p === "/api/transcribe" && req.method === "POST") {
     if (!transcriptionAvailable()) {
-      json(res, 503, { error: "no_transcriber", message: "Speech recognition needs ChatGPT connected — add it in Config." });
+      const message = hearing.state === "loading"
+        ? "My hearing is still loading, sir — a moment, or type instead."
+        : "My hearing couldn't load on this machine. Connect ChatGPT in Config and I'll transcribe through it.";
+      json(res, 503, { error: "no_transcriber", message });
       return;
     }
     let audio: Buffer;
@@ -412,7 +416,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       console.log(`[hear] ${out.model} ${((Date.now() - t0) / 1000).toFixed(2)}s "${out.text.slice(0, 60)}"`);
       json(res, 200, { text: out.text });
     } catch (err) {
-      const message = humanise("openai", err);
+      // through OpenAI: its errors in plain words; the local hearing's are already plain
+      const message = resolveKey("openai") ? humanise("openai", err) : err instanceof Error ? err.message : String(err);
       console.error("[hear]", message);
       json(res, 502, { error: "transcribe_failed", message });
     }
@@ -612,7 +617,8 @@ server.listen(PORT, () => {
   // remain on demand, so the network is not polled continuously.
   void runScan(gateway()).catch((e: unknown) => console.error("[scan]", e));
 
-  void loadKokoro();
+  // the voice first, then the hearing: both load in the background, once
+  void loadKokoro().then(() => loadHearing());
 });
 
 process.on("SIGINT", () => {

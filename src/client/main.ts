@@ -67,13 +67,14 @@ async function pollStatus(): Promise<void> {
     voice.setServerVoices(st.voices, st.kokoro === "ready");
     voice.setServerTranscription(st.transcription);
     renderVoiceSelect();
-    // (in the web version the voice screen follows its own download, and says when it's ready)
-    if (st.kokoro === "loading" && !SERVERLESS) { setTimeout(() => void pollStatus(), 1500); return; }
-    if (!announced) {
+    if (!announced && st.kokoro !== "loading") {
       announced = true;
       if (st.kokoro === "ready") sys("Neural voice online — Kokoro-82M, local.");
       else sys(SERVERLESS ? "Speaking with this device's own voices." : "Neural voice unavailable — using browser voices.");
     }
+    // On the PC the voice and then the hearing load at start: keep asking until
+    // both are in. (The web version's screen follows its own downloads.)
+    if (!SERVERLESS && (st.kokoro === "loading" || st.hearing === "loading")) setTimeout(() => void pollStatus(), 1500);
   } catch {
     if (!SERVERLESS) sys("Console server unreachable.");
   }

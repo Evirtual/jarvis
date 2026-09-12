@@ -563,3 +563,22 @@ is ignored until a key is connected again, and the card names the variable.
 | Sign-in route with an invalid code: friendly "press Connect to try again"; without the console header: 403 | Pass |
 | "switch to OpenRouter", "use open router" | Pass (unit test) |
 | A real sign-in and a free answer | Needs the user's own OpenRouter account |
+
+### 2026-09-12 — JARVIS hears without a key; he speaks sooner
+
+68. With no ChatGPT key, voice input fell back to the browser's dictation —
+which Brave doesn't have, and Chrome only through Google's service. JARVIS now
+has his own hearing, Moonshine Base, on the device: the PC's server loads it at
+start; the web version downloads it on request. Recordings are converted in the
+page to 16 kHz WAV, so no side needs an audio decoder. 69. Speaking waited on
+OpenRouter's free models "thinking" silently first — reasoning is now off for
+them — and on a long first clause; the PC's Kokoro runs on 8 threads and warms
+up at start.
+
+| Area | Result |
+| --- | --- |
+| Kokoro on the PC, 7.2 s of speech: default threads 5.0–6.9 s → 8 threads ~4.5 s | Pass (~30% quicker) |
+| Kokoro on the GPU (DirectML), q8 model | Not possible — DirectML rejects a layer of the q8 model |
+| Moonshine on the PC: 4.0 s of speech in 0.12 s, 6.1 s in 0.24 s, word-for-word but for one proper name | Pass |
+| PC, no ChatGPT key: /api/transcribe hears Kokoro's own speech exactly, 0.15–0.19 s | Pass |
+| Web: hearing download 15 → 41 → 65 → 92% → online (~12 s); a Kokoro line heard exactly in 0.22 s, under the page's CSP and isolation | Pass |

@@ -25,6 +25,7 @@ import { closeMenus, menuOpen } from "./deck.js";
 import { setDrawer } from "./drawer.js";
 import { SERVERLESS } from "./server.js";
 import { loadNeural, neuralError, neuralPct, neuralState, neuralVoices, onNeuralChange, resumeNeural } from "./browser-voice.js";
+import { hearingError, hearingPct, hearingState, loadHearing, onHearingChange, resumeHearing } from "./browser-hearing.js";
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
@@ -103,6 +104,28 @@ if (SERVERLESS) {
   $("neuralBtn").addEventListener("click", () => { voice.markUserActed(); loadNeural(); });
   paintNeural();
   void resumeNeural();
+
+  // …and its hearing, the same way
+  const paintHearing = (): void => {
+    const btn = $<HTMLButtonElement>("hearingBtn");
+    const note = $("hearingNote");
+    btn.hidden = hearingState === "ready" || hearingState === "loading";
+    if (hearingState === "loading") note.textContent = `Downloading JARVIS's hearing — ${hearingPct}%.`;
+    else if (hearingState === "ready") note.textContent = "JARVIS hears you on this device — Moonshine, the same as on the PC. Nothing you say leaves it unless ChatGPT is connected.";
+    else if (hearingState === "failed") { note.textContent = `His hearing couldn't load here (${hearingError ?? "unknown"}).`; btn.textContent = "Try again"; }
+  };
+  let heard = hearingState;
+  onHearingChange(() => {
+    paintHearing();
+    if (hearingState === "ready" && heard !== "ready") {
+      voice.setServerTranscription(true); // record and transcribe here, rather than the browser's dictation
+      sys("Hearing online — Moonshine, on this device. Tap me and speak, sir.");
+    }
+    heard = hearingState;
+  });
+  $("hearingBtn").addEventListener("click", () => { voice.markUserActed(); loadHearing(); });
+  paintHearing();
+  void resumeHearing();
 }
 
 voice.onRecognised = (text, final): void => {

@@ -367,6 +367,13 @@ What differs is where the work happens:
 
   The battery ring shows the real battery where the browser shares it (not on
   iPhone). Readings pause while the page is out of sight.
+- **Hearing**: speech to text without a key — JARVIS's own hearing
+  (Moonshine Base, about 63 MB, once: Configuration → Voice → **Download
+  JARVIS's hearing**), run in a worker; a short command comes back in about a
+  fifth of a second. Brave has no dictation of its own, so there it is the only
+  way to talk to him without a ChatGPT key. On the PC the server runs the same
+  model, downloaded once at first start. A connected ChatGPT key is still used
+  first (a little more accurate, and it knows the console's own words).
 - **Voice**: the same Kokoro voices as on the PC, run in the browser —
   Configuration → Voice → **Download JARVIS's voice** (about 92 MB, once; the
   browser keeps it and it works offline). Until then, and on a device that
@@ -414,6 +421,8 @@ the types are broken.
 | `src/client/browser-core.ts` | The web version's back end: keys kept on the device, the same connections, asking and transcription the server offers |
 | `src/client/sensors.ts` | The web version's instruments: what a browser can genuinely measure of its device |
 | `src/client/browser-voice.ts`, `voice-worker.ts` | The web version's neural voice: Kokoro downloaded on request and run in a worker |
+| `src/client/browser-hearing.ts`, `hearing-worker.ts` | The web version's hearing: Moonshine downloaded on request and run in a worker |
+| `src/shared/hearing.ts`, `src/client/audio.ts` | The hearing model, and recordings turned into the 16 kHz WAV every transcriber here takes |
 | `src/shared/voices.ts` | The Kokoro voices and the WAV writer, for the server and the browser |
 | `src/client/say.ts` | How JARVIS speaks to you: notices, lines in a window, his status word, busy |
 | `src/client/ask.ts` | The command line, the queue, what the core is told, the streamed answer |

@@ -15,6 +15,8 @@ import { PROVIDER_IDS } from "../shared/types.js";
 import { PROVIDERS, adapterFor, exchangeOpenRouterCode, humanise, personaFor, prepareTurns } from "../shared/providers.js";
 import { recall, store } from "./dom.js";
 import { neuralError, neuralState, neuralVoices, speakNeural } from "./browser-voice.js";
+import { hearLocally, hearingState } from "./browser-hearing.js";
+import { wavSamples } from "../shared/hearing.js";
 
 /* ---------------- the keys, on this device ---------------- */
 
@@ -179,7 +181,13 @@ let transcriber: string | null = null;
 
 async function transcribe(audio: Blob): Promise<string> {
   const key = saved.providers.openai?.key;
-  if (!key) throw new Error("Speech recognition needs ChatGPT connected — add it in Config.");
+  // No ChatGPT key: JARVIS's own hearing, on this device (the recording arrives as 16 kHz WAV).
+  if (!key) {
+    if (hearingState === "ready") return hearLocally(wavSamples(await audio.arrayBuffer()));
+    throw new Error(hearingState === "loading"
+      ? "My hearing is still downloading, sir — a moment."
+      : "I can't hear you in this browser yet, sir. Download my hearing in Configuration → Voice — about 63 MB, once — or connect ChatGPT.");
+  }
   const { default: OpenAI } = await import("openai");
   const client = new OpenAI({ apiKey: key, dangerouslyAllowBrowser: true });
   if (!transcriber) {
@@ -209,7 +217,8 @@ async function status(): Promise<StatusResponse> {
     voices: neuralVoices(),
     active: conn.active,
     anyProviderReady: conn.providers.some((p) => p.status.state === "ready"),
-    transcription: !!saved.providers.openai,
+    transcription: !!saved.providers.openai || hearingState === "ready",
+    hearing: hearingState,
   };
 }
 
