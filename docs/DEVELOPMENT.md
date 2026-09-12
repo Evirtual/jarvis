@@ -71,6 +71,7 @@ the web version answers the same API calls in the browser
 | `src/client/voice.ts` | Speech out (the service's voice, streamed; the device's as the fallback) and in (recording, silence detection, dictation) |
 | `src/client/voice-ui.ts` | JARVIS as the microphone, the keyboard, Esc, the voice controls |
 | `src/client/connections.ts` | The Connections screen |
+| `src/client/setup.ts` | The first-run guide: where it's running, connecting a service, saying hello; back from Configuration or by asking |
 | `src/client/memory.ts` | The board's room in the browser's storage |
 | `src/client/readings.ts` | Painting the live readings, and receiving them |
 | `src/client/threads.ts`, `links.ts`, `web.ts` | The Threads list; which threads are about the same things; the context web |

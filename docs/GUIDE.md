@@ -4,6 +4,15 @@ How the screen is laid out, how threads and groups behave, and everything you
 can say. For where the readings come from and what leaves your machine, see
 [How it works](HOW-IT-WORKS.md).
 
+## The first visit
+
+With nothing connected, the console opens a three-step guide: where it is
+running and what that means for your keys; connecting Gemini (free) or
+ChatGPT, or not yet; and saying hello — how he addresses you, a line in his
+voice, and how to talk to him. **Not now** closes it; it doesn't come back on
+its own. Bring it back any time from Configuration → Connections → *Open the
+setup guide*, or by saying "run setup" or "show me the guide".
+
 ## The deck
 
 **JARVIS sits at the bottom of the screen and does not move.** He is the

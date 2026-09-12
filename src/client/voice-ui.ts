@@ -12,13 +12,15 @@ import { T } from "./readings.js";
 import { submit } from "./ask.js";
 import { closeMenus, menuOpen } from "./deck.js";
 import { setDrawer } from "./drawer.js";
+import { closeSetup, setupOpen } from "./setup.js";
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   // Whatever is on top goes first, in the order they stack on screen: the
-  // confirmation (Esc means "no") over everything, then the configuration
-  // drawer, the deck's menus, the web, the keyboard, the front panel.
+  // confirmation (Esc means "no") over everything, then the setup guide, the
+  // configuration drawer, the deck's menus, the web, the keyboard, the front panel.
   if (pendingConfirm) { const note = answerConfirm(false); if (note) announce(note); return; }
+  if (setupOpen()) { closeSetup(); return; }
   if ($("drawer").classList.contains("open")) { setDrawer(false); return; }
   if (menuOpen()) { closeMenus(); return; }
   if (graph.closeWeb()) return;

@@ -19,6 +19,7 @@ import { sweep } from "./readings.js";
 import { mode } from "./deck.js";
 import { applyAddress, setRate, setVoiceOut } from "./voice-ui.js";
 import { setDrawer } from "./drawer.js";
+import { openSetup } from "./setup.js";
 
 /* ===================================================================== *
  * Carrying out actions
@@ -343,6 +344,10 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       return null;
     case "close_config":
       setDrawer(false);
+      return null;
+    case "open_setup":
+      setDrawer(false);
+      openSetup();
       return null;
 
     case "sweep":

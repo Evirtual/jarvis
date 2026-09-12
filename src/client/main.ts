@@ -29,6 +29,7 @@ import "./confirm.js";
 import "./actions.js";
 import "./ask.js";
 import "./drawer.js";
+import { markSetupDone, openSetup, setupDone } from "./setup.js";
 import { SERVERLESS } from "./server.js";
 
 /* ===================================================================== *
@@ -81,5 +82,9 @@ conn.onChange = (c): void => {
 if (!SERVERLESS) void api.status().catch(() => sys("Console server unreachable."));
 startReadings();
 void conn.refresh().then(() => {
-  if (!conn.anyReady) sys("No service connected — open Config and connect Gemini: it's free, and gives me my voice and hearing.");
+  // A first visit with nothing connected gets the guide; someone already
+  // connected has no need of it, and someone who closed it isn't nagged.
+  if (conn.anyReady) markSetupDone();
+  else if (!setupDone()) openSetup();
+  else sys("No service connected — open Config and connect Gemini: it's free, and gives me my voice and hearing.");
 });

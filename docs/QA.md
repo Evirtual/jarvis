@@ -915,3 +915,27 @@ Found and fixed:
     tab said "Scanning installed voices…" for ever: nothing painted the note
     once. It is painted on the first frame now — deferred, because painting
     it during module loading tripped an import cycle (caught in this pass).
+
+### 2026-09-12 — the first-run guide
+
+`setup.ts`: three steps (where you are; connect a service; say hello), shown
+once when nothing is connected, back from Configuration → Connections or by
+"run setup" / "show me the guide". 68 tests; both versions rebuilt.
+
+| Check | PC | Web |
+| --- | --- | --- |
+| Opens by itself on a first visit with nothing connected | — (connected: stays closed, marked seen) | Pass |
+| Step 1 says which version and where keys live | Pass | Pass ("web version… no server behind it") |
+| Step 2: Gemini and ChatGPT cards, key-page links, paste fields; connected services shown as such | Pass (both "Connected", ChatGPT "in use") | Pass |
+| Step 3: address select applies at once; "Hear his voice"; how to talk to him | Pass | Pass (prompt → "MA'AM ›") |
+| Not now / Done close it and it doesn't return; the old "No service connected" notice shows instead | — | Pass |
+| "show me the guide" opens it; Esc closes it; Configuration → Connections → *Open the setup guide* reopens it and closes the drawer | Pass | — |
+| Centred on the desktop; full-screen on a phone (375 × 812), no sideways scroll | Pass | Pass |
+
+Found and fixed before commit:
+
+97. The guide's styles were inserted at the first `.cw-head {` in the file,
+    which was the tail of `.chatwin.lifted .cw-head {`: the sheet lost its
+    position and the lifted-window rule was split. Caught by the browser
+    pass (the sheet sat under the deck); the block now sits after the
+    confirm dialog's rules.

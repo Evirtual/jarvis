@@ -241,6 +241,20 @@
   <div class="confirm-actions"><button class="btn" id="confirmCancel" type="button">Cancel</button><button class="btn danger" id="confirmAccept" type="button">Confirm</button></div>
 </section>
 
+<!-- The first-run guide: above the drawer, below a confirmation. -->
+<div class="setup veil" id="setup" hidden>
+  <section class="setup-sheet glass" id="setupSheet" role="dialog" aria-modal="true" aria-labelledby="setupTitle" tabindex="-1">
+    <header class="setup-head"><h2 id="setupTitle">Setup</h2><span class="setup-dots" id="setupDots" aria-hidden="true"></span></header>
+    <div class="setup-body" id="setupBody"></div>
+    <footer class="setup-actions">
+      <button class="btn" id="setupBack" type="button">Back</button>
+      <span class="spacer"></span>
+      <button class="btn" id="setupSkip" type="button">Not now</button>
+      <button class="btn primary" id="setupNext" type="button">Next</button>
+    </footer>
+  </section>
+</div>
+
 <div class="scrim veil" id="scrim"></div>
 <aside class="drawer glass" id="drawer" aria-label="Console configuration">
   <div class="drawer-head">
@@ -258,6 +272,7 @@
     <h2>Reasoning Cores<span class="tail"></span></h2>
     <div id="providers"></div>
     <p class="hint" id="connHint" data-web="Connect a service to have me answer freely. Keys are kept in this browser on this device, and go only to the service they belong to.">Connect a service to have me answer freely. Keys are stored on this machine and never sent to the browser.</p>
+    <button class="btn wide" id="showSetup" type="button" title="The three-step guide shown on a first visit">Open the setup guide</button>
   </section>
 
   <section class="panel" data-pane="voice" hidden>

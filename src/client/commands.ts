@@ -53,6 +53,8 @@ export type Action =
   | { name: "mute" }
   | { name: "unmute" }
   | { name: "open_config"; tab?: ConfigTab }
+  /** The first-run guide, brought back. */
+  | { name: "open_setup" }
   | { name: "close_config" }
   | { name: "sweep" }
   | { name: "show_panel"; panel: PanelName }
@@ -110,6 +112,9 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
 
   const model = /\b(?:use|switch to|set)\s+(?:the\s+)?(?:model\s+)?((?:gpt|o\d|gemini)-[\w.-]+)/.exec(q);
   if (model?.[1]) return { name: "set_model", model: model[1] };
+
+  // The first-run guide — "run setup", "show me the guide"
+  if (/\b(?:run|open|show|start|redo|repeat)\s+(?:me\s+)?(?:the\s+)?(?:setup|set-up|onboarding|first[- ]run)(?:\s+guide)?\b|\bshow me the guide\b|^(?:setup|setup guide|guide)$/.test(q)) return { name: "open_setup" };
 
   // Config — before the voice rules, so "open voice settings" is never read as
   // a voice called "settings"
@@ -365,6 +370,7 @@ function directiveToAction(n: string, args: Record<string, string>): Action | nu
       const tab = (["connections", "voice", "quick"] as const).find((t) => t === args.tab) ?? "connections";
       return { name: "open_config", tab };
     }
+    case "open_setup": return { name: "open_setup" };
     case "sweep_network": return { name: "sweep" };
     case "show_panel":
       return PANEL_NAMES.includes(args.name as PanelName) ? { name: "show_panel", panel: args.name as PanelName } : null;

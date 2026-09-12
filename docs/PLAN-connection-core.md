@@ -80,10 +80,11 @@ that, and the setup guide will say so plainly.
   dependencies, and the cross-origin isolation in `sw.js` that existed only for
   them. The one runtime dependency left is `openai`.
 
-## Still to build: the first-run guide (`client/setup.ts`)
+## The first-run guide (`client/setup.ts`), built 2026-09-12
 
-Shown once (`jarvis.setupDone`) and reopened from Configuration. It checks
-where it is running (`SERVERLESS`) and says so:
+Shown once (`jarvis.setupDone`), only when nothing is connected; reopened
+from Configuration → Connections, or by asking ("run setup", "show me the
+guide"). It checks where it is running (`SERVERLESS`) and says so:
 
 1. **Where you are.** "Running on your PC": keys stay on this machine, and
    the real sensors are here. Or "Running as a web page": keys stay in this
@@ -94,8 +95,4 @@ where it is running (`SERVERLESS`) and says so:
    says what JARVIS can now do.
 3. **Say hello.** Microphone permission, one spoken line back through the
    connection, and the address (sir or ma'am).
-4. **(PC) Code mode.** A note that code mode signs in with a Claude or
-   ChatGPT account through Claude Code or Codex. It's a later step and
-   doesn't block setup.
-
-Voice commands "run setup" and "show me the guide" open it again.
+Code mode isn't mentioned until it exists.

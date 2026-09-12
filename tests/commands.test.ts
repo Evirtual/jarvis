@@ -189,6 +189,14 @@ test("tidying the board is understood, and never mistaken for deleting", () => {
   assert.equal(intentOf("delete everything", ctx())?.name, "delete_all");
 });
 
+test("the first-run guide can be asked for, and settings are still settings", () => {
+  for (const q of ["run setup", "show me the guide", "open the setup guide", "start the onboarding", "setup"]) {
+    assert.deepEqual(intentOf(q, ctx()), { name: "open_setup" }, q);
+  }
+  assert.deepEqual(intentOf("open settings", ctx()), { name: "open_config", tab: "connections" });
+  assert.deepEqual(extractDirectives("[[do: open_setup]]").actions, [{ name: "open_setup" }]);
+});
+
 test("voice words that aren't a voice's name are not read as one", () => {
   assert.deepEqual(intentOf("open voice settings", ctx()), { name: "open_config", tab: "voice" });
   assert.deepEqual(intentOf("show me the voice settings", ctx()), { name: "open_config", tab: "voice" });
