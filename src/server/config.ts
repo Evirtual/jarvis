@@ -22,14 +22,13 @@ export const ROOT = path.resolve(HERE, "..", "..");
 const CONFIG_PATH = path.join(ROOT, "config.json");
 
 const ENV_VAR: Record<ProviderId, string> = {
-  openrouter: "OPENROUTER_API_KEY",
-  openai: "OPENAI_API_KEY",
-  anthropic: "ANTHROPIC_API_KEY",
   gemini: "GEMINI_API_KEY",
+  openai: "OPENAI_API_KEY",
 };
 
 interface StoredProvider {
   apiKey?: string;
+  /** The chat model chosen for this service; the newest on the account when unset. */
   model?: string;
   /**
    * Disconnected while its key came from the environment: the variable can't
@@ -42,6 +41,7 @@ interface StoredProvider {
 interface StoredConfig {
   providers: Partial<Record<ProviderId, StoredProvider>>;
   active: ProviderId | null;
+  /** The PC's own voice (Kokoro), last used. */
   voice?: string;
 }
 
@@ -138,11 +138,11 @@ export async function setActive(id: ProviderId | null): Promise<void> {
   await persist();
 }
 
-export function getVoice(): string | null {
+export function getKokoroVoice(): string | null {
   return cache.voice ?? null;
 }
 
-export async function setVoice(voice: string): Promise<void> {
+export async function setKokoroVoice(voice: string): Promise<void> {
   cache.voice = voice;
   await persist();
 }

@@ -587,3 +587,24 @@ before and ~0.5 s after, so pieces played back to back left ~¾ s of dead air
 at each join. Playback now trims to the speech and adds a pause that fits the
 join — 0.12 s after a comma, 0.3 s after a sentence. Measured: "…parameters,"
 → ", sir." now 0.12 s apart (was ~0.7 s).
+
+### 2026-09-12 — the connection is the core
+
+The refactor in `docs/PLAN-connection-core.md`, phase 1. One connected
+service — Gemini (free) or ChatGPT — now answers, hears and, in the web
+version, speaks; nothing is downloaded by the browser. Gone: OpenRouter and
+its sign-in, the Claude chat connection (Claude returns in code mode), the
+in-browser Kokoro and Moonshine, Moonshine on the PC, and the cross-origin
+isolation that only those needed. Kokoro stays on the PC as its own voice.
+`shared/providers.ts` became `shared/services/` (`common.ts`, `gemini.ts`,
+`openai.ts`) with one interface: catalogue, chat, speak, hear.
+
+| Area | Result |
+| --- | --- |
+| Typecheck, 48 unit tests, PC build, web build | Pass |
+| PC: status shows Kokoro ready with its voices; `/api/speak` via Kokoro, 99 KB WAV in 1.7 s | Pass |
+| PC, no key: `/api/speak` via Gemini → 503 "can't speak from here"; `/api/transcribe` → 503 "no way to hear you yet" | Pass |
+| PC and web: Connections shows the two cards, Gemini first, with what each gives and costs | Pass |
+| PC: Voice tab reads "Neural voice — George … Kokoro, on this PC" | Pass |
+| Web: no console errors; CSP without huggingface/jsdelivr/anthropic/openrouter | Pass |
+| Gemini free tier hearing and voice, real key; ChatGPT voice latency | Not yet — no key on the PC, no credit on OpenAI; the user tests on the live site |

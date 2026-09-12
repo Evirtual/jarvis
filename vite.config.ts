@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
 
@@ -38,8 +38,8 @@ function manifestBase(): Plugin {
  */
 const SERVERLESS_CSP = [
   "default-src 'self'",
-  // 'wasm-unsafe-eval' lets the neural voice run in the browser; no eval of scripts
-  "script-src 'self' 'wasm-unsafe-eval'",
+  "script-src 'self'",
+  // the load reading is measured in a small worker made from a blob (sensors.ts)
   "worker-src 'self' blob:",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
@@ -47,35 +47,13 @@ const SERVERLESS_CSP = [
   "img-src 'self' data: blob: https:",
   "media-src 'self' blob: data:",
   "frame-src https://www.youtube-nocookie.com https://player.vimeo.com",
-  "connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com" +
-    " https://api.open-meteo.com https://get.geojs.io https://ipwho.is https://cloudflare-dns.com https://www.google.com https://www.anthropic.com" +
-    " https://openrouter.ai https://huggingface.co https://*.huggingface.co https://*.hf.co https://cdn.jsdelivr.net",
+  // the two services, and the keyless readings (weather, where you are, the sweep's anchors)
+  "connect-src 'self' https://api.openai.com https://generativelanguage.googleapis.com" +
+    " https://api.open-meteo.com https://get.geojs.io https://ipwho.is https://cloudflare-dns.com https://www.google.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
 ].join("; ");
-
-/**
- * The web version's neural voice runs ONNX Runtime in the browser; its engine
- * files are copied beside the page (dist/…/ort/) rather than fetched from a
- * CDN at run time, so the page depends on nobody else's servers for them.
- */
-function speechEngine(): Plugin {
-  let outDir = "";
-  return {
-    name: "jarvis-speech-engine",
-    apply: "build",
-    configResolved(c) { outDir = path.resolve(c.root, c.build.outDir); },
-    async closeBundle() {
-      if (process.env.VITE_JARVIS_SERVERLESS !== "1") return;
-      const from = path.resolve("node_modules/@huggingface/transformers/dist");
-      await mkdir(path.join(outDir, "ort"), { recursive: true });
-      for (const f of ["ort-wasm-simd-threaded.jsep.mjs", "ort-wasm-simd-threaded.jsep.wasm"]) {
-        await copyFile(path.join(from, f), path.join(outDir, "ort", f));
-      }
-    },
-  };
-}
 
 function serverlessCsp(): Plugin {
   return {
@@ -93,9 +71,7 @@ export default defineConfig({
   base,
   // icons, manifest, service worker, robots — copied as they are (src/client/public)
   publicDir: "public",
-  plugins: [manifestBase(), serverlessCsp(), speechEngine()],
-  // the voice worker imports the speech engine lazily, which needs module workers
-  worker: { format: "es" },
+  plugins: [manifestBase(), serverlessCsp()],
   build: {
     outDir: "../../dist/client",
     emptyOutDir: true,

@@ -1,9 +1,9 @@
 /**
  * J.A.R.V.I.S. Console — server.
  *
- * Serves the built client, streams speech from the local Kokoro model, exposes
- * real machine and network telemetry, and brokers the reasoning cores so API
- * keys never reach the browser.
+ * Serves the built client, brokers the connected services — answers, hearing
+ * and speech — so API keys never reach the browser, runs the PC's own voice
+ * (Kokoro), and exposes real machine and network telemetry.
  */
 
 import http from "node:http";
@@ -24,7 +24,6 @@ import type {
   SpeakRequest,
   StatusResponse,
   TelemetryResponse,
-  Turn,
 } from "../shared/types.js";
 import { PROVIDER_IDS } from "../shared/types.js";
 
@@ -32,32 +31,30 @@ import {
   ROOT,
   clearKey,
   getActive,
+  getKokoroVoice,
   getModel,
-  getVoice,
   loadConfig,
   maskKey,
   resolveKey,
   setActive,
   setKey,
+  setKokoroVoice,
   setModel,
-  setVoice,
 } from "./config.js";
 import {
   PROVIDERS,
-  activeModelFor,
-  adapterFor,
-  personaFor,
   cachedValidation,
+  connected,
   humanise,
+  personaFor,
   prepareTurns,
+  serviceFor,
   validate,
-} from "./providers.js";
-import { exchangeOpenRouterCode } from "../shared/providers.js";
-import { DEFAULT_VOICE, DTYPE, hasVoice, kokoro, loadKokoro, synthesize, voices } from "./kokoro.js";
+} from "./services.js";
+import { DEFAULT_VOICE, hasVoice, kokoro, loadKokoro, synthesize, voices } from "./kokoro.js";
 import { gateway, snapshot, startSampler } from "./system.js";
 import { runScan, scanState } from "./scan.js";
 import { refreshWorld, startWorld, world } from "./world.js";
-import { hearing, loadHearing, transcribe, transcriptionAvailable } from "./transcribe.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT ?? 7823);
@@ -157,13 +154,15 @@ async function providerView(id: ProviderId, revalidate: boolean): Promise<Provid
     ? await validate(id, resolved.key, true)
     : (cachedValidation(id, resolved.key) ?? (await validate(id, resolved.key)));
 
-  const status: ProviderStatus = v.ok
+  const status: ProviderStatus = v.ok && v.catalogue
     ? {
         state: "ready",
         maskedKey: masked,
-        models: v.models,
-        model: getModel(id) ?? v.models[0] ?? "",
         source: resolved.source,
+        models: v.catalogue.chat,
+        model: getModel(id) ?? v.catalogue.chat[0] ?? "",
+        voices: v.catalogue.voices,
+        hears: v.catalogue.hearing.length > 0,
         ...(lastProblem.has(id) ? { problem: lastProblem.get(id)! } : {}),
       }
     : {
@@ -232,14 +231,9 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   if (p === "/api/status") {
     const conn = await connections();
     const body: StatusResponse = {
-      kokoro: kokoro.state,
-      kokoroError: kokoro.error,
-      dtype: DTYPE,
-      voices: voices(),
+      kokoro: { state: kokoro.state, error: kokoro.error, voices: voices() },
       active: conn.active,
       anyProviderReady: conn.providers.some((x) => x.status.state === "ready"),
-      transcription: transcriptionAvailable(),
-      hearing: hearing.state,
     };
     json(res, 200, body);
     return;
@@ -271,7 +265,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
         return;
       }
       await setKey(id, apiKey);
-      if (!getModel(id) && v.models[0]) await setModel(id, v.models[0]);
       json(res, 200, await connections());
       return;
     }
@@ -298,31 +291,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     // a different model may be usable; out of credit is account-wide and stays
     if (lastProblem.get(id)?.includes("can't use that model")) lastProblem.delete(id);
     json(res, 200, await connections());
-    return;
-  }
-
-  /* OpenRouter's one-click sign-in: the page sends back the code, and the key
-     is fetched and kept here — like every key on the PC, it never reaches the
-     browser. */
-  if (p === "/api/connections/openrouter/oauth" && req.method === "POST") {
-    const body = await readJson<{ code?: string; verifier?: string; method?: string }>(req);
-    if (!body?.code || !body.verifier) {
-      json(res, 400, { error: "missing_code", message: "The sign-in didn't come back complete. Press Connect again." });
-      return;
-    }
-    try {
-      const key = await exchangeOpenRouterCode(body.code, body.verifier, body.method === "plain" ? "plain" : "S256");
-      const v = await validate("openrouter", key, true);
-      if (!v.ok) {
-        json(res, 400, { error: "invalid_key", message: v.message });
-        return;
-      }
-      await setKey("openrouter", key);
-      if (!getModel("openrouter") && v.models[0]) await setModel("openrouter", v.models[0]);
-      json(res, 200, await connections());
-    } catch (err) {
-      json(res, 400, { error: "oauth_failed", message: err instanceof Error ? err.message : String(err) });
-    }
     return;
   }
 
@@ -390,13 +358,13 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     return;
   }
 
-  /* ---- speech to text ---- */
+  /* ---- hearing: through the active service ---- */
   if (p === "/api/transcribe" && req.method === "POST") {
-    if (!transcriptionAvailable()) {
-      const message = hearing.state === "loading"
-        ? "My hearing is still loading, sir — a moment, or type instead."
-        : "My hearing couldn't load on this machine. Connect ChatGPT in Config and I'll transcribe through it.";
-      json(res, 503, { error: "no_transcriber", message });
+    const conn = await connections();
+    const id = conn.active;
+    const c = id ? await connected(id) : null;
+    if (!id || !c || !c.catalogue.hearing.length) {
+      json(res, 503, { error: "no_hearing", message: "I've no way to hear you yet, sir — connect Gemini or ChatGPT in Configuration, or type instead." });
       return;
     }
     let audio: Buffer;
@@ -410,59 +378,79 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       json(res, 200, { text: "" });
       return;
     }
+    const model = c.catalogue.hearing[0]!;
     const t0 = Date.now();
     try {
-      const out = await transcribe(audio, String(req.headers["content-type"] ?? "audio/webm"));
-      console.log(`[hear] ${out.model} ${((Date.now() - t0) / 1000).toFixed(2)}s "${out.text.slice(0, 60)}"`);
-      json(res, 200, { text: out.text });
+      const text = await serviceFor(id).hear(c.key, model, new Blob([audio], { type: String(req.headers["content-type"] ?? "audio/webm") }));
+      console.log(`[hear] ${id} ${model} ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 60)}"`);
+      json(res, 200, { text });
     } catch (err) {
-      // through OpenAI: its errors in plain words; the local hearing's are already plain
-      const message = resolveKey("openai") ? humanise("openai", err) : err instanceof Error ? err.message : String(err);
-      console.error("[hear]", message);
-      json(res, 502, { error: "transcribe_failed", message });
+      const message = humanise(id, err);
+      console.error(`[hear] ${id}: ${message}`);
+      json(res, 502, { error: "hear_failed", message });
     }
     return;
   }
 
-  /* ---- speech ---- */
+  /* ---- speech: through a service, or the PC's own voice ---- */
   if (p === "/api/speak" && req.method === "POST") {
-    if (kokoro.state !== "ready") {
-      json(res, 503, { error: kokoro.state === "loading" ? "model_loading" : "model_failed" });
-      return;
-    }
     const body = await readJson<SpeakRequest>(req);
     if (!body) {
       json(res, 400, { error: "bad_json" });
       return;
     }
     const text = String(body.text ?? "").trim().slice(0, 800);
-    const voice = String(body.voice ?? DEFAULT_VOICE);
     const speed = Math.min(1.4, Math.max(0.6, Number(body.speed) || 1));
     if (!text) {
       json(res, 400, { error: "empty_text" });
       return;
     }
-    if (!hasVoice(voice)) {
+    const t0 = Date.now();
+    const send = (wav: ArrayBuffer | Buffer, who: string): void => {
+      console.log(`[speak] ${who} ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 48)}${text.length > 48 ? "…" : ""}"`);
+      const bytes = Buffer.isBuffer(wav) ? wav : Buffer.from(wav);
+      res.writeHead(200, { "content-type": "audio/wav", "content-length": bytes.length, "cache-control": "no-store" });
+      res.end(bytes);
+    };
+
+    if (body.via === "kokoro") {
+      if (kokoro.state !== "ready") {
+        json(res, 503, { error: kokoro.state === "loading" ? "model_loading" : "model_failed" });
+        return;
+      }
+      const voice = String(body.voice ?? DEFAULT_VOICE);
+      if (!hasVoice(voice)) {
+        json(res, 400, { error: "unknown_voice" });
+        return;
+      }
+      if (voice !== getKokoroVoice()) void setKokoroVoice(voice);
+      try {
+        send(await synthesize(text, voice, speed), voice);
+      } catch (err) {
+        console.error("[kokoro] synthesis failed:", err);
+        json(res, 500, { error: "synthesis_failed" });
+      }
+      return;
+    }
+
+    if (!isProviderId(body.via)) {
       json(res, 400, { error: "unknown_voice" });
       return;
     }
-    if (voice !== getVoice()) void setVoice(voice);
-
-    const t0 = Date.now();
+    const c = await connected(body.via);
+    const model = c?.catalogue.speech[0];
+    if (!c || !model) {
+      json(res, 503, { error: "no_voice", message: `${PROVIDERS[body.via].name} can't speak from here.` });
+      return;
+    }
+    // the voice chosen in Configuration → Voice, or the service's first if it isn't one of this service's
+    const voice = c.catalogue.voices.some((v) => v.id === body.voice) ? body.voice : c.catalogue.voices[0]?.id ?? "";
     try {
-      const wav = await synthesize(text, voice, speed);
-      console.log(
-        `[speak] ${voice} ${((Date.now() - t0) / 1000).toFixed(2)}s "${text.slice(0, 48)}${text.length > 48 ? "…" : ""}"`,
-      );
-      res.writeHead(200, {
-        "content-type": "audio/wav",
-        "content-length": wav.length,
-        "cache-control": "no-store",
-      });
-      res.end(wav);
+      send(await serviceFor(body.via).speak(c.key, model, text, voice, speed), `${body.via} ${voice}`);
     } catch (err) {
-      console.error("[kokoro] synthesis failed:", err);
-      json(res, 500, { error: "synthesis_failed" });
+      const message = humanise(body.via, err);
+      console.error(`[speak] ${body.via}: ${message}`);
+      json(res, 502, { error: "speak_failed", message });
     }
     return;
   }
@@ -483,16 +471,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
       json(res, 503, { error: "no_provider", message: "No reasoning core is connected." });
       return;
     }
-    const resolved = resolveKey(id);
-    if (!resolved) {
-      json(res, 503, { error: "no_key", message: `${PROVIDERS[id].name} has no key.` });
+    const c = await connected(id);
+    if (!c) {
+      json(res, 503, { error: "no_key", message: `${PROVIDERS[id].name} isn't connected.` });
       return;
     }
-    const model = await activeModelFor(id);
-    if (!model) {
-      json(res, 503, { error: "no_model", message: `No model selected for ${PROVIDERS[id].name}.` });
-      return;
-    }
+    const model = c.model;
 
     // Live readings ride along with the newest question only, never the history.
     const turns = prepareTurns(body.turns, body.context);
@@ -521,7 +505,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
 
     try {
       send({ t: "status", status: "thinking" });
-      await adapterFor(id).stream(resolved.key, model, turns, send, ac.signal, personaFor(body.address === "madam" ? "madam" : "sir"));
+      await serviceFor(id).chat(c.key, model, turns, send, ac.signal, personaFor(body.address === "madam" ? "madam" : "sir"));
       console.log(
         `[${id}] ${model} ${((Date.now() - t0) / 1000).toFixed(1)}s ${wrote} chars${searched ? " (web)" : ""}`,
       );
@@ -617,8 +601,8 @@ server.listen(PORT, () => {
   // remain on demand, so the network is not polled continuously.
   void runScan(gateway()).catch((e: unknown) => console.error("[scan]", e));
 
-  // the voice first, then the hearing: both load in the background, once
-  void loadKokoro().then(() => loadHearing());
+  // the PC's own voice loads in the background, once
+  void loadKokoro();
 });
 
 process.on("SIGINT", () => {

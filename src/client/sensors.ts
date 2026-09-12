@@ -255,10 +255,8 @@ let battery: BatteryReading | null = null;
 
 const SERVICES: { name: string; role: string; probe: Probe; self?: boolean }[] = [
   { name: location.hostname.endsWith("github.io") ? "GitHub Pages" : location.host, role: "serves this page", probe: PAGE, self: true },
-  { name: "ChatGPT", role: "reasoning core · OpenAI", probe: { url: "https://api.openai.com/healthz" } },
-  // Claude's API has no address that answers without a key; anthropic.com is served from the same front door
-  { name: "Claude", role: "reasoning core · Anthropic", probe: { url: "https://www.anthropic.com/robots.txt" } },
   { name: "Gemini", role: "reasoning core · Google", probe: { url: "https://generativelanguage.googleapis.com/generate_204" } },
+  { name: "ChatGPT", role: "reasoning core · OpenAI", probe: { url: "https://api.openai.com/healthz" } },
   { name: "Open-Meteo", role: "weather", probe: { url: "https://api.open-meteo.com/v1/forecast?latitude=0&longitude=0", read: true } },
   { name: "GeoJS", role: "where you are, by IP", probe: { url: "https://get.geojs.io/v1/ip.json", read: true } },
   { name: "Cloudflare", role: "reference · 1.1.1.1 resolver", probe: CLOUDFLARE },

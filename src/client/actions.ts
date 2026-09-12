@@ -3,6 +3,7 @@
  */
 
 import type { ProviderId, ScanResponse, TelemetryResponse, VoiceOption, WorldResponse } from "../shared/types.js";
+import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
 import {
   NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type Action, type ConfigTab, type ParseContext, type ProviderWord,
@@ -35,7 +36,7 @@ import { setDrawer } from "./drawer.js";
  * ===================================================================== */
 
 export function coreLabel(p: ProviderWord): string {
-  return (p === "openrouter" ? "OpenRouter" : p === "openai" ? "ChatGPT" : p === "anthropic" ? "Claude" : "Gemini")
+  return PROVIDERS[p].name;
 }
 
 export function findVoice(name: string): VoiceOption | null {
@@ -356,11 +357,8 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
 /* ---- API keys typed into the chat never reach a model ---- */
 
 export const KEY_PATTERNS: [ProviderId, RegExp][] = [
-  // before OpenAI's: an OpenRouter key starts sk- too
-  ["openrouter", /\bsk-or-v1-[A-Za-z0-9]{20,}\b/],
-  ["anthropic", /\bsk-ant-[A-Za-z0-9_-]{20,}\b/],
-  ["openai", /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b/],
   ["gemini", /\bAIza[0-9A-Za-z_-]{30,}\b/],
+  ["openai", /\bsk-(?:proj-|svcacct-)?[A-Za-z0-9_-]{20,}\b/],
 ];
 
 /** If the text contains an API key, store it locally and keep it out of the conversation. */

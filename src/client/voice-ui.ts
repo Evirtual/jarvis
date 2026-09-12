@@ -23,9 +23,7 @@ import { T } from "./readings.js";
 import { submit } from "./ask.js";
 import { closeMenus, menuOpen } from "./deck.js";
 import { setDrawer } from "./drawer.js";
-import { SERVERLESS } from "./server.js";
-import { loadNeural, neuralError, neuralPct, neuralState, neuralVoices, onNeuralChange, resumeNeural } from "./browser-voice.js";
-import { hearingError, hearingPct, hearingState, loadHearing, onHearingChange, resumeHearing } from "./browser-hearing.js";
+import { PROVIDERS } from "../shared/services/index.js";
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
@@ -73,61 +71,6 @@ voice.onState = (): void => {
   note.textContent = d.text;
   renderVoiceSelect();
 };
-/* ---------------------------------------------------------------------
- * The web version's neural voice: downloaded on request, then the same
- * Kokoro voices as on the PC (browser-voice.ts).
- * --------------------------------------------------------------------- */
-
-function paintNeural(): void {
-  const btn = $<HTMLButtonElement>("neuralBtn");
-  const note = $("neuralNote");
-  btn.hidden = neuralState === "ready" || neuralState === "loading";
-  if (neuralState === "loading") note.textContent = `Downloading JARVIS's voice — ${neuralPct}%. You can keep going; he'll switch when it's ready.`;
-  else if (neuralState === "ready") note.textContent = "JARVIS's own voice runs on this device — Kokoro, the same as on the PC. It works offline.";
-  else if (neuralState === "failed") {
-    note.textContent = `The voice couldn't load here (${neuralError ?? "unknown"}), so he's using this device's voices.`;
-    btn.textContent = "Try again";
-  }
-}
-
-if (SERVERLESS) {
-  let was = neuralState;
-  onNeuralChange(() => {
-    paintNeural();
-    if (neuralState === "ready" && was !== "ready") {
-      voice.setServerVoices(neuralVoices(), true);
-      renderVoiceSelect();
-      sys("Neural voice online — Kokoro-82M, on this device.");
-    }
-    was = neuralState;
-  });
-  $("neuralBtn").addEventListener("click", () => { voice.markUserActed(); loadNeural(); });
-  paintNeural();
-  void resumeNeural();
-
-  // …and its hearing, the same way
-  const paintHearing = (): void => {
-    const btn = $<HTMLButtonElement>("hearingBtn");
-    const note = $("hearingNote");
-    btn.hidden = hearingState === "ready" || hearingState === "loading";
-    if (hearingState === "loading") note.textContent = `Downloading JARVIS's hearing — ${hearingPct}%.`;
-    else if (hearingState === "ready") note.textContent = "JARVIS hears you on this device — Moonshine, the same as on the PC. Nothing you say leaves it unless ChatGPT is connected.";
-    else if (hearingState === "failed") { note.textContent = `His hearing couldn't load here (${hearingError ?? "unknown"}).`; btn.textContent = "Try again"; }
-  };
-  let heard = hearingState;
-  onHearingChange(() => {
-    paintHearing();
-    if (hearingState === "ready" && heard !== "ready") {
-      voice.setServerTranscription(true); // record and transcribe here, rather than the browser's dictation
-      sys("Hearing online — Moonshine, on this device. Tap me and speak, sir.");
-    }
-    heard = hearingState;
-  });
-  $("hearingBtn").addEventListener("click", () => { voice.markUserActed(); loadHearing(); });
-  paintHearing();
-  void resumeHearing();
-}
-
 voice.onRecognised = (text, final): void => {
   if (typing_) { input.value = text; return; }
   if (final && text) setTimeout(() => submit(text), 120);
@@ -219,7 +162,7 @@ export function renderVoiceSelect(): void {
   voiceSel.replaceChildren();
   if (voice.voiceOptions.length) {
     const g = document.createElement("optgroup");
-    g.label = "Neural · Kokoro-82M (local)";
+    g.label = voice.via === "kokoro" ? "Neural · Kokoro, on this PC" : `Neural · through ${PROVIDERS[voice.via].name}`;
     for (const v of voice.voiceOptions) {
       const o = document.createElement("option");
       o.value = `k:${v.id}`;

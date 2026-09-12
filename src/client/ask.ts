@@ -86,7 +86,7 @@ export function appSnapshot(): string {
   if (ws.archived.length) out.push(`Put away (restorable): ${ws.archived.slice(0, 8).map((t) => `“${t.title} #${threadRef(t)}”`).join(", ")}.`);
   out.push(
     `Setup: layout ${mode}; open panels: ${panels.openNames.length ? panels.openNames.join(", ") : "none"}; ` +
-    `voice ${voice.engine === "kokoro" ? `Kokoro ${voice.voiceOptions.find((v) => v.id === voice.kokoroVoice)?.name ?? voice.kokoroVoice}` : "browser"}, speed ${voice.rateValue.toFixed(2)}, spoken replies ${voice.enabled ? "on" : "off"}; ` +
+    `voice ${voice.engine === "neural" ? `neural ${voice.voiceOptions.find((v) => v.id === voice.neuralVoice)?.name ?? voice.neuralVoice}` : "browser"}, speed ${voice.rateValue.toFixed(2)}, spoken replies ${voice.enabled ? "on" : "off"}; ` +
     `reasoning core ${conn.activeName()}${conn.activeModel() ? ` (${conn.activeModel()})` : ""}; connected: ${conn.readyNames().join(", ") || "none"}.]`,
   );
   return out.join("\n");
@@ -331,7 +331,7 @@ export async function ask_(t: string): Promise<void> {
   if (localCommand(t)) return;
   if (conn.anyReady) await askCore(t, thread);
   else {
-    jarvis("That needs a reasoning core, sir, and none is connected. Open Config and connect OpenRouter in one click — it has free models — or paste a key right here in the chat.");
+    jarvis("That needs a reasoning core, sir, and none is connected. Open Config and connect Gemini — it's free — or paste a key right here in the chat.");
     setDrawer(true, "connections");
   }
 }

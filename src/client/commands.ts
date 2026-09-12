@@ -16,7 +16,7 @@
 
 import { PANEL_NAMES, type PanelName } from "./panels.js";
 
-export type ProviderWord = "openrouter" | "openai" | "anthropic" | "gemini";
+export type ProviderWord = "gemini" | "openai";
 export type ConfigTab = "connections" | "voice" | "quick";
 
 export type Action =
@@ -70,9 +70,7 @@ export const NO_CONTEXT: ParseContext = { knowsThread: () => false, knowsGroup: 
 
 const CORE_NAMES: Record<string, ProviderWord> = {
   chatgpt: "openai", "open ai": "openai", openai: "openai", gpt: "openai",
-  claude: "anthropic", anthropic: "anthropic",
   gemini: "gemini", google: "gemini",
-  openrouter: "openrouter", "open router": "openrouter",
 };
 
 export function coreFrom(word: string): ProviderWord | null {
@@ -100,13 +98,13 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   }
   // Reasoning core. Checked before thread switching so "switch to Gemini"
   // is never read as a thread called Gemini.
-  const core = /\b(?:switch|change|use|talk|go|move)\b(?:\s+\w+){0,3}?\s+(?:to|with|via|over to)?\s*(open ?router|chatgpt|open ?ai|gpt|claude|anthropic|gemini|google)\b(?!\s+code)|\buse\s+(open ?router|chatgpt|claude|gemini)\b(?!\s+code)/.exec(q);
+  const core = /\b(?:switch|change|use|talk|go|move)\b(?:\s+\w+){0,3}?\s+(?:to|with|via|over to)?\s*(chatgpt|open ?ai|gpt|gemini|google)\b(?!\s+code)|\buse\s+(chatgpt|gemini)\b(?!\s+code)/.exec(q);
   if (core) {
     const p = coreFrom(core[1] ?? core[2] ?? "");
     if (p) return { name: "switch_core", provider: p };
   }
 
-  const model = /\b(?:use|switch to|set)\s+(?:the\s+)?(?:model\s+)?((?:gpt|o\d|claude|gemini)-[\w.-]+)/.exec(q);
+  const model = /\b(?:use|switch to|set)\s+(?:the\s+)?(?:model\s+)?((?:gpt|o\d|gemini)-[\w.-]+)/.exec(q);
   if (model?.[1]) return { name: "set_model", model: model[1] };
 
   // Config — before the voice rules, so "open voice settings" is never read as

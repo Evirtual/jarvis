@@ -196,39 +196,42 @@ click; otherwise answers name their sources in words. Links are never read aloud
 Open **Config → Connections**. Each service is a card that tells you what it is,
 what it costs, and what to do — with the key page one tap away.
 
-| Service | Cost |
-| --- | --- |
-| **OpenRouter** | **Free models, no card, one click.** Press **Connect with OpenRouter**, sign in (or make a free account) and you're sent back connected — no key to copy. It starts on `openrouter/free`, which picks whichever free model is up. 50 questions a day, 20 a minute (1,000 a day once the account has ever bought $10 of credit); hundreds of paid models too, from OpenRouter credit. No web search on it — JARVIS says so rather than guessing. |
-| **Gemini** | **Free tier, no credit card.** Flash models, ~1,500 requests a day. Google may use free-tier data to improve their models. |
-| ChatGPT | Pay per token. Separate from a ChatGPT Plus subscription. |
-| Claude | Pay per token. Separate from a Claude Pro subscription. |
+One key does everything: the service that answers also **hears** you (the
+microphone recording goes to it) and, in the web version, **speaks** for him.
 
-OpenRouter's one click is OAuth with PKCE: the code OpenRouter sends back is
-turned into a key by the server (on the PC) or by the page (in the web version),
-so there is never a key to find or paste. For the others, paste a key, press
-Connect, and it is validated immediately — then you pick the
+| Service | What it gives | Cost |
+| --- | --- | --- |
+| **Gemini** | answers with Google Search, hearing, a voice | **Free tier, no credit card** — hundreds of questions a day on the Flash models, the voice included. Google may use free-tier data to improve their models. |
+| ChatGPT | answers with web search, hearing, the most natural voice | A small prepaid credit on platform.openai.com; an hour of talking is well under a dollar. Separate from ChatGPT Plus, which doesn't cover it. |
+
+Paste a key, press Connect, and it is validated immediately — then you pick the
 model from **your account's real list**, so a retired model can never silently
-break the console. Keys are stored in `config.json` on this machine, `chmod 600`,
-and are never sent to the browser; the screen only ever shows a masked tail.
+break the console. The newest model the account offers is chosen by default, for
+every job: answers, hearing and speech. Keys are stored in `config.json` on this
+machine, `chmod 600`, and are never sent to the browser; the screen only ever
+shows a masked tail.
 
-An existing `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` or
-`GEMINI_API_KEY` in the environment is picked up automatically and labelled with
-the variable's name. **Disconnect** on such a key makes JARVIS ignore it from then
-on (remembered in `config.json`) — the variable itself is left alone for other
-programs — until a key is connected again.
+An existing `GEMINI_API_KEY` or `OPENAI_API_KEY` in the environment is picked up
+automatically and labelled with the variable's name. **Disconnect** on such a key
+makes JARVIS ignore it from then on (remembered in `config.json`) — the variable
+itself is left alone for other programs — until a key is connected again.
 
 If a service stops answering, JARVIS says why in plain words: a rejected key, a
 model this account can't use, or an account that is **out of credit** — which is
 account-wide, so picking a different model of the same service won't help (add
-credit on its billing page, or switch to OpenRouter's or Gemini's free models). The provider's own
+credit on its billing page, or switch to Gemini's free tier). When another
+service is connected he answers through it instead, and says so. The provider's own
 error is written to the server console for diagnosis; keys never appear in it.
 The service's card in Connections shows the same problem under its name — a key
 can list models perfectly well on an account that can't answer — until the next
 answer gets through.
 
-> **On subscriptions.** A ChatGPT Plus or Claude Pro plan does not include API
-> access — they are separate products. OpenRouter's free models and Gemini's free
-> tier are the honest answer if you want AI without per-token billing.
+> **On subscriptions.** A ChatGPT Plus or Claude plan does not include API
+> access — they are separate products, and a program on your own PC is no
+> exception. Gemini's free tier is the honest answer if you want him without
+> per-use billing. Claude has no speech or hearing, so it isn't a chat
+> connection here; it returns in code mode (`docs/PLAN-code-mode.md`), where a
+> Claude subscription does count.
 
 ## The voice
 
@@ -244,11 +247,16 @@ starts playing while the rest is still generating, and repeated lines are cached
 rougher. Default `q8`. If the model fails to load, the console says so and falls
 back to your browser's own voices rather than going silent.
 
-With ChatGPT connected, the mic records in the page and the server transcribes it
-with `gpt-4o-mini-transcribe`, primed with the console's vocabulary so voice
-names and commands come back spelled right. Recording stops by itself about a
-second after you stop talking, and never runs while JARVIS is speaking — so he
-can't hear himself.
+In the web version there is no server to run Kokoro, so the connected service
+speaks instead — Gemini's or ChatGPT's voices, each told to sound like a calm
+British butler — and you pick among them under **Config → Voice** as on the PC.
+
+Hearing is the connected service's, everywhere: the mic records in the page and
+the recording goes to Gemini or ChatGPT, primed with the console's vocabulary so
+voice names and commands come back spelled right. Recording stops by itself
+about a second after you stop talking, and never runs while JARVIS is speaking —
+so he can't hear himself. With nothing connected, the browser's own dictation is
+used where it exists (Brave has none).
 
 ## Everything by conversation
 
@@ -349,7 +357,7 @@ What differs is where the work happens:
 
 - **Keys** are pasted into Configuration → Connections as on the PC, but kept in
   that browser on that device, and sent only to the service they belong to
-  (OpenAI, Anthropic or Google), which all accept calls straight from a web page.
+  (Google or OpenAI), which both accept calls straight from a web page.
   The published page carries a Content Security Policy that lets it talk to
   those services and nothing else. Use a key with a spending limit, and
   **Disconnect** removes it from the device.
@@ -361,28 +369,20 @@ What differs is where the work happens:
   | Compute | CPU per core | how much slower a fixed task runs than at its quickest (a background worker, 20 ms every 2 s), cores, app memory |
   | Graphics | GPU load, temperature, power | the adapter the browser names, frame rate against the display's refresh rate, screen, colour |
   | Storage | disks | what the app keeps on the device, and what the browser allows it |
-  | Perimeter | devices on your network | the services JARVIS relies on — ChatGPT, Claude, Gemini, the weather, this page's host — placed on the radar by measured round trip |
+  | Perimeter | devices on your network | the services JARVIS relies on — Gemini, ChatGPT, the weather, this page's host — placed on the radar by measured round trip |
   | Uplink | Wi-Fi, gateway, throughput | the connection as the browser reports it, measured round trips, public IP and provider (GeoJS) |
   | Environment | weather where the IP says | the same, or where GPS says once you press **Use GPS** |
 
   The battery ring shows the real battery where the browser shares it (not on
   iPhone). Readings pause while the page is out of sight.
-- **Hearing**: speech to text without a key — JARVIS's own hearing
-  (Moonshine Base, about 63 MB, once: Configuration → Voice → **Download
-  JARVIS's hearing**), run in a worker; a short command comes back in about a
-  fifth of a second. Brave has no dictation of its own, so there it is the only
-  way to talk to him without a ChatGPT key. On the PC the server runs the same
-  model, downloaded once at first start. A connected ChatGPT key is still used
-  first (a little more accurate, and it knows the console's own words).
-- **Voice**: the same Kokoro voices as on the PC, run in the browser —
-  Configuration → Voice → **Download JARVIS's voice** (about 92 MB, once; the
-  browser keeps it and it works offline). Until then, and on a device that
-  can't run it, he speaks with the device's own voices. It runs in a worker,
-  so it never costs the page a frame. On Chrome, Edge and Brave the page is
-  made cross-origin isolated by its service worker, which lets the voice use
-  several cores — about real time on a laptop (roughly twice as long where
-  only one core is allowed: Safari, Firefox). The speech engine's files are
-  served with the page, not from a CDN.
+- **Voice and hearing** come from the connected service, the same as its
+  answers: nothing is downloaded and nothing runs in the browser, so a phone
+  is as quick as a laptop. Sentences are requested as they arrive and played
+  back to back, so he starts within about a second. (A model running in the
+  browser was tried first — Kokoro and Moonshine in workers — and was five to
+  ten times too slow on a phone or in Brave to be worth keeping.) With nothing
+  connected he speaks with the device's own voices, and listens through the
+  browser's dictation where it has one.
 
 A custom domain: set the repository variable `JARVIS_SITE_URL` (so the page
 is built for `/` rather than `/jarvis/`) and add the domain under
@@ -418,12 +418,9 @@ the types are broken.
 | `src/client/deck.ts` | The deck and title row: readings, More sheets, the phone/desktop switch |
 | `src/client/readings.ts` | Painting the live readings, and receiving them — over one pushed stream on the PC, from the browser's own sensors on the web |
 | `src/client/server.ts` | Which of the two it is: the PC with its server, or the web page on its own (`VITE_JARVIS_SERVERLESS`) |
-| `src/client/browser-core.ts` | The web version's back end: keys kept on the device, the same connections, asking and transcription the server offers |
+| `src/client/browser-core.ts` | The web version's back end: keys kept on the device, and the same connections, asking, hearing and speech the server offers |
 | `src/client/sensors.ts` | The web version's instruments: what a browser can genuinely measure of its device |
-| `src/client/browser-voice.ts`, `voice-worker.ts` | The web version's neural voice: Kokoro downloaded on request and run in a worker |
-| `src/client/browser-hearing.ts`, `hearing-worker.ts` | The web version's hearing: Moonshine downloaded on request and run in a worker |
-| `src/shared/hearing.ts`, `src/client/audio.ts` | The hearing model, and recordings turned into the 16 kHz WAV every transcriber here takes |
-| `src/shared/voices.ts` | The Kokoro voices and the WAV writer, for the server and the browser |
+| `src/shared/voices.ts` | The Kokoro voices and the WAV writer, for the PC's own voice |
 | `src/client/say.ts` | How JARVIS speaks to you: notices, lines in a window, his status word, busy |
 | `src/client/ask.ts` | The command line, the queue, what the core is told, the streamed answer |
 | `src/client/actions.ts` | Carrying out every action, by you or by the core's directives |
@@ -440,16 +437,17 @@ the types are broken.
 | `src/client/icons.ts` | Every drawn icon, once: title-bar buttons and the instrument pictures |
 | `src/client/address.ts` | Sir or ma'am, and turning the console's own lines round to match |
 | `src/client/styles.css` | Ends with the two shared materials, `.glass` (every box) and `.veil` (behind anything modal); use the class rather than restyling an element |
-| `src/shared/providers.ts` | The three reasoning cores behind one interface — used by the server, and by the browser in the web version |
+| `src/shared/services/` | The two services behind one interface — `common.ts` (the interface, the persona, the helpers), `gemini.ts`, `openai.ts` — each answering, hearing and speaking; used by the server, and by the browser in the web version |
 | `src/shared/weather.ts` | The weather from open-meteo, for both |
-| `src/server/` | HTTP, credential store, validation cache, telemetry, scan, world, Kokoro |
+| `src/server/` | HTTP, credential store, the services with a validation cache, telemetry, scan, world, Kokoro |
 | `tests/` | Node's test runner over the pure modules |
 | `src/client/public/` | The logo (`icon.svg`, JARVIS's core simplified), app icons, manifest, the do-nothing service worker that makes it installable, robots and sitemap |
 | `scripts/icons.mjs` | Renders every icon size and the social preview image from `icon.svg` — run it after changing the logo |
 | `.github/workflows/ci.yml` | Typecheck, tests and build on every push and pull request |
 | `.github/workflows/pages.yml` | Publishes the web version to GitHub Pages on every push to `main` |
 | `docs/QA.md` | The manual test plan: every feature, its steps and edge cases, and a log of each run |
-| `docs/PLAN-code-mode.md` | The plan for the next big feature: a code mode driven by the Claude Agent SDK or the Codex SDK |
+| `docs/PLAN-connection-core.md` | Why one connected service now does everything, and what that replaced |
+| `docs/PLAN-code-mode.md` | The plan for the next big feature: a code mode driven by Claude Code or Codex on the PC |
 
 **What the tests cover:** migrations (including bringing an older save forward
 without losing a message), creating and branching threads, grouping and

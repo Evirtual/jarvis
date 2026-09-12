@@ -1,25 +1,25 @@
 /**
  * Speech, in and out.
  *
- * Out: Kokoro from the local server, the browser's own voices as a fallback.
- * Replies are split into sentences, synthesised in parallel, decoded, and
- * scheduled back-to-back on the audio clock — one continuous voice, with the
- * first sentence playing while the rest are still being generated.
+ * Out: the neural voice — the connected service's, or on the PC its own
+ * Kokoro (`via`) — with the browser's own voices as a fallback. Replies are
+ * split into sentences, synthesised in parallel, decoded, and scheduled
+ * back-to-back on the audio clock: one continuous voice, with the first
+ * sentence playing while the rest are still being made.
  *
- * In: when ChatGPT is connected, the page records the microphone and the server
- * transcribes it. That avoids Chrome's dictation, which quietly depends on
- * Google's speech service and fails with "network" when that is unreachable.
- * The Web Speech API remains as a fallback, and the text field always works.
+ * In: the page records the microphone and the connected service turns it
+ * into text. That avoids Chrome's dictation, which quietly depends on
+ * Google's speech service (and which Brave doesn't have). Dictation remains
+ * as a fallback, and the text field always works.
  */
 
-import type { VoiceOption } from "../shared/types.js";
+import type { SpeakVia, VoiceOption } from "../shared/types.js";
+import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
 import { addressed } from "./address.js";
 import { recall, store } from "./dom.js";
-import { toWav16k } from "./audio.js";
-import { SERVERLESS } from "./server.js";
 
-type Engine = "kokoro" | "system";
+type Engine = "neural" | "system";
 
 const GB_MALE = /(george|ryan|thomas|oliver|arthur|daniel|james|brian|guy|edward|male)/i;
 const FEMALE = /(zira|hazel|susan|libby|sonia|maisie|olivia|female|samantha|karen|moira|tessa|fiona|catherine|aria|jenny)/i;
@@ -53,9 +53,7 @@ const AudioCtor = (): typeof AudioContext | undefined =>
 
 
 /** When the browser can't take dictation (Brave has none; Chrome's needs Google's service). */
-const NO_DICTATION = SERVERLESS
-  ? "This browser can't take dictation, sir. Download my hearing in Configuration → Voice — about 63 MB, once — and I'll listen myself."
-  : "This browser can't take dictation, and my own hearing is still loading, sir — a moment, or type instead.";
+const NO_DICTATION = "This browser can't take dictation, sir. Connect Gemini or ChatGPT in Configuration and I'll hear you through it — or type instead.";
 
 /**
  * Where the speech in a generated piece starts and ends, in seconds: the
@@ -78,8 +76,10 @@ function speechBounds(buf: AudioBuffer): { start: number; end: number } {
 export class Voice {
   enabled = true;
   engine: Engine = "system";
-  kokoroVoice = "bm_george";
-  kokoroReady = false;
+  /** Who makes the neural voice: the PC's own Kokoro, or the connected service (main.ts decides). */
+  via: SpeakVia = "kokoro";
+  neuralVoice = "bm_george";
+  neuralReady = false;
   listening = false;
   transcribing = false;
   speaking = false;
@@ -139,7 +139,7 @@ export class Voice {
   setRate(v: number): void { this.rate = v; store("jarvis.rate", String(v)); }
   markUserActed(): void { this.userActed = true; }
 
-  /** Turn on recorded-and-transcribed input when the server can do it. */
+  /** Turn on recorded-and-heard input when a connected service can hear. */
   setServerTranscription(on: boolean): void {
     if (this.serverStt === on) return;
     this.serverStt = on;
@@ -151,13 +151,14 @@ export class Voice {
   setServerVoices(list: VoiceOption[], ready: boolean): void {
     const first = this.serverVoices.length === 0 && list.length > 0;
     this.serverVoices = list;
-    this.kokoroReady = ready;
+    this.neuralReady = ready;
     this.refreshSystemList();
-    if (!first && this.engine === "kokoro") return; // don't re-pick on every poll
+    if (!first && this.engine === "neural") return; // don't re-pick on every poll
     const saved = recall("jarvis.voice");
     if (!saved || !this.select(saved, true)) {
       if (list.length) this.select(`k:${list[0]!.id}`, true);
       else if (this.systemList[0]) this.select(`s:${this.systemList[0].name}`, true);
+      else this.onState?.(); // nothing to pick: say so, rather than "scanning" forever
     }
   }
 
@@ -168,13 +169,13 @@ export class Voice {
     if (!this.systemVoice) this.systemVoice = this.systemList[0] ?? null;
   }
 
-  /** `k:<kokoro id>` or `s:<system voice name>`. */
+  /** `k:<neural id>` or `s:<system voice name>`. */
   select(value: string, quiet = false): boolean {
     if (value.startsWith("k:")) {
       const id = value.slice(2);
       if (!this.serverVoices.some((v) => v.id === id)) return false;
-      this.engine = "kokoro";
-      this.kokoroVoice = id;
+      this.engine = "neural";
+      this.neuralVoice = id;
     } else if (value.startsWith("s:")) {
       const pick = this.systemList.find((v) => v.name === value.slice(2));
       if (!pick) return false;
@@ -188,14 +189,15 @@ export class Voice {
   }
 
   get selectionValue(): string {
-    return this.engine === "kokoro" ? `k:${this.kokoroVoice}` : `s:${this.systemVoice?.name ?? ""}`;
+    return this.engine === "neural" ? `k:${this.neuralVoice}` : `s:${this.systemVoice?.name ?? ""}`;
   }
 
   describe(): { text: string; warn: boolean } {
-    if (this.engine === "kokoro") {
-      const v = this.serverVoices.find((x) => x.id === this.kokoroVoice);
+    if (this.engine === "neural") {
+      const v = this.serverVoices.find((x) => x.id === this.neuralVoice);
+      const who = this.via === "kokoro" ? "Kokoro, on this PC — nothing leaves it" : `through ${PROVIDERS[this.via].name}`;
       return {
-        text: `Neural voice — Kokoro-82M · ${v?.name ?? this.kokoroVoice}${v ? ` (${v.note})` : ""}. Generated on this machine; nothing leaves it.`,
+        text: `Neural voice — ${v?.name ?? this.neuralVoice}${v ? ` (${v.note})` : ""}, ${who}.`,
         warn: false,
       };
     }
@@ -291,7 +293,7 @@ export class Voice {
     chain: Promise<void>;      // keeps sentences in order however fast synthesis finishes
     last: AudioBufferSourceNode | null;
     lastUtter: SpeechSynthesisUtterance | null;
-    kokoro: boolean;
+    neural: boolean;
     ended: boolean;
   } | null = null;
 
@@ -319,10 +321,10 @@ export class Voice {
   beginStream(): void {
     this.stop();
     if (!this.enabled || !this.userActed) return;
-    const kokoro = this.engine === "kokoro" && this.kokoroReady && this.graph() !== null;
+    const neural = this.engine === "neural" && this.neuralReady && this.graph() !== null;
     this.run = {
       id: this.seq, consumed: 0, chunks: 0, nextAt: 0,
-      chain: Promise.resolve(), last: null, lastUtter: null, kokoro, ended: false,
+      chain: Promise.resolve(), last: null, lastUtter: null, neural, ended: false,
     };
   }
 
@@ -372,10 +374,10 @@ export class Voice {
         this.run = null;
         this.sources = [];
         this.speaking = false;
-        if (r.kokoro) this.tone(false);
+        if (r.neural) this.tone(false);
         this.onState?.();
       };
-      if (r.kokoro) {
+      if (r.neural) {
         if (r.last) r.last.onended = finish;
         else finish();
       } else if (r.lastUtter) {
@@ -403,11 +405,11 @@ export class Voice {
     r.chunks += 1;
     if (first) {
       this.speaking = true;
-      if (r.kokoro) this.tone(true);
+      if (r.neural) this.tone(true);
       this.onState?.();
     }
 
-    if (!r.kokoro) {
+    if (!r.neural) {
       if (!this.synth) return;
       const u = new SpeechSynthesisUtterance(text);
       if (this.systemVoice) { u.voice = this.systemVoice; u.lang = this.systemVoice.lang; }
@@ -423,7 +425,7 @@ export class Voice {
     const { ac, bus } = g;
     const id = r.id;
     // Start synthesis now; play it once everything before it has been scheduled.
-    const audio = api.speak({ text, voice: this.kokoroVoice, speed: this.rate })
+    const audio = api.speak({ text, via: this.via, voice: this.neuralVoice, speed: this.rate })
       .then((b) => b.arrayBuffer())
       .then((ab) => ac.decodeAudioData(ab));
     audio.catch(() => undefined);
@@ -439,7 +441,7 @@ export class Voice {
           this.warned = true;
           this.onNotice?.("Neural voice unavailable — using a system voice.");
         }
-        r.kokoro = false;
+        r.neural = false;
         // hand this and any later sentences to the browser's voice
         const u = new SpeechSynthesisUtterance(text);
         if (this.systemVoice) u.voice = this.systemVoice;
@@ -508,7 +510,7 @@ export class Voice {
     this.micAnalyser = null;
   }
 
-  /** Record until you stop talking, then hand the audio to the server. */
+  /** Record until you stop talking, then hand the audio to the connected service. */
   private async startRecording(): Promise<void> {
     const stream = await this.openMic();
     if (!stream) return;
@@ -563,8 +565,7 @@ export class Voice {
     this.transcribing = true;
     this.onState?.();
     try {
-      // as 16 kHz WAV: the form every transcriber here takes (audio.ts)
-      const text = await api.transcribe(await toWav16k(blob).catch(() => blob));
+      const text = await api.transcribe(blob);
       if (text) this.onRecognised?.(text, true);
       else this.onNotice?.("I didn't catch that, sir.");
     } catch (err) {

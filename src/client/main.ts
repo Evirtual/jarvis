@@ -9,8 +9,8 @@
  *   panels.ts     the glass instrument panels
  *
  * Every figure on screen is measured. Local commands answer from those live
- * readings; anything else goes to whichever reasoning core is connected, with
- * a snapshot of the console and the readings attached.
+ * readings; anything else goes to whichever service is connected, with a
+ * snapshot of the console and the readings attached.
  */
 
 import "./styles.css";
@@ -29,7 +29,6 @@ import "./actions.js";
 import "./ask.js";
 import "./drawer.js";
 import { SERVERLESS } from "./server.js";
-import { finishOpenRouter } from "./oauth.js";
 
 /* ===================================================================== *
  * Boot
@@ -59,40 +58,55 @@ refreshLinks(false);
 if (mode === "desk") input.focus();
 paintHosts();
 
+/* ---------------------------------------------------------------------
+ * Who speaks. On the PC, its own voice (Kokoro, run by the server). On the
+ * web there is no server, so the connected service speaks — whichever is
+ * answering — and its voices are the ones offered in Configuration → Voice.
+ * --------------------------------------------------------------------- */
 
 let announced = false;
 async function pollStatus(): Promise<void> {
   try {
     const st = await api.status();
-    voice.setServerVoices(st.voices, st.kokoro === "ready");
-    voice.setServerTranscription(st.transcription);
-    renderVoiceSelect();
-    if (!announced && st.kokoro !== "loading") {
-      announced = true;
-      if (st.kokoro === "ready") sys("Neural voice online — Kokoro-82M, local.");
-      else sys(SERVERLESS ? "Speaking with this device's own voices." : "Neural voice unavailable — using browser voices.");
+    if (!SERVERLESS) {
+      voice.via = "kokoro";
+      voice.setServerVoices(st.kokoro.voices, st.kokoro.state === "ready");
+      renderVoiceSelect();
+      if (!announced && st.kokoro.state !== "loading") {
+        announced = true;
+        sys(st.kokoro.state === "ready" ? "Neural voice online — Kokoro, on this PC." : "My own voice couldn't load — using this device's voices.");
+      }
+      // the voice loads at start: keep asking until it's in
+      if (st.kokoro.state === "loading") setTimeout(() => void pollStatus(), 1500);
     }
-    // On the PC the voice and then the hearing load at start: keep asking until
-    // both are in. (The web version's screen follows its own downloads.)
-    if (!SERVERLESS && (st.kokoro === "loading" || st.hearing === "loading")) setTimeout(() => void pollStatus(), 1500);
   } catch {
     if (!SERVERLESS) sys("Console server unreachable.");
   }
 }
 
-conn.onChange = (): void => {
+conn.onChange = (c): void => {
   const name = conn.anyReady ? conn.activeName() : "none";
   $("openDrawer").classList.toggle("primary", !conn.anyReady);
   $("openDrawer").title = conn.anyReady ? "Configuration" : "Connect a service";
   document.title = `J.A.R.V.I.S. Console — ${name}`;
+  // the service that answers is the one that hears
+  voice.setServerTranscription(c.providers.some((p) => p.id === c.active && p.status.state === "ready" && p.status.hears));
+  if (SERVERLESS) {
+    const active = c.providers.find((p) => p.id === c.active);
+    const ready = active?.status.state === "ready" ? active.status : null;
+    const speaks = !!active && !!ready && ready.voices.length > 0;
+    voice.via = speaks ? active.id : "kokoro";
+    voice.setServerVoices(speaks ? ready.voices : [], speaks);
+    renderVoiceSelect();
+    if (!announced && speaks) {
+      announced = true;
+      sys(`Voice online — speaking through ${active.name}.`);
+    }
+  }
 };
 
 void pollStatus();
 startReadings();
-// Back from OpenRouter's sign-in? Finish connecting before saying anything about connections.
-void finishOpenRouter().then(async (back) => {
-  await conn.refresh();
-  if (back === "connected") sys("OpenRouter connected — its free models are ready. Ask me anything, sir.");
-  else if (back !== "none") sys(back);
-  else if (!conn.anyReady) sys("No reasoning core connected — open Config: OpenRouter connects in one click, with free models.");
+void conn.refresh().then(() => {
+  if (!conn.anyReady) sys("No service connected — open Config and connect Gemini: it's free, and gives me my voice and hearing.");
 });

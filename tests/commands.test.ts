@@ -51,8 +51,8 @@ test("switching needs a thread that exists; the core name wins over a thread nam
   assert.deepEqual(intentOf("select the Cambodia thread", ctx()), { name: "switch_thread", title: "cambodia" });
   assert.equal(intentOf("go back to Mars", ctx()), null);
   assert.deepEqual(intentOf("switch to Gemini", ctx()), { name: "switch_core", provider: "gemini" });
-  assert.deepEqual(intentOf("switch to OpenRouter", ctx()), { name: "switch_core", provider: "openrouter" });
-  assert.deepEqual(intentOf("use open router", ctx()), { name: "switch_core", provider: "openrouter" });
+  assert.deepEqual(intentOf("use chatgpt", ctx()), { name: "switch_core", provider: "openai" });
+  assert.deepEqual(intentOf("talk to open ai", ctx()), { name: "switch_core", provider: "openai" });
 });
 
 test("connecting and moving threads, and folding groups", () => {
@@ -79,8 +79,8 @@ test("close means archive; only an explicit phrase deletes", () => {
   assert.deepEqual(intentOf("restore the Cambodia thread", ctx()), { name: "restore_thread", title: "Cambodia" });
 });
 
-test("Claude remains a reasoning core", () => {
-  assert.deepEqual(intentOf("use claude", ctx()), { name: "switch_core", provider: "anthropic" });
+test("services that aren't connections are not cores", () => {
+  assert.equal(intentOf("use claude", ctx()), null);
 });
 
 test("yes and no only mean approve and deny while a confirmation is waiting", () => {

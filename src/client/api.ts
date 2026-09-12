@@ -66,11 +66,8 @@ const serverApi = {
     postJson<ConnectionsResponse>(`/api/connections/${id}/model`, { model }),
   setActive: (provider: ProviderId) =>
     postJson<ConnectionsResponse>("/api/connections/active", { provider }),
-  /** Finish OpenRouter's one-click sign-in: the server turns the code into a key and keeps it. */
-  connectOpenRouter: (code: string, verifier: string, method: "S256" | "plain") =>
-    postJson<ConnectionsResponse>("/api/connections/openrouter/oauth", { code, verifier, method }),
 
-  /** Recorded speech in, text out — transcribed server-side. */
+  /** Recorded speech in, text out — heard by the active service. */
   transcribe: async (audio: Blob): Promise<string> => {
     const r = await fetch("/api/transcribe", {
       method: "POST",
@@ -82,13 +79,17 @@ const serverApi = {
     return (body.text ?? "").trim();
   },
 
+  /** One line as WAV, spoken by a service or by the PC's own voice (`via`). */
   speak: async (body: SpeakRequest): Promise<Blob> => {
     const r = await fetch("/api/speak", {
       method: "POST",
       headers: { "content-type": "application/json", ...CONSOLE },
       body: JSON.stringify(body),
     });
-    if (!r.ok) throw new Error(`speak ${r.status}`);
+    if (!r.ok) {
+      const err = (await r.json().catch(() => ({}))) as { message?: string };
+      throw new Error(err.message ?? `speak ${r.status}`);
+    }
     return r.blob();
   },
 
@@ -156,7 +157,6 @@ const serverApi = {
     if (failure && !out) throw new Error(failure);
     return out.trim();
   },
-
 };
 
 export const api = SERVERLESS ? { ...serverApi, ...browserCore } : serverApi;

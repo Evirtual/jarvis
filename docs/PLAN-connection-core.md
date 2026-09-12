@@ -9,6 +9,12 @@ the Max plan counts; Codex on a ChatGPT plan joins it there later. OpenRouter
 goes: 50 free questions a day and then credit anyway, for a second sign-in
 path and a set of confusing errors.
 
+**Settled with the user, later the same day:** Moonshine (hearing) goes
+everywhere — the connection hears. Kokoro stays **on the PC only**, because
+the user wants George's voice there and on the PC it is quick; on the web the
+connection speaks, in the closest British voice each service has. Nothing is
+ever downloaded by the browser.
+
 ## Why
 
 The web version ran the speech models in the browser — Kokoro to speak,

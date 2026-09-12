@@ -12,10 +12,9 @@ import type { ConnectionsResponse, ProviderId, ProviderView } from "../shared/ty
 import { api } from "./api.js";
 import { $, esc } from "./dom.js";
 import { SERVERLESS } from "./server.js";
-import { startOpenRouter } from "./oauth.js";
 
 /** Where a key "from the environment" came from, named so it can be found. */
-const ENV_VARS: Record<ProviderId, string> = { openrouter: "OPENROUTER_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY", gemini: "GEMINI_API_KEY" };
+const ENV_VARS: Record<ProviderId, string> = { gemini: "GEMINI_API_KEY", openai: "OPENAI_API_KEY" };
 
 export class Connections {
   private root: HTMLElement;
@@ -94,8 +93,6 @@ export class Connections {
     if (!id) return;
 
     if (act === "save") await this.save(id);
-    // to OpenRouter and back in this window; main.ts finishes the connection on the way back
-    if (act === "oauth") { await startOpenRouter(); return; }
     if (act === "use") {
       this.apply(await api.setActive(id));
     }
@@ -146,11 +143,14 @@ export class Connections {
       this.hint.className = "hint warn";
       this.hint.innerHTML =
         "No service connected yet, so I can only answer my built-in commands. " +
-        "<b>OpenRouter</b> connects in one click and has free models — that is the quickest way to get me talking.";
+        "<b>Gemini</b> is free and gives me my answers, my hearing and my voice — the quickest way to get me talking.";
     } else {
+      const active = this.data.providers.find((p) => p.id === this.data.active);
+      const ready = active?.status.state === "ready" ? active.status : null;
+      const does = ready ? ["answering", ...(ready.hears ? ["hearing"] : []), ...(SERVERLESS && ready.voices.length ? ["speaking"] : [])].join(", ") : "answering";
       this.hint.className = "hint";
       this.hint.innerHTML =
-        `Answering through <b>${esc(this.activeName())}</b>. ` +
+        `<b>${esc(this.activeName())}</b> is ${does}. ` +
         (SERVERLESS
           ? "Keys are kept in this browser on this device, and go only to the service they belong to."
           : "Keys are stored on this machine only and are never sent to the browser.");
@@ -193,12 +193,7 @@ export class Connections {
         `<p class="blurb">${esc(p.blurb)}</p>` +
         `<p class="cost">${esc(p.cost)}</p>` +
         (err ? `<p class="err">${esc(err)}</p>` : "") +
-        (p.id === "openrouter"
-          ? // one click: sign in (or make a free account) at OpenRouter and come straight back
-            `<button class="btn primary wide" data-act="oauth" data-id="openrouter">Connect with OpenRouter</button>` +
-            `<p class="hint">Takes you to OpenRouter to sign in — or make a free account, no card — and straight back, connected. Or paste a key:</p>`
-          : "") +
-        `<ol class="steps"${p.id === "openrouter" ? " hidden" : ""}>` +
+        `<ol class="steps">` +
         `<li>Open <a href="${p.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${p.free ? " and sign in with a Google account" : ""}.</li>` +
         `<li>Create a key and copy it. ${esc(p.keyHint)}.</li>` +
         `<li>Paste it below and press Connect.</li>` +
@@ -226,6 +221,7 @@ export class Connections {
       `<span class="src"${st.source === "environment" ? ` title="Disconnect makes JARVIS stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${ENV_VARS[p.id]}` : "saved here"}</span>` +
       `</div>` +
       (st.problem ? `<p class="err">${esc(st.problem)}</p>` : "") +
+      `<p class="hint">${st.hears ? "Answers, hears" : "Answers"}${st.voices.length ? (SERVERLESS ? " and speaks" : ", and speaks in the web version") : ""} through this key.</p>` +
       `<div class="ctl"><span class="ctl-k"><span>Model</span><span class="n">${st.models.length} available</span></span>` +
       `<select class="sel" data-model="${p.id}" aria-label="${esc(p.name)} model">${models}</select></div>` +
       `<div class="row">` +

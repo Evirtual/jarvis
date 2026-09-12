@@ -3,20 +3,18 @@
  * published as a web page, with no server behind it.
  *
  * It answers exactly as the server does (the same shapes, the same messages),
- * using the same provider code (shared/providers.ts). The difference is where
- * the keys live: in this browser's storage, on the user's own device, sent to
- * nobody but the provider they belong to.
+ * using the same services (shared/services). The difference is where the
+ * keys live: in this browser's storage, on the user's own device, sent to
+ * nobody but the service they belong to. There is no Kokoro here — the
+ * connected service speaks.
  */
 
 import type {
-  AskRequest, AskStatus, ConnectionsResponse, ProviderId, ProviderStatus, ProviderView, SpeakRequest, StatusResponse,
+  AskRequest, AskStatus, Catalogue, ConnectionsResponse, ProviderId, ProviderStatus, ProviderView, SpeakRequest, StatusResponse,
 } from "../shared/types.js";
 import { PROVIDER_IDS } from "../shared/types.js";
-import { PROVIDERS, adapterFor, exchangeOpenRouterCode, humanise, personaFor, prepareTurns } from "../shared/providers.js";
+import { PROVIDERS, humanise, personaFor, prepareTurns, serviceFor } from "../shared/services/index.js";
 import { recall, store } from "./dom.js";
-import { neuralError, neuralState, neuralVoices, speakNeural } from "./browser-voice.js";
-import { hearLocally, hearingState } from "./browser-hearing.js";
-import { wavSamples } from "../shared/hearing.js";
 
 /* ---------------- the keys, on this device ---------------- */
 
@@ -52,10 +50,10 @@ function mask(key: string): string {
 
 /* ---------------- validation, cached as the server caches it ---------------- */
 
-interface Validation { ok: boolean; models: string[]; message: string | null; checkedAt: number }
+interface Validation { ok: boolean; catalogue: Catalogue | null; message: string | null; checkedAt: number }
 const CHECKED = "jarvis.coresChecked";
-// The model lists (never the keys) are kept between visits, so the Connections
-// screen is instant; a key is re-checked after ten minutes.
+// What each key can reach (never the keys) is kept between visits, so the
+// Connections screen is instant; a key is re-checked after ten minutes.
 const checked = new Map<string, Validation>(Object.entries(((): Record<string, Validation> => {
   try { return JSON.parse(recall(CHECKED) ?? "{}") as Record<string, Validation>; } catch { return {}; }
 })()));
@@ -64,17 +62,27 @@ const checkKey = (id: ProviderId, key: string): string => `${id}:${key.slice(-8)
 async function validate(id: ProviderId, key: string, force = false): Promise<Validation> {
   const ck = checkKey(id, key);
   const hit = checked.get(ck);
-  if (hit && !force && Date.now() - hit.checkedAt < 10 * 60 * 1000) return hit;
+  if (hit && !force && hit.catalogue && Date.now() - hit.checkedAt < 10 * 60 * 1000) return hit;
   let v: Validation;
   try {
-    const models = await adapterFor(id).listModels(key);
-    v = { ok: models.length > 0, models, message: models.length ? null : "The key works but no chat models are available on it.", checkedAt: Date.now() };
+    const catalogue = await serviceFor(id).catalogue(key);
+    v = { ok: catalogue.chat.length > 0, catalogue, message: catalogue.chat.length ? null : "The key works but no chat models are available on it.", checkedAt: Date.now() };
   } catch (err) {
-    v = { ok: false, models: [], message: humanise(id, err), checkedAt: Date.now() };
+    v = { ok: false, catalogue: null, message: humanise(id, err), checkedAt: Date.now() };
   }
   checked.set(ck, v);
   store(CHECKED, JSON.stringify(Object.fromEntries(checked)));
   return v;
+}
+
+/** A service that can be used right now: its key, what it can reach, and the chat model in use. */
+async function connected(id: ProviderId): Promise<{ key: string; catalogue: Catalogue; model: string } | null> {
+  const p = saved.providers[id];
+  if (!p) return null;
+  const v = await validate(id, p.key);
+  if (!v.ok || !v.catalogue) return null;
+  const model = p.model && v.catalogue.chat.includes(p.model) ? p.model : v.catalogue.chat[0]!;
+  return { key: p.key, catalogue: v.catalogue, model };
 }
 
 /** The last account-level failure per service (no credit, no access), shown on its card until an answer succeeds. */
@@ -85,9 +93,11 @@ async function view(id: ProviderId, revalidate: boolean): Promise<ProviderView> 
   const p = saved.providers[id];
   if (!p) return { ...meta, status: { state: "unconfigured" } };
   const v = await validate(id, p.key, revalidate);
-  const status: ProviderStatus = v.ok
+  const status: ProviderStatus = v.ok && v.catalogue
     ? {
-        state: "ready", maskedKey: mask(p.key), models: v.models, model: p.model ?? v.models[0] ?? "", source: "saved",
+        state: "ready", maskedKey: mask(p.key), source: "saved",
+        models: v.catalogue.chat, model: p.model ?? v.catalogue.chat[0] ?? "",
+        voices: v.catalogue.voices, hears: v.catalogue.hearing.length > 0,
         ...(lastProblem.has(id) ? { problem: lastProblem.get(id)! } : {}),
       }
     : { state: "error", maskedKey: mask(p.key), message: v.message ?? "Unknown error", source: "saved" };
@@ -95,7 +105,7 @@ async function view(id: ProviderId, revalidate: boolean): Promise<ProviderView> 
 }
 
 async function connections(revalidate = false): Promise<ConnectionsResponse> {
-  saved = load(); // another tab may have connected something (OpenRouter's sign-in happens in one)
+  saved = load(); // another tab may have connected something
   const providers = await Promise.all(PROVIDER_IDS.map((id) => view(id, revalidate)));
   const ready = providers.filter((p) => p.status.state === "ready").map((p) => p.id);
   // Never advertise a core that cannot answer.
@@ -108,7 +118,8 @@ async function saveKey(id: ProviderId, apiKey: string): Promise<ConnectionsRespo
   if (!key) throw new Error("Paste the key first.");
   const v = await validate(id, key, true);
   if (!v.ok) throw new Error(v.message ?? "That key didn't work.");
-  saved.providers[id] = { key, ...(saved.providers[id]?.model ? { model: saved.providers[id]!.model! } : { model: v.models[0]! }) };
+  const model = saved.providers[id]?.model;
+  saved.providers[id] = { key, ...(model ? { model } : {}) };
   if (!saved.active) saved.active = id;
   persist();
   return connections();
@@ -130,27 +141,24 @@ async function selectModel(id: ProviderId, model: string): Promise<ConnectionsRe
   return connections();
 }
 
-/** Finish OpenRouter's one-click sign-in: here the key is fetched by the page itself, and kept on the device. */
-async function connectOpenRouter(code: string, verifier: string, method: "S256" | "plain"): Promise<ConnectionsResponse> {
-  return saveKey("openrouter", await exchangeOpenRouterCode(code, verifier, method));
-}
-
 async function setActive(id: ProviderId): Promise<ConnectionsResponse> {
   saved.active = id;
   persist();
   return connections();
 }
 
+/** Which service is asked when the caller names none. */
+async function activeId(): Promise<ProviderId | null> {
+  return (await connections()).active;
+}
+
 /* ---------------- asking ---------------- */
 
 async function ask(body: AskRequest, onDelta: (full: string) => void, onStatus: (s: AskStatus) => void, signal?: AbortSignal): Promise<string> {
-  const conn = await connections();
-  const id = body.provider && PROVIDER_IDS.includes(body.provider) ? body.provider : conn.active;
+  const id = body.provider && PROVIDER_IDS.includes(body.provider) ? body.provider : await activeId();
   if (!id) throw new Error("No reasoning core is connected.");
-  const p = saved.providers[id];
-  if (!p) throw new Error(`${PROVIDERS[id].name} has no key.`);
-  const model = p.model ?? (await validate(id, p.key)).models[0];
-  if (!model) throw new Error(`No model selected for ${PROVIDERS[id].name}.`);
+  const c = await connected(id);
+  if (!c) throw new Error(`${PROVIDERS[id].name} isn't connected.`);
   const turns = prepareTurns(body.turns, body.context);
   if (!turns) throw new Error("There's nothing to answer.");
 
@@ -159,7 +167,7 @@ async function ask(body: AskRequest, onDelta: (full: string) => void, onStatus: 
   let out = "";
   onStatus("thinking");
   try {
-    await adapterFor(id).stream(p.key, model, turns, (ev) => {
+    await serviceFor(id).chat(c.key, c.model, turns, (ev) => {
       if (ev.t === "text") { out += ev.delta; onDelta(out); }
       else if (ev.t === "status") onStatus(ev.status);
     }, ac.signal, personaFor(body.address === "madam" ? "madam" : "sir"));
@@ -168,41 +176,38 @@ async function ask(body: AskRequest, onDelta: (full: string) => void, onStatus: 
     if (ac.signal.aborted) throw err;
     const message = humanise(id, err);
     if (/out of credit|can't use that model/.test(message)) lastProblem.set(id, message);
-    console.warn(`[${id}] ${model}:`, err);
+    console.warn(`[${id}] ${c.model}:`, err);
     if (!out) throw new Error(message);
   }
   return out.trim();
 }
 
-/* ---------------- speech to text, through the OpenAI key ---------------- */
-
-const TRANSCRIBERS = ["gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"];
-let transcriber: string | null = null;
+/* ---------------- hearing and speech, through the services ---------------- */
 
 async function transcribe(audio: Blob): Promise<string> {
-  const key = saved.providers.openai?.key;
-  // No ChatGPT key: JARVIS's own hearing, on this device (the recording arrives as 16 kHz WAV).
-  if (!key) {
-    if (hearingState === "ready") return hearLocally(wavSamples(await audio.arrayBuffer()));
-    throw new Error(hearingState === "loading"
-      ? "My hearing is still downloading, sir — a moment."
-      : "I can't hear you in this browser yet, sir. Download my hearing in Configuration → Voice — about 63 MB, once — or connect ChatGPT.");
+  const id = await activeId();
+  const c = id ? await connected(id) : null;
+  const model = c?.catalogue.hearing[0];
+  if (!id || !c || !model) throw new Error("I've no way to hear you yet, sir — connect Gemini or ChatGPT in Configuration, or type instead.");
+  try {
+    return await serviceFor(id).hear(c.key, model, audio);
+  } catch (err) {
+    throw new Error(humanise(id, err));
   }
-  const { default: OpenAI } = await import("openai");
-  const client = new OpenAI({ apiKey: key, dangerouslyAllowBrowser: true });
-  if (!transcriber) {
-    const ids = new Set<string>();
-    for await (const m of await client.models.list()) ids.add(m.id);
-    transcriber = TRANSCRIBERS.find((m) => ids.has(m)) ?? "whisper-1";
+}
+
+async function speak(body: SpeakRequest): Promise<Blob> {
+  if (body.via === "kokoro") throw new Error("The PC's own voice isn't available in the web version.");
+  const id = body.via;
+  const c = await connected(id);
+  const model = c?.catalogue.speech[0];
+  if (!c || !model) throw new Error(`${PROVIDERS[id].name} can't speak from here.`);
+  const voice = c.catalogue.voices.some((v) => v.id === body.voice) ? body.voice : c.catalogue.voices[0]?.id ?? "";
+  try {
+    return new Blob([await serviceFor(id).speak(c.key, model, body.text, voice, body.speed)], { type: "audio/wav" });
+  } catch (err) {
+    throw new Error(humanise(id, err));
   }
-  const type = audio.type || "audio/webm";
-  const ext = type.includes("ogg") ? "ogg" : type.includes("mp4") ? "mp4" : type.includes("wav") ? "wav" : "webm";
-  // Bias the transcriber toward words this console actually uses.
-  const prompt =
-    "JARVIS, sir. Voices: George, Fable, Lewis, Daniel, Emma, Alice, Isabella, Lily, Michael. " +
-    "Services: OpenRouter, ChatGPT, Claude, Gemini. Commands: new thread, close thread, status, uplink, locate me.";
-  const res = await client.audio.transcriptions.create({ file: new File([audio], `speech.${ext}`, { type }), model: transcriber, language: "en", prompt });
-  return (res.text ?? "").trim();
 }
 
 /* ---------------- status ---------------- */
@@ -210,18 +215,10 @@ async function transcribe(audio: Blob): Promise<string> {
 async function status(): Promise<StatusResponse> {
   const conn = await connections();
   return {
-    // the neural voice runs here too, once the user has downloaded it (browser-voice.ts)
-    kokoro: neuralState === "none" ? "failed" : neuralState,
-    kokoroError: neuralState === "none" ? "not downloaded on this device" : neuralError,
-    dtype: "q8",
-    voices: neuralVoices(),
+    kokoro: { state: "absent", error: null, voices: [] },
     active: conn.active,
     anyProviderReady: conn.providers.some((p) => p.status.state === "ready"),
-    transcription: !!saved.providers.openai || hearingState === "ready",
-    hearing: hearingState,
   };
 }
 
-const speak = (body: SpeakRequest): Promise<Blob> => speakNeural(body.text, body.voice, body.speed);
-
-export const browserCore = { connections, saveKey, removeKey, selectModel, setActive, connectOpenRouter, ask, transcribe, status, speak };
+export const browserCore = { connections, saveKey, removeKey, selectModel, setActive, ask, transcribe, status, speak };

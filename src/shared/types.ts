@@ -9,8 +9,12 @@
  * Providers
  * ------------------------------------------------------------------ */
 
-// OpenRouter first: its free models are the quickest way in for someone new
-export const PROVIDER_IDS = ["openrouter", "openai", "anthropic", "gemini"] as const;
+/**
+ * The services JARVIS can connect to. One key each, and everything comes
+ * through it: his reasoning, his hearing and his voice. Gemini first — its
+ * free tier is the way in for someone new.
+ */
+export const PROVIDER_IDS = ["gemini", "openai"] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export interface ProviderMeta {
@@ -30,11 +34,43 @@ export interface ProviderMeta {
   free: boolean;
 }
 
+/** A voice a service (or the PC's own Kokoro) can speak with. */
+export interface VoiceOption {
+  id: string;
+  name: string;
+  note: string;
+}
+
+/**
+ * What a key can reach on its account, found by asking the service: the
+ * models for each job, newest and most capable first, and the voices.
+ * Nothing about model names is hardcoded, so a retired model can never
+ * silently break the console.
+ */
+export interface Catalogue {
+  /** Answers questions. */
+  chat: string[];
+  /** Turns text into speech. */
+  speech: string[];
+  /** Turns recorded speech into text. */
+  hearing: string[];
+  voices: VoiceOption[];
+}
+
 export type ProviderStatus =
   | { state: "unconfigured" }
   | { state: "checking" }
   | {
-      state: "ready"; maskedKey: string; models: string[]; model: string; source: KeySource;
+      state: "ready";
+      maskedKey: string;
+      source: KeySource;
+      /** The chat models on the account, and the one in use. */
+      models: string[];
+      model: string;
+      /** The voices this service can speak with — empty when it can't speak. Which one is chosen in Configuration → Voice. */
+      voices: VoiceOption[];
+      /** Whether this service can turn recorded speech into text. */
+      hears: boolean;
       /** The key works, but the last request failed for a reason on the account (no credit, no access). Cleared by the next success. */
       problem?: string;
     }
@@ -100,31 +136,28 @@ export type AskEvent =
  * Speech
  * ------------------------------------------------------------------ */
 
-export type KokoroState = "loading" | "ready" | "failed";
-
-export interface VoiceOption {
-  id: string;
-  name: string;
-  note: string;
-}
+/**
+ * Who makes the speech: a connected service, or "kokoro" — the PC's own
+ * voice, run by its server, which the web version doesn't have.
+ */
+export type SpeakVia = ProviderId | "kokoro";
 
 export interface SpeakRequest {
   text: string;
+  via: SpeakVia;
   voice: string;
+  /** 1 is natural; the Cadence slider in Configuration → Voice. */
   speed: number;
 }
 
+/** The PC's own voice: "absent" on the web, where there is no server to run it. */
+export type KokoroState = "loading" | "ready" | "failed" | "absent";
+
 export interface StatusResponse {
-  kokoro: KokoroState;
-  kokoroError: string | null;
-  dtype: string;
-  voices: VoiceOption[];
+  /** The PC's own voice, Kokoro. */
+  kokoro: { state: KokoroState; error: string | null; voices: VoiceOption[] };
   active: ProviderId | null;
   anyProviderReady: boolean;
-  /** True when the server can turn recorded speech into text. */
-  transcription: boolean;
-  /** JARVIS's own hearing (Moonshine, on the device): "none" where it hasn't been downloaded. */
-  hearing: "none" | "loading" | "ready" | "failed";
 }
 
 /* ------------------------------------------------------------------ *
