@@ -140,8 +140,11 @@ export async function askCore(question: string, thread: Thread): Promise<void> {
 
   try {
     const ctx = [appSnapshot(), contextBlock(), relatedContext(thread)].filter(Boolean).join("\n");
-    const raw = await api.ask(
-      { turns, ...(ctx ? { context: ctx } : {}), address: getAddress() },
+    const request = { turns, ...(ctx ? { context: ctx } : {}), address: getAddress() };
+    // A service at its limit or out of credit, with another one connected:
+    // ask that one instead of stopping — before a word has been said.
+    const askVia = (provider?: ProviderId): Promise<string> => api.ask(
+      { ...request, ...(provider ? { provider } : {}) },
       (full) => {
         // Hide console directives while they stream in; they are acted on, not read.
         const visible = full.split("[[")[0] ?? "";
@@ -156,6 +159,16 @@ export async function askCore(question: string, thread: Thread): Promise<void> {
         }
       },
     );
+    let raw: string;
+    try {
+      raw = await askVia();
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      const spare = conn.readyIds().find((p) => p !== conn.active);
+      if (streamed || !spare || !/limit|out of credit|needs credit|busy|rate-limiting|quota/i.test(why)) throw err;
+      sys(`${conn.activeName()} can't answer right now — answering through ${conn.nameOf(spare)}.`);
+      raw = await askVia(spare);
+    }
     const d = extractDirectives(raw);
     pendingActions = d.actions;
     const out = cleanReply(d.text);

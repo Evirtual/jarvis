@@ -467,7 +467,15 @@ export function humanise(id: ProviderId, err: unknown): string {
       return "That OpenRouter model needs credit, and the account has none — pick a free one (their names end in “free”), or add credit on OpenRouter.";
     }
     if (status === 429 || /rate.?limit/i.test(raw)) {
-      return "OpenRouter's free models are at their limit — 20 questions a minute and 50 a day (1,000 once the account has ever bought $10 of credit). Try again shortly, or pick a paid model.";
+      // One 429 for two different things: the account's daily allowance, or
+      // one free model's provider being briefly overloaded.
+      if (/per.?day|daily/i.test(raw)) {
+        return "OpenRouter's free models are at today's limit — 50 questions a day, 1,000 once the account has ever bought $10 of credit. It resets at midnight UTC; Gemini's free tier allows far more meanwhile.";
+      }
+      if (/upstream|temporarily|provider/i.test(raw)) {
+        return "That free OpenRouter model is busy right now — try again in a moment, or pick another free model in Configuration → Connections.";
+      }
+      return "OpenRouter's free models are at their limit — 20 questions a minute, 50 a day. Try again shortly.";
     }
   }
   if (status === 401 || /401|unauthor|invalid[_ ]api[_ ]key|API key not valid/i.test(raw)) {

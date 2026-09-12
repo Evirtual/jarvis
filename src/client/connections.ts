@@ -66,6 +66,14 @@ export class Connections {
     return this.data.providers.filter((p) => p.status.state === "ready").map((p) => p.name);
   }
 
+  readyIds(): ProviderId[] {
+    return this.data.providers.filter((p) => p.status.state === "ready").map((p) => p.id);
+  }
+
+  nameOf(id: ProviderId): string {
+    return this.data.providers.find((p) => p.id === id)?.name ?? id;
+  }
+
   async refresh(revalidate = false): Promise<void> {
     this.data = await api.connections(revalidate);
     this.render();
