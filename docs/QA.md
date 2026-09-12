@@ -582,3 +582,8 @@ up at start.
 | Moonshine on the PC: 4.0 s of speech in 0.12 s, 6.1 s in 0.24 s, word-for-word but for one proper name | Pass |
 | PC, no ChatGPT key: /api/transcribe hears Kokoro's own speech exactly, 0.15–0.19 s | Pass |
 | Web: hearing download 15 → 41 → 65 → 92% → online (~12 s); a Kokoro line heard exactly in 0.22 s, under the page's CSP and isolation | Pass |
+70. Long pauses while speaking: every Kokoro piece carries ~0.25 s of silence
+before and ~0.5 s after, so pieces played back to back left ~¾ s of dead air
+at each join. Playback now trims to the speech and adds a pause that fits the
+join — 0.12 s after a comma, 0.3 s after a sentence. Measured: "…parameters,"
+→ ", sir." now 0.12 s apart (was ~0.7 s).

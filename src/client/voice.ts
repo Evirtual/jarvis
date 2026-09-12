@@ -57,6 +57,24 @@ const NO_DICTATION = SERVERLESS
   ? "This browser can't take dictation, sir. Download my hearing in Configuration → Voice — about 63 MB, once — and I'll listen myself."
   : "This browser can't take dictation, and my own hearing is still loading, sir — a moment, or type instead.";
 
+/**
+ * Where the speech in a generated piece starts and ends, in seconds: the
+ * silence before and after it trimmed, with a few milliseconds kept so no
+ * word is clipped.
+ */
+function speechBounds(buf: AudioBuffer): { start: number; end: number } {
+  const d = buf.getChannelData(0);
+  const quiet = 0.01;
+  let a = 0, b = d.length - 1;
+  while (a < d.length && Math.abs(d[a]!) < quiet) a++;
+  while (b > a && Math.abs(d[b]!) < quiet) b--;
+  if (a >= b) return { start: 0, end: buf.duration }; // nothing above the floor: play it as it is
+  return {
+    start: Math.max(0, a / buf.sampleRate - 0.03),
+    end: Math.min(buf.duration, b / buf.sampleRate + 0.06),
+  };
+}
+
 export class Voice {
   enabled = true;
   engine: Engine = "system";
@@ -433,9 +451,15 @@ export class Voice {
       const src = ac.createBufferSource();
       src.buffer = buf;
       src.connect(bus);
+      // Kokoro pads every piece with ~0.25 s of silence before and ~0.5 s
+      // after, so back to back they left ¾ s of dead air at every join. Play
+      // only the speech, then a pause that fits how the piece ended: a breath
+      // after a comma, a beat after a full stop.
+      const { start, end } = speechBounds(buf);
+      const pause = /[.!?]["”’)]?$/.test(text.trim()) ? 0.3 : /[,;:—]$/.test(text.trim()) ? 0.12 : 0.18;
       const when = Math.max(ac.currentTime + 0.03, r.nextAt);
-      src.start(when);
-      r.nextAt = when + buf.duration;
+      src.start(when, start, end - start);
+      r.nextAt = when + (end - start) + pause;
       this.sources.push(src);
       r.last = src;
     });
