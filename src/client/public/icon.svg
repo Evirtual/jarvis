@@ -27,7 +27,7 @@
     <!-- the plasma at the centre -->
     <circle r="112" fill="url(#plasma)" stroke="none"/>
     <!-- the gold triangle, with its glow -->
-    <path d="M0 -66 L57.2 33 L-57.2 33 Z" stroke="#ffb648" stroke-opacity=".35" stroke-width="30" stroke-linejoin="round"/>
-    <path d="M0 -66 L57.2 33 L-57.2 33 Z" stroke="#f5a430" stroke-width="13" stroke-linejoin="round"/>
+    <path d="M0 -66 L57.2 33 L-57.2 33 Z" stroke="#ffb648" stroke-opacity=".35" stroke-width="24" stroke-linejoin="round"/>
+    <path d="M0 -66 L57.2 33 L-57.2 33 Z" stroke="#f5a430" stroke-width="10" stroke-linejoin="round"/>
   </g>
 </svg>
