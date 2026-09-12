@@ -976,3 +976,11 @@ Found and fixed:
     recomputed on every save rather than only on a full redraw.
 100. The line under the core (`#threadName`) had been hidden since code mode
     left; it now says what to do on a clear board.
+
+Found and fixed, later the same day:
+
+101. With the sheets moved down onto the deck, the deck (z 200) drew over
+    the Threads list's footer (z 80): its buttons showed through "Put all
+    away". The Threads sheet now stacks above the deck. And the Threads list
+    and the More menus keep the same 16 px gap at the bottom as at the sides;
+    the guide and a confirmation run to the edge, full width.
