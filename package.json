@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "description": "Real-telemetry HUD console that answers, hears and speaks through one connected service, for desktop, mobile and the car",
+  "license": "AGPL-3.0-only",
+  "author": "Edgaras Neverdauskas",
   "engines": {
     "node": ">=20.11"
   },

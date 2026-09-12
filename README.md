@@ -73,3 +73,9 @@ product. Connect both and JARVIS falls back from one to the other, saying why.
   service fails
 - **[Development](docs/DEVELOPMENT.md)** — commands, the code map and tests
 - **[QA log](docs/QA.md)** — the manual test plan and every end-to-end run
+
+## Licence
+
+[AGPL-3.0](LICENSE). Use it, read it, change it, share it; if you run a
+changed version as a service for others, publish your changes too.
+© 2026 Edgaras Neverdauskas.
