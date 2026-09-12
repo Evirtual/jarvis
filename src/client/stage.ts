@@ -238,6 +238,18 @@ export class Stage {
   save(): void {
     const json = JSON.stringify(this.ws.data);
     this.onSaved?.(store(STORE_KEY, json), json.length);
+    this.paintRoom();
+  }
+
+  /**
+   * What the board as a whole is: clear, or one thread with something in it —
+   * which on a phone may use all the room there is (styles.css). Kept current
+   * on every save, so a first answer opens the room without a full redraw.
+   */
+  private paintRoom(): void {
+    this.root.classList.toggle("clear", this.ws.empty);
+    const only = this.ws.live.length === 1 ? this.ws.live[0]! : null;
+    this.root.classList.toggle("one-thread", !!only && only.turns.length > 0);
   }
 
   /**
@@ -735,9 +747,7 @@ export class Stage {
       this.raisedFor = this.ws.activeId;
       this.raise(this.ws.activeId);
     }
-    this.root.classList.toggle("clear", this.ws.empty);
-    // one thread on the board: on a phone it may use all the room there is (styles.css)
-    this.root.classList.toggle("one-thread", this.ws.live.length === 1);
+    this.paintRoom();
     if (this.web.openFor && !this.ws.thread(this.web.openFor)) this.closeWeb();
     this.place();
 

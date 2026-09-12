@@ -681,7 +681,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .setup-actions .spacer { flex: 1; }
 body.m-compact .setup { padding: 0; align-items: flex-end; }
 body.m-compact .setup-sheet {
-  position: fixed; left: var(--edge); right: var(--edge); bottom: var(--sheet-bottom);
+  position: fixed; left: 0; right: 0; bottom: var(--sheet-bottom);
   width: auto; max-height: calc(100dvh - var(--sheet-bottom) - var(--header-h) - 4px);
   box-shadow: 0 18px 44px rgba(0,0,0,.55);
   animation: sheetUp .26s cubic-bezier(.2,.9,.3,1);
@@ -1119,7 +1119,7 @@ body.m-compact .panel.float > h2.drag { cursor: default; }
 body.m-compact .drawer { width: 100%; max-width: 100%; }
 /* A confirmation, too, is a sheet above the deck on a phone. */
 body.m-compact .confirm-dialog {
-  left: var(--edge); right: var(--edge); top: auto; bottom: var(--sheet-bottom);
+  left: 0; right: 0; top: auto; bottom: var(--sheet-bottom);
   width: auto; transform: none;
   box-shadow: 0 18px 44px rgba(0,0,0,.55);
   animation: sheetUp .26s cubic-bezier(.2,.9,.3,1);
@@ -1228,9 +1228,10 @@ body.m-compact .stage.one-thread .bubble.loose .chatwin:not(.shut) .cw-body { fl
    buttons sit 30px up (tops at 70px), so a sheet ends 30px above that, at
    100px — deck height + 4px. While one is open, JARVIS's status word and
    notices step aside rather than show through it. */
-/* Where a sheet stops on a phone: just above the deck. Set on the body, so the
-   sheets outside the stage (the guide, a confirmation) share the same line. */
-body.m-compact { --sheet-bottom: calc(var(--deck-h, 96px) + 4px + env(safe-area-inset-bottom)); }
+/* Where a sheet stops on a phone: the bottom of the screen, over the deck. Set
+   on the body, so every sheet — the Threads list, the More menus, the guide, a
+   confirmation — rises to the same line. */
+body.m-compact { --sheet-bottom: env(safe-area-inset-bottom, 0px); }
 body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden])) :is(.core-label, .toast) {
   opacity: 0;
 }
