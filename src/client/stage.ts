@@ -239,15 +239,9 @@ export class Stage {
     this.paintRoom();
   }
 
-  /**
-   * What the board as a whole is: clear, or one thread with something in it —
-   * which on a phone may use all the room there is (styles.css). Kept current
-   * on every save, so a first answer opens the room without a full redraw.
-   */
+  /** Whether the board is clear (styles.css draws the clean screen). Kept current on every save. */
   private paintRoom(): void {
     this.root.classList.toggle("clear", this.ws.empty);
-    const only = this.ws.live.length === 1 ? this.ws.live[0]! : null;
-    this.root.classList.toggle("one-thread", !!only && only.turns.length > 0);
   }
 
   /**

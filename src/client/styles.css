@@ -59,7 +59,7 @@
   --ic: 16px;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; height: 100%; -webkit-tap-highlight-color: transparent; }
 img { max-width: 100%; }
 [hidden] { display: none !important; }
 
@@ -1269,16 +1269,6 @@ body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="th
   display: block; animation: veilIn .2s var(--ease-soft);
 }
 @keyframes veilIn { from { opacity: 0; } }
-
-/* On a phone, a thread that is alone on the board uses all the room the list
-   has — down to the line above JARVIS — instead of stopping at 42% of the
-   screen; its conversation scrolls inside it. Folded, it stays a title bar. */
-body.m-compact .stage.one-thread .windows > .bubble.loose:has(.chatwin:not(.shut)) {
-  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
-}
-body.m-compact .stage.one-thread .bubble.loose > .bb-list { flex: 1 1 auto; min-height: 0; }
-body.m-compact .stage.one-thread .bubble.loose .chatwin:not(.shut) { flex: 1 1 auto; min-height: 0; }
-body.m-compact .stage.one-thread .bubble.loose .chatwin:not(.shut) .cw-body { flex: 1 1 auto; max-height: none !important; }
 
 /* Phone sheets (More, Threads) come down close to the bottom buttons, leaving
    the same gap above them as the buttons keep from the bottom edge: the 40px

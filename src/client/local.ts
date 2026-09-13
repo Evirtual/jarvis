@@ -72,7 +72,8 @@ export function localCommand(raw: string): boolean {
     jarvis(`Good ${partOfDay()}, sir. I'm at your disposal.`);
     return true;
   }
-  if (short && /\b(?:status|diagnostics?|systems? check|how are (?:you|the systems))\b/.test(q)) {
+  // "how are you" is conversation, not a request for readings: it goes to the service, or gets the no-service line.
+  if (short && /\b(?:status|diagnostics?|systems? check|how are the systems)\b/.test(q)) {
     if (T?.web) {
       const w = T.web;
       const bits = [`This device is at ${w.load ?? 0} percent load${w.cores ? ` across ${w.cores} cores` : ""}`];
