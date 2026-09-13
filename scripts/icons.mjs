@@ -17,7 +17,12 @@ const logo = await readFile(path.join(PUBLIC, "icon.svg"), "utf8");
 const core = logo.slice(logo.indexOf('<g transform="translate(256 256)"'), logo.lastIndexOf("</g>") + 4);
 const defs = logo.slice(logo.indexOf("<defs>"), logo.indexOf("</defs>") + 7);
 
-/** A full-bleed square with the core scaled into its safe zone (maskable / Apple icons). */
+/**
+ * A full-bleed square with the core on the dark ground (maskable / Apple
+ * icons). Scaled so the outer ring meets the edge of what the platform shows —
+ * the 80% circle Android's masks are guaranteed to keep, the whole square on
+ * an iPhone — rather than sitting in a dark margin.
+ */
 const square = (scale) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">${defs}
   <rect width="512" height="512" fill="url(#ground)"/>
   <g transform="translate(256 256) scale(${scale}) translate(-256 -256)">${core}</g></svg>`;
@@ -51,7 +56,7 @@ const out = async (name, svg, w, h = w) => {
 await out("favicon-32.png", logo, 32);
 await out("icon-192.png", logo, 192);
 await out("icon-512.png", logo, 512);
-await out("icon-maskable-512.png", square(0.78), 512);
-await out("apple-touch-icon.png", square(0.86), 180);
+await out("icon-maskable-512.png", square(1), 512);
+await out("apple-touch-icon.png", square(1.24), 180);
 // social preview: the size Open Graph and X cards expect, as a light JPEG
 await out("og-image.jpg", og, 1200, 630);

@@ -151,9 +151,9 @@ setVoiceOut(recall("jarvis.voiceOn") !== "0");
 voiceOut.addEventListener("change", () => setVoiceOut(voiceOut.checked));
 
 /* ---------------------------------------------------------------------
- * The voice list: the AI voices of the service in use; the device's own
- * only when nothing is connected. Rebuilt whenever the voice's state
- * changes (onState).
+ * The voice list: the AI voices of the service in use, then the device's
+ * own — always on offer, since a phone's voices answer at once and some
+ * prefer them. Rebuilt whenever the voice's state changes (onState).
  * --------------------------------------------------------------------- */
 
 const voiceSel = $<HTMLSelectElement>("voiceSel");
@@ -167,9 +167,9 @@ function renderVoiceSelect(): void {
       options: neural.filter((n) => n.via === via).map((n) => ({ value: `${via}:${n.voice.id}`, text: `${n.voice.name}  ·  ${n.voice.note}` })),
     });
   }
-  if (!neural.length && voice.deviceSpeaks) {
+  if (voice.deviceSpeaks) {
     groups.push({
-      label: "This device · until a service is connected",
+      label: neural.length ? "This device" : "This device · until a service is connected",
       // a browser that won't name its voices (Brave) still speaks with its default
       options: voice.systemVoices.length
         ? voice.systemVoices.map((v) => ({ value: `device:${v.name}`, text: voice.labelFor(v) }))

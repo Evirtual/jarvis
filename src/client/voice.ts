@@ -200,7 +200,11 @@ export class Voice {
     this.choose();
   }
 
-  /** The service's voice when a service offers voices; the device's otherwise. */
+  /**
+   * The service's voice when a service offers voices; the device's otherwise —
+   * or the device's anyway, when that is what was chosen last: a phone's own
+   * voices answer at once, and stay on offer beside the service's.
+   */
   private choose(): void {
     const before = this.selectionValue;
     // The device voice — speaking now, or standing by for when the service can't.
@@ -209,7 +213,8 @@ export class Voice {
 
     const offered = this.neuralVoices();
     const via = offered[0]?.via;
-    if (via) {
+    const deviceChosen = this.synth !== null && recall("jarvis.voice.kind") === "device";
+    if (via && !deviceChosen) {
       const wanted = recall(`jarvis.voice.${via}`);
       const pick = offered.find((v) => v.voice.id === wanted) ?? offered[0]!;
       this.chosen = { kind: "neural", via, id: pick.voice.id };
@@ -224,14 +229,18 @@ export class Voice {
     return this.synth !== null && (s.name === null || this.systemList.some((v) => v.name === s.name));
   }
 
-  /** Choose by value — "<service>:<voice>", or "device:<name>" when no service is connected — and remember it. */
+  /** Choose by value — "<service>:<voice>", or "device:<name>" for one of the device's own — and remember it. */
   select(value: string): boolean {
     const s = parseSelection(value);
     if (!s || !this.available(s)) return false;
     if (s.kind === "neural") {
       store(`jarvis.voice.${s.via}`, s.id);
+      store("jarvis.voice.kind", "neural");
       this.resting.delete(s.via); // chosen again: worth asking again
-    } else if (s.name) store("jarvis.voice.device", s.name);
+    } else {
+      if (s.name) store("jarvis.voice.device", s.name);
+      store("jarvis.voice.kind", "device");
+    }
     this.choose();
     this.onState?.();
     return true;
@@ -283,9 +292,10 @@ export class Voice {
     const resting = this.restingReason();
     if (n && resting) return { text: `${n.voice.name}, ${this.sourceLabel(n.via)}, is unavailable: ${resting} This device's voice speaks meanwhile.`, warn: true };
     if (n) return { text: `AI voice — ${n.voice.name} (${n.voice.note}), ${this.sourceLabel(n.via)}.`, warn: false };
-    if (!this.synth) return { text: "No service is connected and this browser can't speak. Connect Gemini or ChatGPT and he will.", warn: true };
+    if (!this.synth) return { text: "No service is connected and this browser can't speak. Connect Gemini or ChatGPT for a voice.", warn: true };
     const which = this.systemVoice ? ` — ${shortName(this.systemVoice)} (${this.systemVoice.lang})` : "";
-    return { text: `No service is connected, so this device's voice speaks${which}. Connect Gemini or ChatGPT for his AI voice.`, warn: true };
+    if (this.neuralVoices().length) return { text: `This device's voice${which}. Answers still come through the connected service; its AI voices are in the list.`, warn: false };
+    return { text: `No service is connected, so this device's voice speaks${which}. Connect Gemini or ChatGPT for an AI voice.`, warn: true };
   }
 
   /** One line for the console snapshot the reasoning core is shown. */

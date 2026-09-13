@@ -174,13 +174,16 @@ otherwise answers name their sources in words. Links are never read aloud.
 
 ## The voice and hearing
 
-**He speaks with the connected service's AI voice** — ChatGPT's when you're on
-ChatGPT, Gemini's on Gemini — each told to sound like a calm British butler.
-**Config → Voice** lists that service's voices; the one you pick is remembered
-for it. The device's own voice speaks only when nothing is connected, or when
-the service refuses (a spent free allowance, no credit) — he says why once, and
-tries the service again after a while. **Cadence** sets the pace for both;
-**Timbre** reaches only the device's voices, which take a pitch.
+**JARVIS speaks with the connected service's AI voice** — ChatGPT's when you're
+on ChatGPT, Gemini's on Gemini — each told to sound like a calm British butler.
+**Config → Voice** lists that service's voices, then the device's own; the one
+you pick is remembered. A phone's own voices answer at once, and choosing one
+changes nothing else: answers and hearing still go through the service. With
+nothing connected the device's voice speaks anyway, and it steps in when the
+service refuses (a spent free allowance, no credit) — the reason is said once,
+and the service is tried again after a while. **Cadence** sets the pace for
+both; **Timbre** reaches only the device's voices, which take a pitch, so the
+two sliders are put away while an AI voice is chosen.
 
 Replies are spoken sentence by sentence as they arrive, the first while the rest
 is still being written, streamed as the service makes the sound; the silence

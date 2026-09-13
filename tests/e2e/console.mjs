@@ -344,6 +344,23 @@ await check('configuration: quick queries run, voice choice persists, the guide 
   const pick = options.find((v) => v.startsWith('openai:') && !v.endsWith('fable')) ?? options[0];
   await page.select('#voiceSel', pick); await wait(500);
   const remembered = await page.evaluate(() => localStorage.getItem('jarvis.voice') || Object.keys(localStorage).filter((k) => /voice/i.test(k)).join(','));
+  // The device's own voices stay on offer beside the service's, and the choice survives a reload.
+  const device = options.find((v) => v.startsWith('device:'));
+  assert(device !== undefined, 'no device voice listed while connected: ' + options.join(' '));
+  await page.select('#voiceSel', device); await wait(500);
+  const onDevice = await page.evaluate(() => ({
+    value: document.getElementById('voiceSel').value,
+    note: document.getElementById('voiceNote').textContent,
+    sliders: !document.getElementById('pitchSl').closest('.ctl-row').hidden,
+  }));
+  assert(onDevice.value === device && /this device/i.test(onDevice.note) && onDevice.sliders, 'device voice not taken: ' + JSON.stringify(onDevice));
+  await page.reload({ waitUntil: 'networkidle2' }); await wait(1500);
+  const kept = await page.evaluate(() => document.getElementById('voiceSel').value);
+  assert(kept === device, 'device voice forgotten on reload: ' + kept);
+  await page.evaluate(() => document.getElementById('openDrawer').click()); await wait(300);
+  await page.evaluate(() => document.querySelector('.tab[data-tab="voice"]').click()); await wait(200);
+  await page.select('#voiceSel', pick); await wait(500);
+  assert((await page.evaluate(() => document.getElementById('voiceSel').value)) === pick, 'service voice not taken back');
   await page.evaluate(() => document.querySelector('.tab[data-tab="connections"]').click()); await wait(200);
   await page.evaluate(() => document.getElementById('showSetup').click()); await wait(400);
   const b = await board();
