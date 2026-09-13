@@ -18,7 +18,7 @@ export const conn = new Connections();
 export const graph = new Stage($("stage"), $<HTMLCanvasElement>("graph"), $("windows"));
 export const ws = graph.ws;
 export const radar = new Radar($<HTMLCanvasElement>("radar"));
-export const panels = new Panels($("overlays"));
+export const panels = new Panels($("overlays"), () => graph.room);
 
 /** The command line. */
 export const input = $<HTMLInputElement>("input");

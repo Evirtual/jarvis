@@ -49,9 +49,9 @@ const CORE_ZONE = 150;
 /** Room above his ring for the status line and a notice. */
 const CORE_STATUS_ROOM = 44;
 const STORE_KEY = "jarvis.workspace";
-const MIN_W = 210, MIN_H = 90;
 
 import type { Related } from "./web.js";
+import { gestures, resized, sidesOf, sizeLimits } from "./surface.js";
 export type { Related } from "./web.js";
 
 interface Card {
@@ -62,6 +62,12 @@ interface Card {
   count: HTMLElement;
   /** What the body was last drawn from, so it's only redrawn when that changes. */
   sig: string;
+}
+
+/** Phone: a thread being dragged up or down the list by its title bar. */
+interface PhoneDrag {
+  id: string; sy: number; scroll0: number; started: boolean; wasActive: boolean;
+  list: HTMLElement; index: number; target: number; h: number;
 }
 
 interface Bubble {
@@ -118,17 +124,8 @@ export class Stage {
   private web: ContextWeb;
   private pulse = 0;
   private placeQueued = false;
-  private groupDrag: { id: string; dx: number; dy: number; pid: number; sx: number; sy: number; moved: boolean; node: boolean } | null = null;
-  private cardDrag: { id: string; pid: number; sx: number; sy: number; ox: number; oy: number; lifted: boolean; onHead: boolean; wasActive: boolean } | null = null;
-  /**
-   * A corner being dragged. `x`/`y` are where the surface started (stage-centre
-   * offsets), so a left or top corner can move the surface while it grows and
-   * the opposite corner stays where it was.
-   */
-  private sizeDrag: {
-    kind: "thread" | "group"; id: string; pid: number; sx: number; sy: number;
-    w: number; h: number; ex: number; ey: number; x?: number; y?: number;
-  } | null = null;
+  /** The window being carried right now, for the drop targets worked out each frame. */
+  private carrying: string | null = null;
   private sizer = new ResizeObserver(() => this.queuePlace());
   private stick = new ResizeObserver((entries) => {
     for (const { target } of entries) {
@@ -150,13 +147,6 @@ export class Stage {
   private raisedFor = "";
   /** Threads already on the board, so a new one can be scrolled to on a phone. */
   private known: Set<string> | null = null;
-  /** Phone: a thread being given a height of its own by the grip at its bottom. */
-  private phoneSize: { id: string; pid: number; sy: number; h0: number } | null = null;
-  /** Phone: a thread being dragged up or down the list by its title bar. */
-  private phoneDrag: {
-    id: string; pid: number; sy: number; scroll0: number; moved: boolean; wasActive: boolean;
-    list: HTMLElement; index: number; target: number; h: number;
-  } | null = null;
   /** While a window is carried: where the pointer is, and what it would drop on. */
   private hitAt: { x: number; y: number; id: string } | null = null;
   private hitQueued = false;
@@ -198,10 +188,10 @@ export class Stage {
     new MutationObserver(() => this.scheduleFit()).observe(layer, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "hidden"] });
     layer.addEventListener("load", () => this.scheduleFit(), true);
 
+    // Every press begins a gesture (surface.ts follows it to its end); the
+    // cursor over JARVIS is the one thing watched between gestures.
     root.addEventListener("pointerdown", (e) => this.onDown(e));
-    window.addEventListener("pointermove", (e) => this.onMove(e));
-    window.addEventListener("pointerup", (e) => this.onUp(e));
-    window.addEventListener("pointercancel", (e) => this.onUp(e));
+    window.addEventListener("pointermove", (e) => this.cursorAt(e));
     root.addEventListener("dblclick", (e) => {
       const card = (e.target as HTMLElement).closest<HTMLElement>(".chatwin");
       if (card) { this.openWeb(card.dataset.id!); return; }
@@ -215,7 +205,7 @@ export class Stage {
     // breathing is slow, and half the drawing is half the battery on a phone.
     let skip = false;
     const frame = (t: number): void => {
-      const resting = this.activity === "idle" && this.pulse <= 0 && !this.cardDrag && !this.groupDrag && !this.sizeDrag && !this.phoneDrag;
+      const resting = this.activity === "idle" && this.pulse <= 0 && !gestures.busy;
       skip = resting && !skip;
       if (!skip) this.draw(t);
       requestAnimationFrame(frame);
@@ -702,13 +692,11 @@ export class Stage {
   }
 
   /** Phone: follow a thread being dragged up or down its list; the others make way. */
-  private movePhoneDrag(e: PointerEvent): void {
-    const d = this.phoneDrag!;
+  private movePhoneDrag(d: PhoneDrag, e: PointerEvent): void {
     const c = this.cards.get(d.id);
     if (!c) return;
-    if (!d.moved) {
-      if (Math.abs(e.clientY - d.sy) < 8) return;
-      d.moved = true;
+    if (!d.started) {
+      d.started = true;
       const all = this.phoneCards(d.list);
       d.index = d.target = all.indexOf(c.el);
       d.h = c.el.offsetHeight + (parseFloat(getComputedStyle(d.list).rowGap) || 8);
@@ -738,12 +726,10 @@ export class Stage {
   }
 
   /** Phone: let go of a thread — a tap folds or focuses it, a drag puts it where it was heading. */
-  private endPhoneDrag(): void {
-    const d = this.phoneDrag!;
-    this.phoneDrag = null;
+  private endPhoneDrag(d: PhoneDrag, moved: boolean): void {
     const t = this.ws.thread(d.id);
     if (!t) return;
-    if (!d.moved) {
+    if (!moved) {
       if (!d.wasActive) this.focus(t.id);
       else { this.ws.setOpen(t.id, !this.ws.isOpen(t)); this.commit(); }
       return;
@@ -834,7 +820,8 @@ export class Stage {
   }
 
   /** The board as the geometry sees it: its edges, and the column kept clear above JARVIS. */
-  private get room(): Room {
+  /** The board as it is right now: its edges, and the column kept clear above JARVIS. Panels sit by it too. */
+  get room(): Room {
     return { bounds: this.bounds, cx: this.core().cx, coreZone: CORE_ZONE, coreFloor: this.coreFloor };
   }
 
@@ -1067,7 +1054,13 @@ export class Stage {
     this.cards.get(id)?.el.scrollIntoView({ block: "nearest" });
   }
 
-  /* ---------------- pointer ---------------- */
+  /* ---------------- pointer ---------------- *
+   * Every box here — a window, a bubble — is carried, sized and folded the
+   * way every box on the board is (surface.ts): the press decides what was
+   * pressed, and hands the gesture its handlers. What is particular to the
+   * stage is what a drop means: on another window, a group; on a bubble,
+   * membership; on the bin, deletion; on JARVIS, out of its group.
+   * ------------------------------------------------------------------- */
 
   private onDown(e: PointerEvent): void {
     const target = e.target as HTMLElement;
@@ -1082,317 +1075,294 @@ export class Stage {
     if (surface?.dataset.id) this.raise(surface.dataset.id);
     else if (surface?.dataset.gid) raise(stackKey.group(surface.dataset.gid));
 
-    // A phone follows the desktop's rules, with taps for clicks: tap a window
-    // to bring it forward, tap the title bar of the one you're in to fold it
-    // or open it again, tap a group's name to fold or open the group.
-    if (this.compact) {
-      if (target.closest("button")) return;
-      const card = target.closest<HTMLElement>(".chatwin");
-      if (card) {
-        const t = this.ws.thread(card.dataset.id);
-        if (!t) return;
-        // The title bar: a tap folds or focuses it (on release), a drag moves it
-        // up or down the list.
-        if (target.closest(".cw-head") && card.parentElement) {
-          this.phoneDrag = {
-            id: t.id, pid: e.pointerId, sy: e.clientY, scroll0: this.layer.scrollTop, moved: false,
-            wasActive: t.id === this.ws.activeId, list: card.parentElement, index: 0, target: 0, h: 0,
-          };
-          return;
-        }
-        if (target.closest(".cw-grip-m")) {
-          this.phoneSize = { id: t.id, pid: e.pointerId, sy: e.clientY, h0: card.offsetHeight };
-          card.classList.add("sizing");
-          e.preventDefault();
-          return;
-        }
-        if (t.id !== this.ws.activeId) this.focus(t.id);
-        return;
-      }
-      const bub = target.closest<HTMLElement>(".bubble");
-      const g = bub ? this.ws.group(bub.dataset.gid) : undefined;
-      if (g && g.id !== GENERAL_ID && target.closest(".bb-head, .bb-node")) this.setFolded(g.id, !g.collapsed);
-      return;
-    }
+    if (this.compact) { this.onDownCompact(e, target); return; }
 
-    // A corner: resize the window, or the bubble.
+    // A corner or an edge: size the window, or the bubble.
     const grip = target.closest<HTMLElement>(".cw-grip, .bb-grip");
-    if (grip) {
-      const corner = grip.dataset.corner ?? "se";
-      // a corner moves on both axes, an edge on one: w/e horizontally, n/s vertically
-      const ex = corner.includes("w") ? -1 : corner.includes("e") ? 1 : 0;
-      const ey = corner.includes("n") ? -1 : corner.includes("s") ? 1 : 0;
-      if (grip.classList.contains("bb-grip")) {
-        const bub = grip.closest<HTMLElement>(".bubble")!;
-        const b = this.bubbles.get(bub.dataset.gid!);
-        const g = this.ws.group(bub.dataset.gid);
-        if (!b || !g) return;
-        const box = this.boxes.get(g.id);
-        this.sizeDrag = {
-          kind: "group", id: g.id, pid: e.pointerId, sx: e.clientX, sy: e.clientY,
-          w: b.el.offsetWidth, h: b.el.offsetHeight, ex, ey, // the bubble's own height: that is what the drag sets (applyGroupSize)
-          ...(box ? { x: box.x, y: box.y } : {}),
-        };
-        bub.classList.add("sizing");
-      } else {
-        const card = grip.closest<HTMLElement>(".chatwin")!;
-        const c = this.cards.get(card.dataset.id!);
-        const t = this.ws.thread(card.dataset.id);
-        // Only a loose window is sized by hand; one inside a group takes the
-        // group's width, and it is the group that is resized.
-        if (!c || !t || t.groupId !== GENERAL_ID) return;
-        this.sizeDrag = {
-          kind: "thread", id: t.id, pid: e.pointerId, sx: e.clientX, sy: e.clientY,
-          w: c.el.offsetWidth, h: c.body.offsetHeight, ex, ey, x: c.el.offsetLeft, y: c.el.offsetTop,
-        };
-        card.classList.add("sizing");
-      }
-      e.preventDefault();
-      return;
-    }
+    if (grip) { this.beginSize(e, grip); return; }
 
     // A bubble, by its name bar or — folded — by the orb itself.
     const bubEl = target.closest<HTMLElement>(".bubble");
     const onHead = target.closest(".bb-head") && !target.closest("button");
     const onNode = target.closest(".bb-node");
-    if (bubEl && (onHead || onNode)) {
-      const g = this.ws.group(bubEl.dataset.gid);
-      if (!g) return;
-      const box = bubEl.getBoundingClientRect();
-      // Nothing is written to the group until the pointer actually travels —
-      // a click on the name must not nudge the bubble.
-      this.groupDrag = {
-        id: g.id, dx: box.left - e.clientX, dy: box.top - e.clientY,
-        pid: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false, node: !!onNode,
-      };
-      e.preventDefault();
-      return;
-    }
+    if (bubEl && (onHead || onNode)) { this.beginCarryGroup(e, bubEl, !!onNode); return; }
 
     // A thread window: click to bring it forward, its title bar to fold it,
     // and drag that bar to move or group it.
     const card = target.closest<HTMLElement>(".chatwin");
     if (!card || target.closest(".cw-x, .cw-del, .cw-b, .cw-w")) return;
+    this.beginCarryCard(e, card, !!target.closest(".cw-head"));
+  }
+
+  /**
+   * A phone follows the desktop's rules, with taps for clicks: tap a window
+   * to bring it forward, tap the title bar of the one you're in to fold it
+   * or open it again, drag that bar to move it up or down the list, drag the
+   * grip at its bottom for a height of its own, tap a group's name to fold or
+   * open the group.
+   */
+  private onDownCompact(e: PointerEvent, target: HTMLElement): void {
+    if (target.closest("button")) return;
+    const card = target.closest<HTMLElement>(".chatwin");
+    if (card) {
+      const t = this.ws.thread(card.dataset.id);
+      if (!t) return;
+      if (target.closest(".cw-head") && card.parentElement) { this.beginPhoneDrag(e, t, card.parentElement); return; }
+      if (target.closest(".cw-grip-m")) { this.beginPhoneSize(e, t, card); return; }
+      if (t.id !== this.ws.activeId) this.focus(t.id);
+      return;
+    }
+    const bub = target.closest<HTMLElement>(".bubble");
+    const g = bub ? this.ws.group(bub.dataset.gid) : undefined;
+    if (g && g.id !== GENERAL_ID && target.closest(".bb-head, .bb-node")) this.setFolded(g.id, !g.collapsed);
+  }
+
+  /** A window or a bubble sized from a corner or an edge, within the board's limits, the opposite side staying put. */
+  private beginSize(e: PointerEvent, grip: HTMLElement): void {
+    const sides = sidesOf(grip.dataset.corner ?? "se");
+    const isGroup = grip.classList.contains("bb-grip");
+    const el = grip.closest<HTMLElement>(isGroup ? ".bubble" : ".chatwin")!;
+    const id = isGroup ? el.dataset.gid! : el.dataset.id!;
+    const t = isGroup ? undefined : this.ws.thread(id);
+    const c = isGroup ? undefined : this.cards.get(id);
+    // Only a loose window is sized by hand; one inside a group takes the
+    // group's width, and it is the group that is resized.
+    if (!isGroup && (!t || !c || t.groupId !== GENERAL_ID)) return;
+    const box = isGroup ? this.boxes.get(id) : undefined;
+    // What the drag sets: a bubble's own height; a window's body, with its
+    // title bar on top of that.
+    const start = isGroup
+      ? { x: box?.x ?? 0, y: box?.y ?? 0, w: el.offsetWidth, h: el.offsetHeight }
+      : { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: c!.body.offsetHeight };
+    const lim = sizeLimits(this.room);
+    if (!isGroup) lim.maxH = Math.max(lim.minH, lim.maxH - 50);
+    el.classList.add("sizing");
+    e.preventDefault();
+    gestures.begin(e, {
+      travel: 0,
+      move: (_ev, dx, dy) => {
+        const r = resized(start, sides, dx, dy, lim);
+        if (isGroup) {
+          const g = this.ws.group(id);
+          if (!g) return;
+          g.size = { w: r.w, h: r.h };
+          delete g.fit;
+          if (box) { g.x = Math.round(r.x); g.y = Math.round(r.y); }
+          this.applyGroupSize(id);
+        } else {
+          t!.size = { w: r.w, h: r.h };
+          delete t!.fit;
+          t!.x = Math.round(r.x);
+          t!.y = Math.round(r.y);
+          this.applySize(id);
+        }
+        if (sides.ex < 0 || sides.ey < 0) this.place();
+      },
+      end: () => { el.classList.remove("sizing"); this.commit(); },
+    });
+  }
+
+  /**
+   * A bubble carried by its name bar — wherever the pointer takes it, over
+   * the edge included, as a window is — and put down inside the board
+   * (place → shown). A tap on the name bar folds it; a tap on the folded
+   * orb opens it — as a thread's title bar folds and opens it.
+   */
+  private beginCarryGroup(e: PointerEvent, bubEl: HTMLElement, onNode: boolean): void {
+    const g = this.ws.group(bubEl.dataset.gid);
+    if (!g) return;
+    const box = bubEl.getBoundingClientRect();
+    const dx0 = box.left - e.clientX, dy0 = box.top - e.clientY;
+    e.preventDefault();
+    let lifted = false;
+    gestures.begin(e, {
+      travel: 5,
+      move: (ev) => {
+        if (!lifted) { lifted = true; this.showBin(true); bubEl.classList.add("dragging"); }
+        const r = this.root.getBoundingClientRect();
+        g.x = Math.round(ev.clientX + dx0 - r.left);
+        g.y = Math.round(ev.clientY + dy0 - r.top);
+        bubEl.style.transform = `translate3d(${g.x}px, ${g.y}px, 0)`;
+        this.overBin(ev.clientX, ev.clientY);
+      },
+      end: (ev, moved) => {
+        bubEl.classList.remove("dragging");
+        const binned = moved && this.overBin(ev.clientX, ev.clientY);
+        this.showBin(false);
+        if (binned) { this.onDropDelete?.("group", g.id); return; }
+        if (!moved) { this.setFolded(g.id, !onNode); return; }
+        this.place();
+        this.save();
+      },
+    });
+  }
+
+  /**
+   * A window: the first click on an inactive one only brings it forward;
+   * the title bar of the one you're in folds it. Carried past a few pixels
+   * it lifts, and where it is let go decides what happens (dropCard).
+   */
+  private beginCarryCard(e: PointerEvent, card: HTMLElement, onHead: boolean): void {
     const id = card.dataset.id!;
     const wasActive = id === this.ws.activeId;
     if (!wasActive) this.focus(id);
-    const onCardHead = !!target.closest(".cw-head");
     const box = card.getBoundingClientRect();
-    this.cardDrag = {
-      id, pid: e.pointerId, sx: e.clientX, sy: e.clientY,
-      ox: e.clientX - box.left, oy: e.clientY - box.top, lifted: false, onHead: onCardHead, wasActive,
-    };
-    if (onCardHead) e.preventDefault();
+    const ox = e.clientX - box.left, oy = e.clientY - box.top;
+    if (onHead) e.preventDefault();
+    gestures.begin(e, {
+      travel: 7,
+      move: (ev, dx, dy) => {
+        const c = this.cards.get(id);
+        if (!c) return;
+        if (this.carrying !== id) {
+          this.carrying = id;
+          c.el.classList.add("lifted");
+          // Carried where it is, by a transform. Moving the window to another
+          // parent would reload anything in it — a video would stop and restart.
+          c.el.closest(".bubble")?.classList.add("carrying");
+          this.root.classList.add("carrying");
+          this.showBin(true);
+        }
+        c.el.style.transform = `translate(${Math.round(dx)}px, ${Math.round(dy)}px)`;
+        // What it would land on — another thread (making a group), a bubble, the
+        // bin — is worked out once a frame, not on every pointer event: measuring
+        // every window that often makes a heavy one (a playing video) stutter.
+        this.hitAt = { x: ev.clientX, y: ev.clientY, id };
+        if (!this.hitQueued) {
+          this.hitQueued = true;
+          requestAnimationFrame(() => {
+            this.hitQueued = false;
+            const h = this.hitAt;
+            if (!h || this.carrying !== h.id) return;
+            const ontoCard = this.cardAt(h.x, h.y, h.id);
+            const over = ontoCard ? null : this.bubbleAt(h.x, h.y);
+            const dropGroup = over && over !== this.ws.thread(h.id)?.groupId ? over : null;
+            if (ontoCard !== this.dropCard) {
+              if (this.dropCard) this.cards.get(this.dropCard)?.el.classList.remove("drop");
+              if (ontoCard) this.cards.get(ontoCard)?.el.classList.add("drop");
+              this.dropCard = ontoCard;
+            }
+            if (dropGroup !== this.dropGroup) {
+              if (this.dropGroup) this.bubbles.get(this.dropGroup)?.el.classList.remove("drop");
+              if (dropGroup) this.bubbles.get(dropGroup)?.el.classList.add("drop");
+              this.dropGroup = dropGroup;
+            }
+            this.overBin(h.x, h.y);
+          });
+        }
+      },
+      end: (ev, moved) => this.putDownCard(ev, id, moved, onHead, wasActive, ox, oy),
+    });
   }
 
-  private onMove(e: PointerEvent): void {
-    if (this.phoneDrag && e.pointerId === this.phoneDrag.pid) { this.movePhoneDrag(e); return; }
-    if (this.phoneSize && e.pointerId === this.phoneSize.pid) {
-      const d = this.phoneSize;
-      const t = this.ws.thread(d.id);
-      const c = this.cards.get(d.id);
-      if (!t || !c) return;
-      // no smaller than its title bar and a line or two, no taller than the list itself
-      const room = this.layer.clientHeight - Stage.PHONE_MIN;
-      t.mh = Math.round(Math.max(110, Math.min(room, d.h0 + (e.clientY - d.sy))));
-      c.el.style.minHeight = c.el.style.maxHeight = `${t.mh}px`;
+  /** What letting go of a window means: a fold, a new group, a new home, the bin, or a new seat. */
+  private putDownCard(e: PointerEvent, id: string, moved: boolean, onHead: boolean, wasActive: boolean, ox: number, oy: number): void {
+    this.carrying = null;
+    const c = this.cards.get(id);
+    for (const b of this.bubbles.values()) b.el.classList.remove("drop");
+    for (const x of this.cards.values()) x.el.classList.remove("drop");
+    this.hitAt = null; this.dropCard = null; this.dropGroup = null;
+    if (!c) { this.showBin(false); return; }
+
+    // The first click on an inactive card only focuses it. Folding is a
+    // separate, deliberate second click on the active title bar.
+    if (!moved) {
+      this.showBin(false);
+      if (!onHead || !wasActive) return;
+      const t = this.ws.thread(id);
+      if (!t) return;
+      this.ws.setOpen(t.id, !this.ws.isOpen(t));
+      this.commit();
       return;
     }
-    const r = this.root.getBoundingClientRect();
-    if (this.sizeDrag && e.pointerId === this.sizeDrag.pid) {
-      const d = this.sizeDrag;
-      const size = {
-        w: Math.max(MIN_W, Math.min(760, d.w + (e.clientX - d.sx) * d.ex)),
-        // never taller than fits above JARVIS (title bar and frame take ~50px)
-        h: Math.max(MIN_H, Math.min(this.coreFloor - this.bounds.top - 50, d.h + (e.clientY - d.sy) * d.ey)),
-      };
-      // Dragging a left or top corner moves that edge; the opposite one stays put.
-      const x = d.x === undefined ? undefined : Math.round(d.x - (d.ex < 0 ? size.w - d.w : 0));
-      const y = d.y === undefined ? undefined : Math.round(d.y - (d.ey < 0 ? size.h - d.h : 0));
-      if (d.kind === "group") {
-        const g = this.ws.group(d.id);
-        if (!g) return;
-        g.size = size;
-        delete g.fit;
-        if (x !== undefined) g.x = x;
-        if (y !== undefined) g.y = y;
-        this.applyGroupSize(d.id);
-      } else {
-        const t = this.ws.thread(d.id);
-        if (!t) return;
-        t.size = size;
-        delete t.fit;
-        if (x !== undefined) t.x = x;
-        if (y !== undefined) t.y = y;
-        this.applySize(d.id);
+
+    // Put down without a glide back from where it was carried: the move to
+    // its new seat below is instant, then transitions come back.
+    c.el.classList.add("settling");
+    c.el.classList.remove("lifted");
+    c.el.style.transform = "";
+    c.el.closest(".bubble")?.classList.remove("carrying");
+    this.root.classList.remove("carrying");
+    requestAnimationFrame(() => requestAnimationFrame(() => c.el.classList.remove("settling")));
+    const binned = this.overBin(e.clientX, e.clientY);
+    this.showBin(false);
+    const t = this.ws.thread(id);
+    if (!t) { this.renderAll(); return; }
+    if (binned) { this.renderAll(); this.onDropDelete?.("thread", t.id); return; }
+
+    const ontoCard = this.cardAt(e.clientX, e.clientY, id);
+    const over = this.bubbleAt(e.clientX, e.clientY);
+    const dropAt = (): void => {
+      const r = this.root.getBoundingClientRect();
+      const seat = this.shown({
+        x: e.clientX - r.left - ox,
+        y: e.clientY - r.top - oy,
+        w: c.el.offsetWidth,
+        h: c.el.offsetHeight,
+      });
+      t.x = Math.round(seat.x);
+      t.y = Math.round(seat.y);
+    };
+    if (this.onCore(e.clientX, e.clientY)) {
+      // Dropped on JARVIS himself: out of its group, loose on the board.
+      this.ws.moveThread(t.id, GENERAL_ID);
+      delete t.x; delete t.y;
+    } else if (ontoCard) {
+      // Dropped on another thread: the two of them become a group.
+      const g = this.ws.groupThreads(t.id, ontoCard);
+      if (g && (g.x === undefined || g.y === undefined)) {
+        const box = this.cards.get(ontoCard)?.el.getBoundingClientRect();
+        const r = this.root.getBoundingClientRect();
+        if (box) { g.x = Math.round(box.left - r.left - 12); g.y = Math.round(Math.max(this.bounds.top, box.top - r.top - 46)); }
       }
-      if (d.ex < 0 || d.ey < 0) this.place();
-      return;
+    } else if (over && over !== t.groupId) {
+      this.ws.moveThread(t.id, over);
+    } else if (!over) {
+      // Open space: it becomes (or stays) an independently placed window.
+      this.ws.moveThread(t.id, GENERAL_ID);
+      dropAt();
     }
-    if (this.groupDrag && e.pointerId === this.groupDrag.pid) {
-      const d = this.groupDrag;
-      if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return;
-      if (!d.moved) { this.showBin(true); this.bubbles.get(d.id)?.el.classList.add("dragging"); }
-      d.moved = true;
-      const g = this.ws.group(d.id);
-      if (!g) return;
-      // Carried where the pointer takes it, over the edge included — as a window
-      // is — and brought back onto the board when it is put down (place → shown).
-      g.x = Math.round(e.clientX + d.dx - r.left);
-      g.y = Math.round(e.clientY + d.dy - r.top);
-      const el = this.bubbles.get(d.id)?.el;
-      if (el) el.style.transform = `translate3d(${g.x}px, ${g.y}px, 0)`;
-      this.overBin(e.clientX, e.clientY);
-      return;
-    }
-    if (this.cardDrag && e.pointerId === this.cardDrag.pid) {
-      const d = this.cardDrag;
-      const c = this.cards.get(d.id);
-      if (!c) return;
-      if (!d.lifted) {
-        if (Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 7) return;
-        d.lifted = true;
-        c.el.classList.add("lifted");
-        // Carried where it is, by a transform. Moving the window to another
-        // parent would reload anything in it — a video would stop and restart.
-        c.el.closest(".bubble")?.classList.add("carrying");
-        this.root.classList.add("carrying");
-        this.showBin(true);
-      }
-      c.el.style.transform = `translate(${Math.round(e.clientX - d.sx)}px, ${Math.round(e.clientY - d.sy)}px)`;
-      // What it would land on — another thread (making a group), a bubble, the
-      // bin — is worked out once a frame, not on every pointer event: measuring
-      // every window that often makes a heavy one (a playing video) stutter.
-      this.hitAt = { x: e.clientX, y: e.clientY, id: d.id };
-      if (!this.hitQueued) {
-        this.hitQueued = true;
-        requestAnimationFrame(() => {
-          this.hitQueued = false;
-          const h = this.hitAt;
-          if (!h || !this.cardDrag) return;
-          const ontoCard = this.cardAt(h.x, h.y, h.id);
-          const over = ontoCard ? null : this.bubbleAt(h.x, h.y);
-          const dropGroup = over && over !== this.ws.thread(h.id)?.groupId ? over : null;
-          if (ontoCard !== this.dropCard) {
-            if (this.dropCard) this.cards.get(this.dropCard)?.el.classList.remove("drop");
-            if (ontoCard) this.cards.get(ontoCard)?.el.classList.add("drop");
-            this.dropCard = ontoCard;
-          }
-          if (dropGroup !== this.dropGroup) {
-            if (this.dropGroup) this.bubbles.get(this.dropGroup)?.el.classList.remove("drop");
-            if (dropGroup) this.bubbles.get(dropGroup)?.el.classList.add("drop");
-            this.dropGroup = dropGroup;
-          }
-          this.overBin(h.x, h.y);
-        });
-      }
-      return;
-    }
-    // JARVIS is a button, and says so under the pointer.
+    this.commit();
+  }
+
+  /** Phone: the title bar dragged moves the thread up or down the list; a tap folds or focuses it (endPhoneDrag). */
+  private beginPhoneDrag(e: PointerEvent, t: Thread, list: HTMLElement): void {
+    const d: PhoneDrag = {
+      id: t.id, sy: e.clientY, scroll0: this.layer.scrollTop, started: false,
+      wasActive: t.id === this.ws.activeId, list, index: 0, target: 0, h: 0,
+    };
+    gestures.begin(e, {
+      travel: 8,
+      move: (ev) => this.movePhoneDrag(d, ev),
+      end: (_ev, moved) => this.endPhoneDrag(d, moved),
+    });
+  }
+
+  /** Phone: the grip at the bottom of the thread in front, dragged for a height of its own (kept: Thread.mh). */
+  private beginPhoneSize(e: PointerEvent, t: Thread, card: HTMLElement): void {
+    const h0 = card.offsetHeight;
+    card.classList.add("sizing");
+    e.preventDefault();
+    gestures.begin(e, {
+      travel: 0,
+      move: (_ev, _dx, dy) => {
+        const c = this.cards.get(t.id);
+        if (!c) return;
+        // no smaller than its title bar and a line or two, no taller than the list itself
+        const room = this.layer.clientHeight - Stage.PHONE_MIN;
+        t.mh = Math.round(Math.max(110, Math.min(room, h0 + dy)));
+        c.el.style.minHeight = c.el.style.maxHeight = `${t.mh}px`;
+      },
+      end: () => { card.classList.remove("sizing"); this.save(); this.scheduleFit(); },
+    });
+  }
+
+  /** JARVIS is a button, and says so under the pointer. */
+  private cursorAt(e: PointerEvent): void {
+    if (gestures.busy) return;
     const t = e.target as HTMLElement | null;
     if (t instanceof Element && this.root.contains(t) && !t.closest(".bubble, .cmd, .panel, .web, .deck, .topbar")) {
       this.root.style.cursor = this.onCore(e.clientX, e.clientY) ? "pointer" : "";
-    }
-  }
-
-  private onUp(e: PointerEvent): void {
-    if (this.phoneDrag && e.pointerId === this.phoneDrag.pid) { this.endPhoneDrag(); return; }
-    if (this.phoneSize && e.pointerId === this.phoneSize.pid) {
-      this.cards.get(this.phoneSize.id)?.el.classList.remove("sizing");
-      this.phoneSize = null;
-      this.save();
-      this.scheduleFit();
-      return;
-    }
-    if (this.sizeDrag && e.pointerId === this.sizeDrag.pid) {
-      const d = this.sizeDrag;
-      (d.kind === "group" ? this.bubbles.get(d.id)?.el : this.cards.get(d.id)?.el)?.classList.remove("sizing");
-      this.sizeDrag = null;
-      this.commit();
-      return;
-    }
-    if (this.groupDrag && e.pointerId === this.groupDrag.pid) {
-      const d = this.groupDrag;
-      this.groupDrag = null;
-      this.bubbles.get(d.id)?.el.classList.remove("dragging");
-      const binned = d.moved && this.overBin(e.clientX, e.clientY);
-      this.showBin(false);
-      if (binned) { this.onDropDelete?.("group", d.id); return; }
-      // A tap on the name bar folds the group, a tap on the folded orb opens
-      // it — as a thread's title bar folds and opens it.
-      if (!d.moved) { this.setFolded(d.id, !d.node); return; }
-      this.place(); // put down: back inside the board if it was carried past the edge
-      this.save();
-      return;
-    }
-    if (this.cardDrag && e.pointerId === this.cardDrag.pid) {
-      const d = this.cardDrag;
-      this.cardDrag = null;
-      const c = this.cards.get(d.id);
-      for (const b of this.bubbles.values()) b.el.classList.remove("drop");
-      for (const x of this.cards.values()) x.el.classList.remove("drop");
-      this.hitAt = null; this.dropCard = null; this.dropGroup = null;
-      if (!c) { this.showBin(false); return; }
-
-      // The first click on an inactive card only focuses it. Folding is a
-      // separate, deliberate second click on the active title bar.
-      if (!d.lifted) {
-        this.showBin(false);
-        if (!d.onHead || !d.wasActive) return;
-        const t = this.ws.thread(d.id);
-        if (!t) return;
-        this.ws.setOpen(t.id, !this.ws.isOpen(t));
-        this.commit();
-        return;
-      }
-
-      // Put down without a glide back from where it was carried: the move to
-      // its new seat below is instant, then transitions come back.
-      c.el.classList.add("settling");
-      c.el.classList.remove("lifted");
-      c.el.style.transform = "";
-      c.el.closest(".bubble")?.classList.remove("carrying");
-      this.root.classList.remove("carrying");
-      requestAnimationFrame(() => requestAnimationFrame(() => c.el.classList.remove("settling")));
-      const binned = this.overBin(e.clientX, e.clientY);
-      this.showBin(false);
-      const t = this.ws.thread(d.id);
-      if (!t) { this.renderAll(); return; }
-      if (binned) { this.renderAll(); this.onDropDelete?.("thread", t.id); return; }
-
-      const ontoCard = this.cardAt(e.clientX, e.clientY, d.id);
-      const over = this.bubbleAt(e.clientX, e.clientY);
-      const dropAt = (): void => {
-        const r = this.root.getBoundingClientRect();
-        const shown = this.shown({
-          x: e.clientX - r.left - d.ox,
-          y: e.clientY - r.top - d.oy,
-          w: c.el.offsetWidth,
-          h: c.el.offsetHeight,
-        });
-        t.x = Math.round(shown.x);
-        t.y = Math.round(shown.y);
-      };
-      if (this.onCore(e.clientX, e.clientY)) {
-        // Dropped on JARVIS himself: out of its group, loose on the board.
-        this.ws.moveThread(t.id, GENERAL_ID);
-        delete t.x; delete t.y;
-      } else if (ontoCard) {
-        // Dropped on another thread: the two of them become a group.
-        const g = this.ws.groupThreads(t.id, ontoCard);
-        if (g && (g.x === undefined || g.y === undefined)) {
-          const box = this.cards.get(ontoCard)?.el.getBoundingClientRect();
-          const r = this.root.getBoundingClientRect();
-          if (box) { g.x = Math.round(box.left - r.left - 12); g.y = Math.round(Math.max(this.bounds.top, box.top - r.top - 46)); }
-        }
-      } else if (over && over !== t.groupId) {
-        this.ws.moveThread(t.id, over);
-      } else if (!over) {
-        // Open space: it becomes (or stays) an independently placed window.
-        this.ws.moveThread(t.id, GENERAL_ID);
-        dropAt();
-      }
-      this.commit();
     }
   }
 
