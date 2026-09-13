@@ -190,26 +190,6 @@ test("each window remembers whether it is open, on its own", () => {
   assert.equal(ws.isOpen(b), true, "and so does moving the focus");
 });
 
-/* ---------------- what a thread's answers are based on ---------------- */
-
-test("a thread hears only itself; a new subthread also hears its parent's tail", () => {
-  const ws = new Workspace();
-  const a = ws.createThread({ title: "Lithuania" });
-  a.turns = turns("news in Lithuania", "Vilnius…");
-  const b = ws.createThread({ title: "Cambodia" });
-  b.turns = turns("news in Cambodia", "Phnom Penh…");
-  assert.deepEqual(ws.historyFor(b), b.turns, "nothing from the other thread");
-
-  const sub = ws.createThread({ title: "Vilnius hotels", parentId: a.id });
-  sub.turns = turns("hotels?", "Stikliai…");
-  assert.deepEqual(ws.historyFor(sub), [...a.turns, ...sub.turns], "a young subthread inherits its parent's tail");
-  assert.ok(!ws.historyFor(sub).some((t) => t.content.includes("Cambodia")), "and nothing from unrelated threads");
-
-  // Once it has a conversation of its own, it stands alone.
-  sub.turns = Array.from({ length: 8 }, (_, i) => ({ role: i % 2 ? ("assistant" as const) : ("user" as const), content: `m${i}` }));
-  assert.deepEqual(ws.historyFor(sub), sub.turns);
-});
-
 /* ---------------- lifecycle: archive ≠ clear ≠ delete ---------------- */
 
 test("archive puts a thread and its subthreads away; restore brings them back", () => {

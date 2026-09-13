@@ -136,8 +136,9 @@ use it, but it is deliberately unfriendly to anything else:
 A ChatGPT Plus or Claude plan does not include API access — they are separate
 products, and a program on your own PC is no exception. Gemini's free tier is
 the honest answer if you want JARVIS without per-use billing. Claude has no
-speech or hearing, so it isn't a connection here; it returns in code mode
-([PLAN-code-mode.md](PLAN-code-mode.md)), where a Claude subscription does count.
+speech or hearing, so it isn't a connection here. A code mode with Claude is
+sketched in [PLAN-code-mode.md](PLAN-code-mode.md) and set aside; none of it
+is built.
 
 ## Odds and ends
 

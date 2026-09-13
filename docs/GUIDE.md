@@ -263,9 +263,11 @@ confirmation on your behalf, or change a model.
 
 **He sees the whole console.** Every question carries a snapshot: every group,
 every thread with a summary and its tag, what connects them, what's open, how
-he's set up, and whether this is the PC or the web version. A thread's answers
-are based on that thread alone — a new subthread also hears the tail of the
-thread it grew from, and nothing else bleeds across.
+he's set up, and whether this is the PC or the web version. With it go the
+last dozen lines of your conversation at the core and, when a thread is in
+front, that thread's last exchanges — so a follow-up is answered in its own
+context, and other threads reach him only as one-line summaries, or as
+findings through the web when two threads are connected.
 
 Short questions about this machine ("status", "my IP", "weather") are answered
 instantly from live readings, at the core; anything else goes to the service,

@@ -42,7 +42,7 @@ localStorage.removeItem("jarvis.stack");
 
 | ID | Steps | Expected |
 | --- | --- | --- |
-| L-01 | Clean start at 1440×900 | Only the title row (Threads top-left with count, J.A.R.V.I.S. centred, Configuration top-right), JARVIS at the bottom centre, and the deck. No thread, no text box. |
+| L-01 | Clean start at 1440×900 | Only the title row (Threads and Conversation top-left, each with a count, J.A.R.V.I.S. centred, Configuration top-right), JARVIS at the bottom centre, and the deck. No thread, no text box. |
 | L-02 | Look at the deck | New thread button left of JARVIS, keyboard right of him. CPU/GPU/Disk on the left edge, Net/LAN/Sky on the right edge. Readings show icon + value only (no labels). |
 | L-03 | Each reading's colour | CPU, GPU, Disk, Net, LAN, Sky each have their instrument's colour on border/icon; the same colour as that panel's border and title. Open a panel: its reading lights up in that colour. |
 | L-04 | Narrow the window (1440 → 768) | Each side folds its least important reading first (Disk, then LAN, …) into its own More (2×2 grid icon). Nothing overlaps JARVIS or the side buttons. |
@@ -155,7 +155,7 @@ localStorage.removeItem("jarvis.stack");
 ## 11. Local commands (no model)
 
 "status", "what time is it", "weather", "show me the radar", "close all panels",
-"open config", "mute" / "unmute", "use the Lewis voice", "speak faster",
+"open config", "mute" / "unmute", "use the Charon voice", "speak faster",
 "switch to Rail Baltica", "minimise Baltic cable damage", "open the Baltic cable
 damage thread", "rename Solar storms to Space weather." — each acts at once, with
 a short notice, and nothing reaches the model. While an answer is streaming, a new
@@ -349,7 +349,7 @@ input, in the preview's own storage. Every step passed after the fixes below.
 | --- | --- |
 | D1–D5 | Clean start; New thread; "rename this to …"; fold/open by title; four threads never overlapping; the newest is active and on top |
 | D6–D7 | Drop a window on another → group; drop on JARVIS → out, a group of one dissolves |
-| D8–D11 | All seven panels open without overlapping, clear of the title row, deck and JARVIS; clicked thread rises above panels; Esc and ×; the web opens over the veil, Esc closes it; Tidy up |
+| D8–D11 | All eight panels open without overlapping, clear of the title row, deck and JARVIS; clicked thread rises above panels; Esc and ×; the web opens over the veil, Esc closes it; Tidy up |
 | D12–D13 | × puts away; "put all away"; restore by name (an unknown name is answered, never guessed); bin → confirm → "no" keeps it in place → "yes" deletes |
 | D14–D16 | Reload keeps windows and panels in place; narrowing keeps widths and clamps, widening restores; delete everything → clean screen |
 | M1–M3 | Phone deck and 16px edges; newest first; a new thread lands on top and the list scrolls to it; tap body focuses, tap title folds/opens |
@@ -918,7 +918,7 @@ Found and fixed:
 
 ### 2026-09-12 — the first-run guide
 
-`setup.ts`: three steps (where you are; connect a service; say hello), shown
+`setup.ts`: four steps (where you are; connect a service; what J.A.R.V.I.S. needs; say hello — the Voice tab's own controls), shown
 once when nothing is connected, back from Configuration → Connections or by
 "run setup" / "show me the guide". 68 tests; both versions rebuilt.
 
@@ -927,7 +927,7 @@ once when nothing is connected, back from Configuration → Connections or by
 | Opens by itself on a first visit with nothing connected | — (connected: stays closed, marked seen) | Pass |
 | Step 1 says which version and where keys live | Pass | Pass ("web version… no server behind it") |
 | Step 2: Gemini and ChatGPT cards, key-page links, paste fields; connected services shown as such | Pass (both "Connected", ChatGPT "in use") | Pass |
-| Step 3: address select applies at once; "Hear his voice"; how to talk to him | Pass | Pass (prompt → "MA'AM ›") |
+| Last step: the Voice tab's controls; "Test voice"; how to talk | Pass | Pass (prompt → "MA'AM ›") |
 | Not now / Done close it and it doesn't return; the old "No service connected" notice shows instead | — | Pass |
 | "show me the guide" opens it; Esc closes it; Configuration → Connections → *Open the setup guide* reopens it and closes the drawer | Pass | — |
 | Centred on the desktop; full-screen on a phone (375 × 812), no sideways scroll | Pass | Pass |
@@ -1031,3 +1031,10 @@ Found and fixed on the way:
      as a window's title bar does.
 109. Threads, groups and panels each had their own drag, resize and edge
      code. One shared surface behaviour (surface.ts) carries all three.
+110. The line under the core (`#threadName`), recorded as restored in fix
+     100, had been hidden again ever since. Element, style and code are
+     removed for good; the status word and notices are the line under him.
+111. An audit of the whole client (see the commits of 2026-09-13, "Audit"):
+     dead rules and code, doubled constants and helpers, three focus rings
+     and nine hover alphas, storage keys in three styles, the palette retyped
+     on the canvas — each brought to one.

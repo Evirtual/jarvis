@@ -58,6 +58,11 @@ the web version answers the same API calls in the browser
 | `src/client/state.ts` | The singletons every module shares (stage, workspace, panels, voice, connections) |
 | `src/client/server.ts` | Which version this is: the PC with its server, or the web page on its own |
 | `src/client/api.ts` | Typed calls to the console's API — to the server, or to `browser-core.ts` |
+| `src/client/dom.ts`, `text.ts`, `num.ts` | Small pure helpers: elements and storage (with old key names still read), escaping and formatting; clipping and edit distance; clamp |
+| `src/client/palette.ts` | The stylesheet's colours for what is drawn on a canvas, read once |
+| `src/client/markdown.ts`, `message.ts` | A reply's Markdown parsed with marked and drawn into the DOM node by node (no innerHTML), media markers lifted into cards |
+| `src/client/core-chat.ts` | The conversation at the core — what is said outside any thread — kept in this browser, the last dozen lines sent with each question |
+| `src/client/radar-split.ts` | The line under the radar that sizes it |
 | `src/client/browser-core.ts` | The console core with its keys in the browser's storage — the same calls the server answers |
 | `src/client/sensors.ts` | The web version's instruments: what a browser can genuinely measure of its device |
 | `src/client/workspace.ts` | Threads, groups, colours and their lifecycle, as pure data (plus migrations) |
@@ -75,7 +80,7 @@ the web version answers the same API calls in the browser
 | `src/client/pcm.ts`, `device-voices.ts` | Pure and tested: the samples a service sends and where the speech in them is; ranking the device's own voices |
 | `src/client/voice-ui.ts` | JARVIS as the microphone, the keyboard, Esc, the voice controls |
 | `src/client/connections.ts` | The Connections screen |
-| `src/client/setup.ts` | The first-run guide: where it's running, connecting a service, saying hello; back from Configuration or by asking |
+| `src/client/setup.ts`, `readiness.ts` | The first-run guide: where it's running, connecting a service, what J.A.R.V.I.S. needs (microphone, location, sound), saying hello with the Voice tab's own controls; and the readiness card left on the board when the guide is closed with something undone |
 | `src/client/memory.ts` | The board's room in the browser's storage |
 | `src/client/readings.ts` | Painting the live readings, and receiving them |
 | `src/client/threads.ts`, `links.ts`, `web.ts` | The Threads list; which threads are about the same things; the context web |
@@ -99,8 +104,8 @@ asked, an account out of credit shown on its card, hearing, a spent speech
 model giving way to the next); migrations (including bringing an older save forward
 without losing a message), creating and branching threads, grouping and
 ungrouping, colours, where loose windows are kept, persistence round-trips, the
-archive/clear/delete rules, moving a new subject to its own thread, context
-isolation between threads, relatedness for the web, the command parser, how an
+archive/clear/delete rules, moving a new subject to its own thread,
+relatedness for the web, the command parser, how an
 older save's positions are converted, model ranking, and the directive
 whitelist (the model can't delete or confirm).
 

@@ -163,6 +163,17 @@ await check('conversation: talk stays at the core, is kept, and is not a thread;
   assert((await board()).windows.length === before, 'a markerless reply opened a thread');
   const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.conversation') || '[]').map((l) => l.role + ':' + l.content.slice(0, 20)));
   assert(kept.some((l) => l.startsWith('user:how are you')) && kept.some((l) => l.startsWith('assistant:Noted')), 'transcript: ' + JSON.stringify(kept));
+  // The Conversation panel: its button opens it with the lines, its count sits on the button, Clear empties it.
+  const badge = await page.evaluate(() => { const b = document.getElementById('pillConversation').getBoundingClientRect(), c = document.getElementById('pConversation').getBoundingClientRect(); return { count: document.getElementById('pConversation').textContent, onButton: c.left >= b.left - 4 && c.right <= b.right + 6 }; });
+  assert(badge.onButton && Number(badge.count) >= 2, 'conversation count not on its button: ' + JSON.stringify(badge));
+  await page.evaluate(() => document.getElementById('pillConversation').click()); await wait(500);
+  const opened = await page.evaluate(() => ({ open: !document.querySelector('.panel.float[data-panel="conversation"]').hidden, lines: document.querySelectorAll('#coreChat .cw-msg').length }));
+  assert(opened.open && opened.lines >= 2, 'conversation panel: ' + JSON.stringify(opened));
+  await page.evaluate(() => [...document.querySelectorAll('#coreChat button')].find((b) => /clear/i.test(b.textContent)).click()); await wait(300);
+  const cleared = await page.evaluate(() => ({ lines: document.querySelectorAll('#coreChat .cw-msg').length, stored: localStorage.getItem('jarvis.conversation'), count: document.getElementById('pConversation').textContent }));
+  assert(cleared.lines === 0 && cleared.stored === '[]' && cleared.count === '0', 'clear: ' + JSON.stringify(cleared));
+  await page.evaluate(() => document.getElementById('pillConversation').click()); await wait(300);
+  assert(await page.evaluate(() => document.querySelector('.panel.float[data-panel="conversation"]').hidden), 'the button did not close the panel');
   // the model hears the recent conversation: the question sent carries what was said before it
   return { said: said.slice(0, 30), kept: kept.length };
 });

@@ -1,5 +1,10 @@
 # Plan: the connection is the core
 
+**Status (2026-09-13): done.** What follows is the decision and a record of
+what was built. The guide it describes as three steps has since become four
+(where you are; connect a service; what J.A.R.V.I.S. needs; say hello), and a
+readiness card stays on the board when it is closed with something undone.
+
 **Decided (2026-09-12).** One connected service gives JARVIS everything:
 his reasoning, his hearing and his voice. The console behaves the same on the
 PC, on the web and on the phone. There are two services, **Gemini** and

@@ -1,5 +1,9 @@
 # Plan: code mode
 
+**Status (2026-09-13): set aside.** Nothing of this is built; the only trace in
+the code is the loader turning an old "code" thread back into a conversation.
+Kept as a sketch.
+
 **Goal.** A switch that turns JARVIS from the research console into a
 developer at your side: in **code mode** he works on a project folder through
 **Claude Code, installed and signed in on the PC** — reading, planning, editing

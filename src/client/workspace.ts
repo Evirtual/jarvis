@@ -354,19 +354,6 @@ export class Workspace {
     for (const r of roots) walk(r);
     return out;
   }
-  /**
-   * The conversation the reasoning core hears for a thread: that thread's own
-   * turns and nothing else — except for a subthread that has only just begun,
-   * which also hears the tail of the thread it grew from. Other threads reach
-   * the core only as one-line summaries in the console snapshot, so two lines
-   * of enquiry never bleed into each other.
-   */
-  historyFor(thread: Thread, limit = 14): Turn[] {
-    const parent = this.parentOf(thread);
-    const inherited = parent && thread.turns.length <= 6 ? parent.turns.slice(-6) : [];
-    return [...inherited, ...thread.turns].slice(-limit);
-  }
-
   /** Groups with something in them. An empty one isn't drawn. */
   get visibleGroups(): Group[] {
     return this.data.groups.filter((g) => this.live.some((t) => t.groupId === g.id));
