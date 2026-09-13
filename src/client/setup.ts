@@ -22,7 +22,7 @@ import { conn, voice } from "./state.js";
 import { applyAddress } from "./voice-ui.js";
 
 const DONE = "jarvis.setupDone";
-const STEPS = ["Where you are", "Connect a service", "What he needs", "Say hello"] as const;
+const STEPS = ["Where you are", "Connect a service", "What JARVIS needs", "Say hello"] as const;
 const NEEDS_STEP = 2;
 
 /* ---------------- installing ----------------
@@ -82,14 +82,14 @@ export function closeSetup(): void {
 /* ---------------- the steps ---------------- */
 
 function whereYouAre(): string {
-  const who = `<p class="lead">JARVIS is a console that talks back: ask him anything, by voice or by typing, and he answers, hears and speaks through a service you connect with your own key.</p>`;
+  const who = `<p class="lead">JARVIS is a console that talks back: ask anything, by voice or by typing, and it answers, hears and speaks through a service you connect with your own key.</p>`;
   return SERVERLESS
     ? who + `<p>This is the web version: it runs entirely in your browser, and a key you connect stays here on this device.</p>
        <details class="disclose"><summary>More on keys and privacy</summary><div class="body">
        <p>A key goes only to the service it belongs to; nothing is sent anywhere else. The readings on the deck are what a browser can measure of this device. Installed, or added to your home screen, it opens like an app.</p></div></details>`
-    : who + `<p>This is the PC version: his own server runs on this machine, and a key you connect stays there.</p>
+    : who + `<p>This is the PC version: the console's own server runs on this machine, and a key you connect stays there.</p>
        <details class="disclose"><summary>More on keys and privacy</summary><div class="body">
-       <p>A key is saved in <b>config.json</b> beside the server and never sent to the browser. He reads this machine's sensors and, when asked, sweeps your network.</p></div></details>`;
+       <p>A key is saved in <b>config.json</b> beside the server and never sent to the browser. The server reads this machine's sensors and, when asked, sweeps your network.</p></div></details>`;
 }
 
 function providerCard(id: ProviderId): string {
@@ -133,8 +133,8 @@ function providerCard(id: ProviderId): string {
 function connect(): string {
   const any = conn.anyReady;
   return (
-    `<p class="lead">One key gives JARVIS everything: his answers, his hearing and his voice.</p>` +
-    `<p>${any ? "He's connected. A second service is a spare for when the first is at its limit." : "Gemini's free tier is the quickest way in: no card, and it takes a minute."}</p>` +
+    `<p class="lead">One key gives JARVIS everything: answers, hearing and a voice.</p>` +
+    `<p>${any ? "Connected. A second service is a spare for when the first is at its limit." : "Gemini's free tier is the quickest way in: no card, and it takes a minute."}</p>` +
     PROVIDER_IDS.map(providerCard).join("") +
     `<p class="hint">You can do this later in Configuration → Connections, or paste a key straight into the chat; it's kept, never sent to a model.</p>`
   );
@@ -163,25 +163,24 @@ async function permissionState(need: Need): Promise<PermissionState | "unknown">
 function needRow(need: Need, name: string, how: string): string {
   return (
     `<div class="need" data-need="${need}">` +
-    `<div class="need-h"><b>${name}</b><button class="ibtn" type="button" data-setup-info aria-expanded="false" aria-label="What ${name.toLowerCase()} is for">i</button>` +
-    `<span class="st">…</span><button class="btn sm" type="button" data-setup-perm="${need}">Allow</button></div>` +
-    `<p class="how" hidden>${how}</p><p class="err" hidden></p></div>`
+    `<div class="need-h"><b>${name}</b><span class="st">…</span><button class="btn sm" type="button" data-setup-perm="${need}">Allow</button></div>` +
+    `<p class="how">${how}</p><p class="err" hidden></p></div>`
   );
 }
 
 function needs(): string {
   const sound = isApp() || voice.soundOnOpen === "yes";
   const soundHow = sound
-    ? "He greets you aloud the moment the console opens."
-    : "In a browser tab he greets you after your first click. Installed, he does so the moment it opens.";
+    ? "JARVIS greets you aloud the moment the console opens."
+    : "In a browser tab, JARVIS greets you after your first click. Installed, the moment it opens.";
   const install = !isApp() && installPrompt ? `<button class="btn sm primary" type="button" data-setup-install>Install</button>` : "";
   return (
-    `<p class="lead">Three things the browser asks about. None is needed to type to him.</p>` +
-    needRow("mic", "Microphone", "To talk to him. Tapping JARVIS asks for it too, the first time.") +
-    needRow("geo", "Location", "For the weather where you are, to a few streets. Without it he uses your connection's city.") +
-    `<div class="need"><div class="need-h"><b>Voice on opening</b><button class="ibtn" type="button" data-setup-info aria-expanded="false" aria-label="About the voice on opening">i</button>` +
+    `<p class="lead">Three things the browser asks about. None is needed to type.</p>` +
+    needRow("mic", "Microphone", "To talk to JARVIS.") +
+    needRow("geo", "Location", "For the weather where you are.") +
+    `<div class="need"><div class="need-h"><b>Voice on opening</b>` +
     `<span class="st${sound ? " ok" : ""}">${sound ? "On opening" : "After first click"}</span>${install}</div>` +
-    `<p class="how" hidden>${soundHow}</p></div>`
+    `<p class="how">${soundHow}</p></div>`
   );
 }
 
@@ -224,12 +223,6 @@ async function allow(need: Need, root: ParentNode): Promise<void> {
 
 /** A click in a set of rows: Allow asks; Install takes the browser's offer. True when it was one of ours. */
 function needsClick(target: HTMLElement, root: HTMLElement): boolean {
-  const info = target.closest<HTMLButtonElement>("[data-setup-info]");
-  if (info) {
-    const how = info.closest(".need")?.querySelector<HTMLElement>(".how");
-    if (how) { how.hidden = !how.hidden; info.setAttribute("aria-expanded", String(!how.hidden)); }
-    return true;
-  }
   const permBtn = target.closest<HTMLElement>("[data-setup-perm]");
   if (permBtn) { void allow(permBtn.dataset.setupPerm as Need, root); return true; }
   if (target.closest("[data-setup-install]") && installPrompt) {
@@ -258,11 +251,11 @@ document.querySelector<HTMLElement>('.tab[data-tab="access"]')?.addEventListener
 function sayHello(): string {
   const address = getAddress();
   return (
-    `<p class="lead">${conn.anyReady ? "Everything is ready." : "Nothing connected yet: he'll answer his built-in questions (status, the weather, the time) in this device's voice until a service is."}</p>` +
+    `<p class="lead">${conn.anyReady ? "Everything is ready." : "Nothing connected yet: JARVIS answers the built-in questions (status, the weather, the time) in this device's voice until a service is."}</p>` +
     `<div class="ctl"><span class="ctl-k"><span>Address me as</span></span>` +
     `<select class="sel" id="setupAddress" aria-label="How JARVIS addresses you"><option value="sir"${address === "sir" ? " selected" : ""}>Sir</option><option value="madam"${address === "madam" ? " selected" : ""}>Ma'am</option></select></div>` +
-    `<button class="btn wide" type="button" id="setupVoice">Hear his voice</button>` +
-    `<p>Tap <b>JARVIS</b>, the ring at the bottom, and speak; the first tap asks for the microphone. Any letter opens the keyboard. Type <b>help</b> for what he answers directly.</p>`
+    `<button class="btn wide" type="button" id="setupVoice">Hear the voice</button>` +
+    `<p>Tap <b>JARVIS</b>, the ring at the bottom, and speak; the first tap asks for the microphone. Any letter opens the keyboard. Type <b>help</b> for what is answered directly.</p>`
   );
 }
 

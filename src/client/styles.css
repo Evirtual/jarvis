@@ -1328,14 +1328,6 @@ html:not(.serverless) [data-web-only] { display: none !important; }
 .disclose > summary:hover, .disclose > summary:focus-visible { color: var(--ice); outline: none; }
 .disclose > .body { padding: 3px 0 4px; }
 .disclose > .body p { margin: 4px 0 0; }
-/* A small "i": the explanation of a row appears when it is pressed. */
-.ibtn {
-  flex: none; width: 18px; height: 18px; border-radius: 50%; padding: 0; cursor: pointer;
-  border: 1px solid var(--line-hot); background: transparent; color: var(--ice-dim);
-  font: 700 10px/1 var(--f-hud); display: inline-grid; place-items: center;
-}
-.ibtn:hover, .ibtn[aria-expanded="true"] { color: var(--ice); border-color: var(--ice); }
-.ibtn:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
 /* A tooltip on hover or focus, for a label that needs a sentence. */
 [data-tip] { position: relative; cursor: help; }
 [data-tip]:hover::after, [data-tip]:focus-visible::after {
