@@ -16,7 +16,7 @@ import { type Thread } from "./stage.js";
 import { clip } from "./text.js";
 import { threadRef } from "./workspace.js";
 import { conn, graph, input, panels, voice, ws } from "./state.js";
-import { addMsg, announce, busy, hideSay, jarvis, noteIn, say, setBusy, toast } from "./say.js";
+import { addMsg, announce, busy, hideSay, hideToast, jarvis, noteIn, say, setBusy, toast } from "./say.js";
 import { interceptKey, KEY_PATTERNS, parseCtx, resolve, runAction } from "./actions.js";
 import { S, T, W } from "./readings.js";
 import { boardLinks, paintThread, paintThreadCount, refreshLinks, relatedContext } from "./threads.js";
@@ -237,7 +237,13 @@ async function askCore(question: string): Promise<void> {
       if (streamed || !spare || !/limit|out of credit|needs credit|busy|rate-limiting|quota/i.test(why)) throw err;
       // the service's own reason ("…busy at the moment…"), then what happens instead
       announce(`${why} Meanwhile I'm answering through ${conn.nameOf(spare)}.`);
-      raw = await askVia(spare);
+      try {
+        raw = await askVia(spare);
+      } catch (err2) {
+        // the spare failed too: one line with both reasons, not two boxes at once
+        hideToast();
+        throw new Error(`${why} ${err2 instanceof Error ? err2.message : String(err2)}`);
+      }
     }
     const routed = parseRoute(raw);
     const t = place(routed.route); // a reply of directives alone still has a place

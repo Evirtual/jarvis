@@ -28,6 +28,10 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 
 /* ---------------- the fake service ---------------- */
 let failNext = null; let failLeft = 0; // a status to return for the next question, however often the client retries it
+let geminiFail = null; let geminiFailLeft = 0; // the same for the fake Gemini
+const geminiSse = (text) => `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }] })}
+
+`;
 const asked = [];    // every question the console sent, in order
 // Every reply says where it belongs in its first words, as the real service is told to:
 // conversation at the core, a follow-up in the thread in front, research in a thread of its own.
@@ -74,6 +78,15 @@ page.on('request', (r) => {
     }
     return r.respond({ status: 404, headers: cors, body: '{}' });
   }
+  if (u.startsWith('https://generativelanguage.googleapis.com/')) {
+    if (r.method() === 'OPTIONS') return r.respond({ status: 204, headers: cors });
+    if (u.includes('/models?')) return r.respond({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ models: [{ name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] }] }) });
+    if (u.includes(':streamGenerateContent')) {
+      if (geminiFail && geminiFailLeft > 0) { geminiFailLeft--; const s = geminiFail; if (!geminiFailLeft) geminiFail = null; return r.respond({ status: s, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ error: { code: s, message: 'The model is overloaded. Please try again later.', status: 'UNAVAILABLE' } }) }); }
+      return r.respond({ status: 200, headers: { ...cors, 'content-type': 'text/event-stream' }, body: geminiSse('[[at: core]] Gemini here, sir. All in order.') });
+    }
+    return r.respond({ status: 404, headers: cors, body: '{}' });
+  }
   if (u.startsWith(base) || u.startsWith('http://127.0.0.1')) return r.continue();
   return r.abort();
 });
@@ -84,6 +97,8 @@ const say = async (text) => { await page.evaluate((t) => { const i = document.ge
 const untilIdle = async (timeout = 20000) => { await page.waitForFunction(() => !/Thinking|Searching/.test(document.getElementById('logState')?.textContent || '') && ![...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].some((m) => /Thinking…|Searching the web…/.test(m.textContent)), { timeout }).catch(() => null); await wait(400); };
 /** What JARVIS last said at the core (the line under him), whole. */
 const coreSaid = () => page.evaluate(() => document.getElementById('coreSay')?.textContent || '');
+// which services hold a key and which is in use — never the keys themselves
+const cores = () => page.evaluate(() => { const s = JSON.parse(localStorage.getItem('jarvis.cores') || '{}'); return { active: s.active, with: Object.keys(s.providers || {}) }; });
 const ws = () => page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.workspace') || '{}'));
 const board = () => page.evaluate(() => ({
   windows: [...document.querySelectorAll('section.chatwin')].map((w) => ({ id: w.dataset.id, title: w.querySelector('.cw-title')?.textContent.trim(), msgs: w.querySelectorAll('.cw-msg').length, folded: w.querySelector('.cw-body')?.childElementCount === 0 })),
@@ -264,6 +279,37 @@ await check('panels: show radar, open weather, close all', async () => {
   return true;
 });
 
+await check('closing the thread in front: nothing takes its place, a follow-up opens its own thread, "this thread" has to be named', async () => {
+  let w = await ws();
+  const front = w.threads.find((t) => t.id === w.activeId && !t.archivedAt);
+  assert(front, 'no thread in front to close');
+  const liveBefore = w.threads.filter((t) => !t.archivedAt).map((t) => t.id);
+  await say('close this chat'); await wait(800);
+  w = await ws();
+  assert(w.threads.find((t) => t.id === front.id)?.archivedAt, 'the thread in front was not put away');
+  assert(w.activeId === '', 'another thread was put in front after the close: ' + w.activeId);
+  // a reply the model addresses to "the thread" now goes to a thread of its own, not into whichever was open
+  await say('follow up'); await untilIdle(); await wait(400);
+  w = await ws();
+  const fresh = w.threads.filter((t) => !t.archivedAt && !liveBefore.includes(t.id));
+  assert(fresh.length === 1 && fresh[0].turns.some((t) => t.content === 'follow up'), 'the follow-up did not open its own thread: ' + JSON.stringify(w.threads.map((t) => [t.title, t.turns.length, !!t.archivedAt])));
+  assert(w.threads.filter((t) => !t.archivedAt && liveBefore.includes(t.id)).every((t) => !t.turns.some((x) => x.content === 'follow up')), 'the follow-up was written into an older thread');
+  assert(w.activeId === fresh[0].id, 'the new thread is not the one in front');
+  // with it closed too, "this thread" names nothing: a line says so, no thread is touched
+  await say('close this chat'); await wait(800);
+  await say('close this chat'); await wait(800);
+  const line = (await board()).toast;
+  assert(/no thread in front/i.test(line || ''), 'no word that nothing is in front: ' + line);
+  w = await ws();
+  assert(w.threads.filter((t) => !t.archivedAt).length === liveBefore.length - 1, 'a thread that was not in front was closed');
+  // restore what this scenario put away, so the next one finds the board as it was
+  await say('restore the last one'); await wait(600);
+  await say('restore ' + front.title); await wait(600);
+  w = await ws();
+  assert(!w.threads.find((t) => t.id === front.id)?.archivedAt, 'restore by name failed: ' + front.title);
+  return { closed: front.title, opened: fresh[0].title };
+});
+
 await check('threads list: put away, restore, put all away, restore, tidy, delete everything with confirm', async () => {
   await say('close this chat'); await wait(800);
   let w = await ws(); const away = w.threads.filter((t) => t.archivedAt);
@@ -303,12 +349,54 @@ await check('error paths: 429 then 500 from the service give a friendly line, th
   return { recovered: last.slice(0, 40) };
 });
 
+await check('a spare service: answers when the first is busy, with one notice; both down is one line, not two boxes', async () => {
+  const untilAnswered = async () => { for (let i = 0; i < 80; i++) { const st = await page.evaluate(() => ({ busy: document.getElementById('logState')?.textContent })); if (st.busy !== 'Thinking' && st.busy !== 'Searching the web') break; await wait(250); } await wait(600); };
+  // connect a second service in Configuration; ChatGPT stays the one in use
+  await say('open config'); await wait(500);
+  await page.evaluate(() => document.querySelector('.tab[data-tab="connections"]').click()); await wait(200);
+  await page.type('#providers input[data-key="gemini"]', 'AIza' + 'Q1w2E3r4'.repeat(4));
+  await page.evaluate(() => document.querySelector('#providers [data-act="save"][data-id="gemini"]').click());
+  await page.waitForFunction(() => document.querySelectorAll('#providers .provider.ready').length === 2, { timeout: 15000 });
+  await page.evaluate(() => document.getElementById('closeDrawer').click()); await wait(300);
+  assert(/ChatGPT/.test(await page.title()), 'the service in use changed: ' + await page.title());
+  let line = '';
+  try {
+  // ChatGPT at its limit: the notice says so and names the spare; the spare answers at the core
+  failNext = 429; failLeft = 5; await say('who is there'); await untilAnswered();
+  let b = await board(); line = await coreSaid();
+  assert(/answering through Gemini/i.test(b.toast || ''), 'no word of the spare: ' + b.toast);
+  assert(/Gemini here/.test(line), 'the spare did not answer: ' + line);
+  // both down: one line under the core carrying both reasons, and no notice left over it
+  failNext = 429; failLeft = 5; geminiFail = 503; geminiFailLeft = 5; await say('anyone there'); await untilAnswered();
+  line = await coreSaid();
+  const shown = await page.evaluate(() => ({ toast: document.getElementById('toast').classList.contains('in'), say: document.getElementById('coreSay').classList.contains('in') }));
+  assert(/limit|quota/i.test(line) && /Gemini is busy/i.test(line), 'not both reasons in one line: ' + line);
+  assert(shown.say && !shown.toast, 'two notices at once: ' + JSON.stringify(shown));
+  // the two boxes are drawn the same: same corners, padding and border
+  const boxes = await page.evaluate(() => { const g = (id) => { const c = getComputedStyle(document.getElementById(id)); return [c.borderRadius, c.padding, c.borderWidth, c.fontSize].join('|'); }; return { toast: g('toast'), say: g('coreSay') }; });
+  assert(boxes.toast === boxes.say, 'the notice and the line under the core differ: ' + JSON.stringify(boxes));
+  } finally {
+  // put Gemini away again — whatever came of the checks — so the rest of the suite sees one service
+  failNext = null; failLeft = 0; geminiFail = null; geminiFailLeft = 0;
+  await say('open config'); await wait(500);
+  await page.evaluate(() => document.querySelector('.tab[data-tab="connections"]').click()); await wait(200);
+  await page.evaluate(() => document.querySelector('#providers [data-act="remove"][data-id="gemini"]').click()); await wait(800);
+  await page.waitForFunction(() => document.querySelectorAll('#providers .provider.ready').length === 1, { timeout: 15000 });
+  const left = await cores();
+  assert(left.with.join() === 'openai' && left.active === 'openai', 'Gemini not gone: ' + JSON.stringify(left));
+  await page.evaluate(() => document.getElementById('closeDrawer').click()); await wait(300);
+  }
+  await say('and now'); await untilAnswered();
+  assert(/Noted, sir/.test(await coreSaid()), 'did not recover: ' + await coreSaid());
+  return { line: line.slice(0, 80) };
+});
+
 await check('input edges: empty, whitespace, 5000 characters cut to 4000 with a notice, a long reply', async () => {
   const n = asked.length;
   await say(''); await say('   '); await wait(400);
   assert(asked.length === n, 'empty input reached the model');
   await say('x'.repeat(5000)); await untilIdle(30000);
-  assert(asked.length === n + 1 && asked[n].length === 4000, 'long input should be cut to 4000: ' + asked[n]?.length);
+  assert(asked.length === n + 1 && asked[n].length === 4000, 'long input should be cut to 4000: ' + asked[n]?.length + ' ' + JSON.stringify(asked.slice(n).map((q) => q.slice(0, 12) + '…' + q.slice(3990, 4060))));
   const capNote = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.sys')].some((m) => /4,000/.test(m.textContent)) || /4,000/.test(document.getElementById('toast')?.textContent || ''));
   assert(capNote, 'no notice about the 4,000-character cap');
   await say('give me something slow'); await untilIdle(30000); await wait(500);
@@ -392,7 +480,7 @@ await check('voice commands: mute, unmute, switch to a service that is not conne
   assert(muted && unmuted, `mute ${muted} unmute ${unmuted}`);
   await say('switch to Gemini'); await wait(800);
   const b = await board();
-  assert(b.title.includes('ChatGPT'), 'switched to an unconnected service: ' + b.title);
+  assert(b.title.includes('ChatGPT'), 'switched to an unconnected service: ' + b.title + ' ' + JSON.stringify(await cores()));
   assert(/gemini/i.test(b.toast || ''), 'no word about Gemini not being connected: ' + b.toast);
   return { toast: b.toast };
 });

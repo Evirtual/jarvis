@@ -49,7 +49,7 @@ test("version 2 data is repaired, not discarded", () => {
   assert.ok(d.groups.some((g) => g.id === GENERAL_ID));
   assert.equal(d.threads[0]!.groupId, GENERAL_ID);
   assert.equal(d.threads[0]!.parentId, undefined);
-  assert.equal(d.activeId, "x");
+  assert.equal(d.activeId, "", "a thread not in front before is not put in front on load");
 });
 
 /* ---------------- creation, branching, switching ---------------- */
@@ -201,7 +201,8 @@ test("archive puts a thread and its subthreads away; restore brings them back", 
   assert.equal(gone.length, 2);
   assert.ok(!ws.live.includes(root) && !ws.live.includes(sub));
   assert.ok(ws.all.includes(root), "archived is not deleted");
-  assert.notEqual(ws.activeId, root.id, "focus moves to a live thread");
+  assert.equal(ws.activeId, "", "nothing takes its place in front");
+  assert.equal(ws.active, undefined);
 
   ws.restore(root.id);
   assert.ok(ws.live.includes(root) && ws.live.includes(sub));

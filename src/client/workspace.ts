@@ -280,7 +280,8 @@ function repair(d: WorkspaceData): WorkspaceData {
     if (t.ties) t.ties = t.ties.filter((x) => tids.has(x.to) && x.to !== t.id);
   }
   const live = threads.filter((t) => !t.archivedAt);
-  const activeId = live.some((t) => t.id === d.activeId) ? d.activeId : (live[0]?.id ?? "");
+  // a thread in front only if it was in front and is still live — none is promoted on reload
+  const activeId = live.some((t) => t.id === d.activeId) ? d.activeId : "";
   return { version: 2, groups, threads, activeId, ...(d.anchor === "corner" ? { anchor: "corner" as const } : {}) };
 }
 
@@ -305,7 +306,11 @@ export class Workspace {
   get groups(): Group[] { return this.data.groups; }
   get activeId(): string { return this.data.activeId; }
   /** The thread in front — or nothing at all, on a clean screen. */
-  get active(): Thread | undefined { return this.thread(this.data.activeId) ?? this.live[0]; }
+  /** The thread in front — the one a follow-up goes to. None, when none was opened or the last one was closed: then what you say is conversation. */
+  get active(): Thread | undefined {
+    const t = this.thread(this.data.activeId);
+    return t && !t.archivedAt ? t : undefined;
+  }
   get empty(): boolean { return this.live.length === 0; }
 
   thread(id: string | undefined): Thread | undefined {
@@ -562,9 +567,14 @@ export class Workspace {
   }
 
   /** Keep the focus on a live thread — or on nothing, if the board is now clear. */
+  /**
+   * The thread in front is gone: nothing takes its place. A question asked now
+   * is conversation, not a follow-up to whichever thread happened to be newest —
+   * a thread is in front only when it was opened, tapped or asked for.
+   */
   private afterRemoval(): void {
     if (this.live.some((t) => t.id === this.data.activeId)) return;
-    this.data.activeId = this.live.slice().sort((a, b) => b.createdAt - a.createdAt)[0]?.id ?? "";
+    this.data.activeId = "";
   }
 
   /* ---------------- groups ---------------- */

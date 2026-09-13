@@ -74,9 +74,8 @@ export function parseCtx(): ParseContext {
  */
 export async function runAction(a: Action, fromModel = false): Promise<string | null> {
   if (fromModel && NEEDS_CONFIRMATION.has(a.name) && a.name !== "clear_thread") return null;
-  // Everything that acts on "this thread" needs there to be one.
-  const NEEDS_THREAD = new Set(["archive_thread", "delete_thread", "rename_thread", "clear_thread"]);
-  if (!graph.active && NEEDS_THREAD.has(a.name)) return "There's nothing on the board, sir.";
+  // "This thread" is the one in front; with none in front, it has to be named.
+  const noFront = (): string => ws.live.length ? "There's no thread in front, sir — name it, or tap one." : "There's nothing on the board, sir.";
   switch (a.name) {
     case "new_thread": {
       let parent: Thread | undefined;
@@ -108,12 +107,13 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
         : `Connected “${A.title}” with “${B.title}” across their groups, sir. The link shows when either is in front.`;
     }
     case "archive_thread": {
-      let t: Thread = graph.active!;
+      let t = graph.active;
       if (a.title) {
         const r = resolve(a.title);
         if (typeof r === "string") return r;
         t = r;
       }
+      if (!t) return noFront();
       return putAway(t);
     }
     case "restore_thread": {
@@ -122,12 +122,13 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       return bringBack(r);
     }
     case "delete_thread": {
-      let t: Thread = graph.active!;
+      let t = graph.active;
       if (a.title) {
         const r = resolve(a.title);
         if (typeof r === "string") return r;
         t = r;
       }
+      if (!t) return noFront();
       return deleteThread(t);
     }
     case "switch_thread": {
@@ -138,18 +139,20 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       return `Back to “${r.title}”, sir.`;
     }
     case "rename_thread": {
-      let t: Thread = graph.active!;
+      let t = graph.active;
       if (a.target) {
         const r = resolve(a.target);
         if (typeof r === "string") return r;
         t = r;
       }
+      if (!t) return noFront();
       ws.rename(t.id, a.title);
       graph.commit();
       return `Renamed to “${t.title}”, sir.`;
     }
     case "clear_thread": {
-      const t = graph.active!;
+      const t = graph.active;
+      if (!t) return noFront();
       if (!t.turns.length) return "It's already empty, sir.";
       return confirmFirst(
         `Clear ${t.turns.length === 1 ? "the one message" : `all ${t.turns.length} messages`} in “${t.title}”? The thread stays; its history goes.`,
@@ -164,7 +167,7 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
         if (typeof r === "string") return r;
         t = r;
       }
-      if (!t) return "There's nothing on the board, sir.";
+      if (!t) return noFront();
       ws.setOpen(t.id, a.open);
       graph.commit();
       // Opening one by name brings it to the front, as clicking it would.

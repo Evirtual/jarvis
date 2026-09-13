@@ -33,6 +33,13 @@ export function toast(text: string): void {
   toastTimer = window.setTimeout(() => el.classList.remove("in"), 6000);
 }
 
+/** A notice taken back before its time — what it announced did not come to pass. */
+export function hideToast(): void {
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = null;
+  $("toast").classList.remove("in");
+}
+
 /** App operations live at the core, never inside an unrelated thread. */
 export function announce(text: string, speak = true): void {
   toast(text);

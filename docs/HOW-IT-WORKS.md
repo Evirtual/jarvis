@@ -20,7 +20,8 @@ console; the newest one that answers is the default, for every job. The
 key, a model the account can't use, an account **out of credit** (account-wide,
 so another model of the same service won't help), a free allowance spent, or
 the service being busy. When another service is connected he answers through it
-instead, and says so. The service's card in Connections shows the same problem
+instead, and says so in one notice; if the spare fails as well, one line under
+him carries both reasons. The service's card in Connections shows the same problem
 under its name until the next answer gets through — a key can list models
 perfectly well on an account that can't answer. The service's own error is
 written to the server console for diagnosis; keys never appear in it.

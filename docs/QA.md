@@ -988,7 +988,8 @@ Found and fixed, later the same day:
 ### 2026-09-13 — conversation first, the readiness card, one surface behaviour
 
 Sizes: 800×563 (desktop pane), 414×896, 360×740. Typecheck clean, 93 unit
-tests, 20 end-to-end scenarios (`npm run test:e2e`), build clean. Checked
+tests, 20 end-to-end scenarios (`npm run test:e2e`), build clean; after fixes
+112–113, 104 unit tests and 22 scenarios. Checked
 against the real ChatGPT model: a greeting and a factual question stay at
 the core; "find the latest news about …" opens a thread with findings and
 sources; "look up …, just tell me" answers at the core.
@@ -1038,3 +1039,12 @@ Found and fixed on the way:
      dead rules and code, doubled constants and helpers, three focus rings
      and nine hover alphas, storage keys in three styles, the palette retyped
      on the canvas — each brought to one.
+112. Closing the thread in front put the newest other thread in front, so the
+     next question was written into it as a follow-up — two subjects in one
+     window. Nothing takes the place of a closed thread now (on reload too);
+     "this thread" with none in front asks for a name instead of guessing.
+113. With the service in use at its limit and the spare failing too, two
+     notices sat over each other in two different boxes: the rounded "meanwhile
+     I'm answering through …" notice and the spare's own line. The notice is
+     taken back and one line carries both reasons; a notice and the line
+     under the core are drawn as the same box.

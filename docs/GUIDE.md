@@ -252,7 +252,9 @@ goes in a thread of its own, named by him, with its sources — unless you say
 "just tell me", in which case the searched answer is said at the core. Ask for
 a thread, a window, or to keep something, and it is a thread. Pictures and
 footage always get a window, since they can't be spoken. A follow-up to the
-thread in front goes into that thread. He decides all of this from your words,
+thread in front goes into that thread — and when you close the thread in front,
+nothing takes its place: what you say next is conversation until you open, tap
+or ask for a thread. He decides all of this from your words,
 and says where each reply belongs before he says it; the console never opens
 a thread of its own accord.
 
