@@ -30,6 +30,7 @@
   --chamfer: none;
 
   --tap: 44px;
+  --ctl-h: 38px; /* one height for a button, a field and a select that sit in a row */
 
   /* Motion: things here settle rather than snap. One curve for travel, one
      for the small stuff, so the whole console moves with the same hand. */
@@ -680,9 +681,9 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 /* What he needs: one row a permission — its name, state and button on one line, and why beneath at full width. */
 .need { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .need:last-child { border-bottom: 0; }
-.need-h { display: flex; align-items: center; gap: 10px; min-height: 28px; }
+.need-h { display: flex; align-items: center; gap: 8px; min-height: 30px; }
 .need-h b { flex: 1; min-width: 0; }
-.need .how { margin: 4px 0 0; font-size: 11px; color: var(--ice-dim); }
+.need .how { margin: 6px 0 0; font-size: 11px; color: var(--ice-dim); }
 .need .err { margin: 4px 0 0; font-size: 11px; color: var(--red); }
 .need .st { flex: none; font-family: var(--f-hud); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ice-dim); }
 .need .st.ok { color: var(--green); }
@@ -928,8 +929,9 @@ body.m-compact .setup-sheet {
   text-transform: uppercase; color: var(--ice-dim); background: transparent;
   border: 1px solid var(--line-hot); padding: 7px 11px; cursor: pointer; white-space: nowrap;
   transition: color .18s, border-color .18s, background .18s;
-  min-height: 32px;
+  min-height: var(--ctl-h);
 }
+.btn.sm { min-height: 30px; padding: 4px 10px; }
 .btn:hover:not(:disabled) { color: var(--ice); border-color: var(--ice); background: rgba(111,240,255,.07); }
 .btn:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
 .btn:disabled { opacity: .32; cursor: not-allowed; }
@@ -999,18 +1001,19 @@ body.m-compact .setup-sheet {
 .provider.bad .dot { background: var(--red); }
 .provider-head .nm { font-family: var(--f-hud); font-weight: 700; font-size: 13px; letter-spacing: .06em; color: var(--text-hi); }
 .provider-head .badge { font-family: var(--f-hud); font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; border: 1px solid var(--green); color: var(--green); padding: 1px 5px; }
-.provider .blurb { font-size: 10.5px; color: var(--ice-dim); margin: 6px 0 8px; line-height: 1.45; }
-.provider .cost { font-size: 10px; color: var(--gold); margin: 0 0 9px; line-height: 1.45; }
+.provider .blurb { font-size: 10.5px; color: var(--ice-dim); margin: 5px 0 8px; line-height: 1.45; }
+.provider .cost { font-size: 10px; color: var(--gold); margin: 6px 0 2px; line-height: 1.45; }
 .provider .err { font-size: 10.5px; color: var(--red); margin: 0 0 9px; line-height: 1.45; }
-.steps { margin: 0 0 9px; padding-left: 18px; font-size: 10.5px; color: var(--text); line-height: 1.65; }
+.steps { margin: 0; padding-left: 18px; font-size: 10.5px; color: var(--text); line-height: 1.65; }
 .steps li::marker { color: var(--ice-dim); }
 .steps a { color: var(--ice); }
-.row { display: flex; gap: 6px; align-items: center; }
+.row { display: flex; gap: 6px; align-items: stretch; }
+.row .btn { align-self: stretch; }
 .row > .grow { flex: 1; min-width: 0; }
 
 .field {
   width: 100%; background: #071119; color: var(--text-hi); border: 1px solid var(--line-hot);
-  font-family: var(--f-mono); font-size: 12px; padding: 9px 10px; min-height: var(--tap);
+  font-family: var(--f-mono); font-size: 12px; padding: 0 10px; height: var(--ctl-h); min-height: var(--ctl-h);
 }
 .field:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
 .field::placeholder { color: #2a5a6c; }
@@ -1026,7 +1029,7 @@ body.m-compact .setup-sheet {
 .sel {
   width: 100%; background: #071119; color: var(--text-hi); border: 1px solid var(--line-hot);
   font-family: var(--f-mono); font-size: 11.5px; padding: 8px 24px 8px 8px; cursor: pointer;
-  appearance: none; -webkit-appearance: none; text-overflow: ellipsis; min-height: 38px;
+  appearance: none; -webkit-appearance: none; text-overflow: ellipsis; min-height: var(--ctl-h);
   background-image: linear-gradient(45deg, transparent 50%, var(--ice-dim) 50%), linear-gradient(135deg, var(--ice-dim) 50%, transparent 50%);
   background-position: calc(100% - 13px) center, calc(100% - 8px) center;
   background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
@@ -1311,3 +1314,33 @@ body.m-compact .cw-head { touch-action: none; }
    can, and an instrument it can't read at all is not shown (see sensors.ts). */
 html.serverless [data-pc] { display: none !important; }
 html:not(.serverless) [data-web-only] { display: none !important; }
+
+/* ---------- less on the page, more on request ---------- */
+/* A disclosure: one short line closed, the detail beneath it when opened. */
+.disclose { margin: 8px 0 0; border-top: 1px dashed var(--line); }
+.disclose > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 7px 0 2px;
+  font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim);
+}
+.disclose > summary::-webkit-details-marker { display: none; }
+.disclose > summary::before { content: "▸"; font-size: 9px; transition: transform .18s var(--ease); }
+.disclose[open] > summary::before { transform: rotate(90deg); }
+.disclose > summary:hover, .disclose > summary:focus-visible { color: var(--ice); outline: none; }
+.disclose > .body { padding: 3px 0 4px; }
+.disclose > .body p { margin: 4px 0 0; }
+/* A small "i": the explanation of a row appears when it is pressed. */
+.ibtn {
+  flex: none; width: 18px; height: 18px; border-radius: 50%; padding: 0; cursor: pointer;
+  border: 1px solid var(--line-hot); background: transparent; color: var(--ice-dim);
+  font: 700 10px/1 var(--f-hud); display: inline-grid; place-items: center;
+}
+.ibtn:hover, .ibtn[aria-expanded="true"] { color: var(--ice); border-color: var(--ice); }
+.ibtn:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
+/* A tooltip on hover or focus, for a label that needs a sentence. */
+[data-tip] { position: relative; cursor: help; }
+[data-tip]:hover::after, [data-tip]:focus-visible::after {
+  content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 5;
+  width: max-content; max-width: 240px; padding: 6px 8px; white-space: normal;
+  font: 10.5px/1.4 var(--f-mono); letter-spacing: 0; text-transform: none; color: var(--text-hi);
+  background: #071119; border: 1px solid var(--line-hot); box-shadow: 0 8px 24px rgba(0,0,0,.5); pointer-events: none;
+}

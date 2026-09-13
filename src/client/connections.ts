@@ -144,19 +144,15 @@ export class Connections {
     const ready = this.data.providers.filter((p) => p.status.state === "ready");
     if (!ready.length) {
       this.hint.className = "hint warn";
-      this.hint.innerHTML =
-        "No service connected yet, so I can only answer my built-in commands. " +
-        "<b>Gemini</b> is free and gives me my answers, my hearing and my voice — the quickest way to get me talking.";
+      this.hint.innerHTML = "Nothing connected: I answer only my built-in commands. <b>Gemini</b> is free, and the quickest way to get me talking.";
     } else {
       const active = this.data.providers.find((p) => p.id === this.data.active);
       const ready = active?.status.state === "ready" ? active.status : null;
       const does = ready?.hears ? "answering and hearing" : "answering";
       this.hint.className = "hint";
       this.hint.innerHTML =
-        `<b>${esc(this.activeName())}</b> is ${does}; which voice speaks is chosen in Voice. ` +
-        (SERVERLESS
-          ? "Keys are kept in this browser on this device, and go only to the service they belong to."
-          : "Keys are stored on this machine only and are never sent to the browser.");
+        `<b>${esc(this.activeName())}</b> is ${does}. The voice is chosen in Voice. ` +
+        (SERVERLESS ? "Keys stay in this browser." : "Keys stay on this machine.");
     }
   }
 
@@ -179,7 +175,7 @@ export class Connections {
       (isActive
         ? `<span class="src" style="color:var(--ice);font-family:var(--f-hud);font-size:9px;letter-spacing:.12em;text-transform:uppercase">In use</span>`
         : st.state === "ready"
-          ? `<button class="btn" data-act="use" data-id="${p.id}">Use</button>`
+          ? `<button class="btn sm" data-act="use" data-id="${p.id}">Use</button>`
           : "") +
       `</div>`;
 
@@ -194,19 +190,22 @@ export class Connections {
         `<div class="${cls}">` +
         head +
         `<p class="blurb">${esc(p.blurb)}</p>` +
-        `<p class="cost">${esc(p.cost)}</p>` +
         (err ? `<p class="err">${esc(err)}</p>` : "") +
-        `<ol class="steps">` +
-        `<li>Open <a href="${p.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${p.free ? " and sign in with a Google account" : ""}.</li>` +
-        `<li>Create a key and copy it. ${esc(p.keyHint)}.</li>` +
-        `<li>Paste it below and press Connect.</li>` +
-        `</ol>` +
         `<div class="row">` +
         `<input class="field grow" type="password" data-key="${p.id}" placeholder="${esc(p.keyPrefix)}…" autocomplete="off" spellcheck="false" aria-label="${esc(p.name)} API key">` +
         `<button class="btn primary" data-act="save" data-id="${p.id}"${busy ? " disabled" : ""}>${busy ? "Checking" : "Connect"}</button>` +
         `</div>` +
+        // the how and the cost, a line away rather than on the page
+        `<details class="disclose"><summary>How to get a key</summary><div class="body">` +
+        `<ol class="steps">` +
+        `<li>Open <a href="${p.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${p.free ? " and sign in with a Google account" : ""}.</li>` +
+        `<li>Create a key and copy it. ${esc(p.keyHint)}.</li>` +
+        `<li>Paste it above and press Connect.</li>` +
+        `</ol>` +
+        `<p class="cost">${esc(p.cost)}</p>` +
+        `</div></details>` +
         (st.state === "error"
-          ? `<div class="row" style="margin-top:8px"><button class="btn danger" data-act="remove" data-id="${p.id}">Forget key</button></div>`
+          ? `<div class="row" style="margin-top:8px"><button class="btn sm danger" data-act="remove" data-id="${p.id}">Forget key</button></div>`
           : "") +
         `</div>`
       );

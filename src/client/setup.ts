@@ -84,9 +84,12 @@ export function closeSetup(): void {
 function whereYouAre(): string {
   const who = `<p class="lead">JARVIS is a console that talks back: ask him anything, by voice or by typing, and he answers, hears and speaks through a service you connect with your own key.</p>`;
   return SERVERLESS
-    ? who + `<p>This is the web version, running entirely in your browser. A key you connect stays in this browser, on this device, and goes only to the service it belongs to; nothing is sent anywhere else. The readings on the deck are what a browser can measure of this device.</p>
-       <p>Add it to your home screen, or install it, and it opens like an app.</p>`
-    : who + `<p>This is the PC version: his own server runs on this machine. A key you connect is saved in <b>config.json</b> beside it and never sent to the browser. He reads this machine's sensors and, when asked, sweeps your network.</p>`;
+    ? who + `<p>This is the web version: it runs entirely in your browser, and a key you connect stays here on this device.</p>
+       <details class="disclose"><summary>More on keys and privacy</summary><div class="body">
+       <p>A key goes only to the service it belongs to; nothing is sent anywhere else. The readings on the deck are what a browser can measure of this device. Installed, or added to your home screen, it opens like an app.</p></div></details>`
+    : who + `<p>This is the PC version: his own server runs on this machine, and a key you connect stays there.</p>
+       <details class="disclose"><summary>More on keys and privacy</summary><div class="body">
+       <p>A key is saved in <b>config.json</b> beside the server and never sent to the browser. He reads this machine's sensors and, when asked, sweeps your network.</p></div></details>`;
 }
 
 function providerCard(id: ProviderId): string {
@@ -110,16 +113,19 @@ function providerCard(id: ProviderId): string {
       : "";
     const use = active
       ? `<p class="blurb">JARVIS answers, hears and speaks through ${esc(meta.name)}.</p>`
-      : `<div class="row"><p class="blurb grow">Connected, as a spare.</p><button class="btn" type="button" data-setup-use="${id}">Use ${esc(meta.name)}</button></div>`;
+      : `<div class="row" style="align-items:center"><p class="blurb grow">Connected, as a spare.</p><button class="btn sm" type="button" data-setup-use="${id}">Use ${esc(meta.name)}</button></div>`;
     return `<div class="provider ready${active ? " active" : ""}">${head}${use}${models}</div>`;
   }
   return (
     `<div class="provider${err ? " bad" : ""}">${head}` +
-    `<p class="blurb">${esc(meta.blurb)}</p><p class="cost">${esc(meta.cost)}</p>` +
+    `<p class="blurb">${esc(meta.blurb)}</p>` +
     (err ? `<p class="err">${esc(err)}</p>` : "") +
-    `<p class="blurb"><a href="${meta.keyUrl}" target="_blank" rel="noreferrer noopener">Get a key</a> — it starts with <b>${esc(meta.keyPrefix)}</b> — and paste it here.</p>` +
     `<div class="row"><input class="field grow" type="password" data-setup-key="${id}" placeholder="${esc(meta.keyPrefix)}…" autocomplete="off" spellcheck="false" aria-label="${esc(meta.name)} API key">` +
     `<button class="btn primary" type="button" data-setup-connect="${id}"${busy ? " disabled" : ""}>${busy ? "Checking" : "Connect"}</button></div>` +
+    `<details class="disclose"><summary>How to get a key</summary><div class="body">` +
+    `<ol class="steps"><li>Open <a href="${meta.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${meta.free ? " and sign in with a Google account" : ""}.</li>` +
+    `<li>Create a key and copy it. It starts with <b>${esc(meta.keyPrefix)}</b>.</li><li>Paste it above and press Connect.</li></ol>` +
+    `<p class="cost">${esc(meta.cost)}</p></div></details>` +
     `</div>`
   );
 }
@@ -157,8 +163,9 @@ async function permissionState(need: Need): Promise<PermissionState | "unknown">
 function needRow(need: Need, name: string, how: string): string {
   return (
     `<div class="need" data-need="${need}">` +
-    `<div class="need-h"><b>${name}</b><span class="st">…</span><button class="btn" type="button" data-setup-perm="${need}">Allow</button></div>` +
-    `<p class="how">${how}</p><p class="err" hidden></p></div>`
+    `<div class="need-h"><b>${name}</b><button class="ibtn" type="button" data-setup-info aria-expanded="false" aria-label="What ${name.toLowerCase()} is for">i</button>` +
+    `<span class="st">…</span><button class="btn sm" type="button" data-setup-perm="${need}">Allow</button></div>` +
+    `<p class="how" hidden>${how}</p><p class="err" hidden></p></div>`
   );
 }
 
@@ -167,13 +174,14 @@ function needs(): string {
   const soundHow = sound
     ? "He greets you aloud the moment the console opens."
     : "In a browser tab he greets you after your first click. Installed, he does so the moment it opens.";
-  const install = !isApp() && installPrompt ? `<button class="btn primary" type="button" data-setup-install>Install</button>` : "";
+  const install = !isApp() && installPrompt ? `<button class="btn sm primary" type="button" data-setup-install>Install</button>` : "";
   return (
     `<p class="lead">Three things the browser asks about. None is needed to type to him.</p>` +
-    needRow("mic", "Microphone", "To talk to him.") +
-    needRow("geo", "Location", "For the weather where you are.") +
-    `<div class="need"><div class="need-h"><b>Voice on opening</b><span class="st${sound ? " ok" : ""}">${sound ? "On opening" : "After first click"}</span>${install}</div>` +
-    `<p class="how">${soundHow}</p></div>`
+    needRow("mic", "Microphone", "To talk to him. Tapping JARVIS asks for it too, the first time.") +
+    needRow("geo", "Location", "For the weather where you are, to a few streets. Without it he uses your connection's city.") +
+    `<div class="need"><div class="need-h"><b>Voice on opening</b><button class="ibtn" type="button" data-setup-info aria-expanded="false" aria-label="About the voice on opening">i</button>` +
+    `<span class="st${sound ? " ok" : ""}">${sound ? "On opening" : "After first click"}</span>${install}</div>` +
+    `<p class="how" hidden>${soundHow}</p></div>`
   );
 }
 
@@ -216,6 +224,12 @@ async function allow(need: Need, root: ParentNode): Promise<void> {
 
 /** A click in a set of rows: Allow asks; Install takes the browser's offer. True when it was one of ours. */
 function needsClick(target: HTMLElement, root: HTMLElement): boolean {
+  const info = target.closest<HTMLButtonElement>("[data-setup-info]");
+  if (info) {
+    const how = info.closest(".need")?.querySelector<HTMLElement>(".how");
+    if (how) { how.hidden = !how.hidden; info.setAttribute("aria-expanded", String(!how.hidden)); }
+    return true;
+  }
   const permBtn = target.closest<HTMLElement>("[data-setup-perm]");
   if (permBtn) { void allow(permBtn.dataset.setupPerm as Need, root); return true; }
   if (target.closest("[data-setup-install]") && installPrompt) {
