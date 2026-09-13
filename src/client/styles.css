@@ -409,10 +409,14 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 }
 .bubble.loose > .bb-head { display: none; }
 .bubble.loose > .bb-list { position: absolute; inset: 0; display: block; overflow: visible; padding: 0; }
+/* A loose window travels to its seat as a bubble does — the same time and
+   easing (--travel) — whether the seat moved or it was carried and let go:
+   its place (left/top) and the carry (transform) ease together, so from
+   wherever it was dropped it glides to where it is put down. */
 .bubble.loose .chatwin {
   position: absolute; pointer-events: auto;
-  transition: opacity .35s var(--ease-soft), border-color .3s var(--ease-soft),
-              box-shadow .3s var(--ease-soft), transform .3s var(--ease);
+  transition: opacity .35s var(--ease-soft), border-color .3s var(--ease-soft), box-shadow .3s var(--ease-soft),
+              left var(--travel) var(--ease), top var(--travel) var(--ease), transform var(--travel) var(--ease);
 }
 .bubble.loose .chatwin:not(.sized) { width: var(--thread-w); }
 .bb-head {
@@ -486,7 +490,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
   box-shadow: 0 0 0 1px rgba(111,240,255,.04) inset, var(--surface-depth);
   opacity: .8;
   transition: opacity .35s var(--ease-soft), border-color .3s var(--ease-soft),
-              width var(--travel) var(--ease), box-shadow .3s var(--ease-soft), transform .3s var(--ease);
+              width var(--travel) var(--ease), box-shadow .3s var(--ease-soft), transform var(--travel) var(--ease);
   animation: winIn .5s var(--ease);
   overflow: hidden;
 }
@@ -528,7 +532,6 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
      reads as a blink when it is put down). */
   box-shadow: 0 0 0 1px var(--ice), 0 24px 60px rgba(0,0,0,.6);
 }
-.chatwin.settling { transition: none !important; }
 /* the group it is carried out of stops clipping it for the moment */
 .bubble.carrying { clip-path: none; }
 .bubble.carrying .bb-list { overflow: visible; }
@@ -883,6 +886,8 @@ body.m-compact .setup-sheet {
   clip-path: var(--chamfer);
   container-type: inline-size;
   animation: panelIn .28s cubic-bezier(.2,.9,.3,1);
+  /* to its seat as a window and a bubble travel: the same time and easing; none while carried or sized */
+  transition: left var(--travel) var(--ease), top var(--travel) var(--ease);
 }
 .panel.float:not([data-panel="threads"]):not([data-panel="conversation"]) { --surface-highlight: 0 0 38px color-mix(in srgb, var(--hue) 26%, transparent); }
 /* Each instrument has one colour, worn by its panel, by its reading in the
@@ -908,7 +913,7 @@ body.m-compact .setup-sheet {
 @keyframes panelIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 .panel.float > h2.drag { cursor: grab; user-select: none; touch-action: none; margin: -10px -12px 9px; padding: 9px 8px 8px 12px; border-bottom: 1px solid rgba(111,240,255,.1); }
 .panel.float.dragging > h2.drag { cursor: grabbing; }
-.panel.float.sizing { transition: none; }
+.panel.float.dragging, .panel.float.sizing { transition: none; }
 /* the same close button, the same size, as a thread window's */
 .p-x {
   width: var(--ic-btn); height: var(--ic-btn); flex: none; display: grid; place-items: center;

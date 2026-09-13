@@ -1276,14 +1276,13 @@ export class Stage {
       return;
     }
 
-    // Put down without a glide back from where it was carried: the move to
-    // its new seat below is instant, then transitions come back.
-    c.el.classList.add("settling");
+    // Let go: its carry (transform) and its place (left/top, set below) ease
+    // back together over the same time, so from where it was dropped it glides
+    // to where it is put down — as a bubble and a panel do.
     c.el.classList.remove("lifted");
     c.el.style.transform = "";
     c.el.closest(".bubble")?.classList.remove("carrying");
     this.root.classList.remove("carrying");
-    requestAnimationFrame(() => requestAnimationFrame(() => c.el.classList.remove("settling")));
     const binned = this.overBin(e.clientX, e.clientY);
     this.showBin(false);
     const t = this.ws.thread(id);
