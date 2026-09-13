@@ -63,7 +63,8 @@ export function closeSetup(): void {
 /* ---------------- the steps ---------------- */
 
 function whereYouAre(): string {
-  const who = `<p class="lead">JARVIS is a console that talks back: ask anything, by voice or by typing, and it answers, hears and speaks through a service you connect with your own key.</p>`;
+  const who = `<p class="lead">JARVIS is a console that talks back: ask anything, by voice or by typing, and it answers, hears and speaks through a service you connect with your own key.</p>
+       <p>Tap the ring at the bottom to talk. To type, press any letter: the keyboard opens.</p>`;
   return SERVERLESS
     ? who + `<p>This is the web version: it runs entirely in your browser, and a key you connect stays here on this device.</p>
        <details class="disclose"><summary>More on keys and privacy</summary><div class="body">

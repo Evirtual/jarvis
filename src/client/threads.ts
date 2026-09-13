@@ -19,12 +19,11 @@ import { mode } from "./deck.js";
  * ===================================================================== */
 
 export function paintThreadName(): void {
-  const t = graph.active;
-  // On a clear board the line under the core says what to do; once there is
-  // a thread, its window carries its name and the line stays out of the way.
+  // The line under the core stays out of the way: a thread's window carries
+  // its name, and how to talk or type is told once, in the guide's first step.
   const line = $("threadName");
-  line.hidden = !!t;
-  line.textContent = t ? "" : "tap me to talk · or type";
+  line.hidden = true;
+  line.textContent = "";
   // The deck reports retained work, not only what happens to be open. A
   // thread put away is still there until the person explicitly deletes it.
   $("pThreads").textContent = String(ws.all.length);
