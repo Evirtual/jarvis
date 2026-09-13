@@ -224,6 +224,7 @@ export class Panels {
       el.style.top = "";
       el.style.width = "";
       el.style.height = "";
+      el.classList.remove("sized");
       return;
     }
     const room = this.room();
@@ -234,6 +235,7 @@ export class Panels {
     const height = saved?.h ? Math.min(lim.maxH, saved.h) : undefined;
     el.style.width = width ? `${width}px` : "";
     el.style.height = height ? `${height}px` : "";
+    el.classList.toggle("sized", !!height); // a height of its own: the list panels drop their resting cap
     const w = el.offsetWidth || 292;
     const h = el.offsetHeight || 200;
     let x: number;
@@ -316,7 +318,7 @@ export class Panels {
         y = clamp(y, B.top, this.floorAt(x, w) - h);
         // only the dimension being dragged is fixed; the other stays as it was
         if (sides.ex) el.style.width = `${Math.round(w)}px`;
-        if (sides.ey) el.style.height = `${Math.round(h)}px`;
+        if (sides.ey) { el.style.height = `${Math.round(h)}px`; el.classList.add("sized"); }
         el.style.left = `${Math.round(x)}px`;
         el.style.top = `${Math.round(y)}px`;
       },

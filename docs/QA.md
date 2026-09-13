@@ -1102,3 +1102,13 @@ Typecheck clean, 118 unit tests, 21 end-to-end scenarios, build clean.
      is looked up; Gemini's thinking is switched off for chat where the
      model allows. The small model of a generation is the default; the
      picker in Configuration still offers the rest.
+117. The Threads list and the Conversation could not be made taller than
+     480 px — a resting cap that also held when a height was dragged — and
+     a dragged height left the list its old size. A panel given a height of
+     its own (`.sized`) sizes like the instrument panels, up to the board,
+     and the list fills it; the cap is for the resting panel only.
+118. The Conversation said "22 lines" in its title, "4" on its button
+     (notices left out) and showed the last 40 of the 80 it keeps: three
+     numbers for one thing. It shows every message it keeps, and the title
+     and the button count those — "messages", since one is often more than
+     a line.

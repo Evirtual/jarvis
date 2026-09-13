@@ -43,11 +43,14 @@
 
 /* ---------- the Threads list: the whole board as a list; the Conversation: the talk at the core ---------- */
 .panel.float[data-panel="threads"], .panel.float[data-panel="conversation"] {
-  width: 320px; max-height: min(480px, var(--board-h));
+  width: 320px;
   display: flex; flex-direction: column; overflow: hidden;
 }
-.panel.float[data-panel="threads"] .tl { min-height: 0; overflow-y: auto; }
-.panel.float[data-panel="conversation"] .tl-core { display: flex; flex-direction: column; min-height: 0; margin: 0; }
+/* At rest they stop at a comfortable height; given a height of their own (panels.ts, .sized)
+   they size like any other panel, up to the board, and the list fills them. */
+.panel.float[data-panel="threads"]:not(.sized), .panel.float[data-panel="conversation"]:not(.sized) { max-height: min(480px, var(--board-h)); }
+.panel.float[data-panel="threads"] .tl { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.panel.float[data-panel="conversation"] .tl-core { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; margin: 0; }
 .panel.float[data-panel="conversation"] .tl-chat { flex: 1 1 auto; min-height: 0; max-height: none; }
 .tl { display: flex; flex-direction: column; gap: 2px; }
 .tl-g {
