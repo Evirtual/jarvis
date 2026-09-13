@@ -238,7 +238,7 @@ news in Cambodia"* opens a window and asks that question in it.
 **Conversation first.** JARVIS listens and talks back; the console follows.
 Anything he can answer from what he knows is said at the core, however long,
 and kept in the Conversation panel, where lists and tables render in full —
-say "show the conversation", or tap the line under him. Anything he had to find on the web is research, and research is kept: it
+open it with the button beside Threads, say "show the conversation", or tap the line under him. Anything he had to find on the web is research, and research is kept: it
 goes in a thread of its own, named by him, with its sources — unless you say
 "just tell me", in which case the searched answer is said at the core. Ask for
 a thread, a window, or to keep something, and it is a thread. Pictures and

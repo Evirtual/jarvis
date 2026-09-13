@@ -139,6 +139,23 @@ test("dropping one thread on another makes a group; the group dissolves back to 
   assert.equal(b.groupId, g!.id);
   assert.equal(c.groupId, GENERAL_ID);
 
+  // two more loose threads dropped together make a group of their own — even
+  // with the same titles as before (every "New thread" pair once joined the first group)
+  const d = ws.createThread({ title: "Solar storms" });
+  const e = ws.createThread({ title: "Aurora forecast" });
+  const g2 = ws.groupThreads(e.id, d.id);
+  assert.notEqual(g2?.id, g!.id, "a new pair made a new group");
+  assert.equal(g2?.title, "Solar storms 2", "named apart from the first");
+  assert.equal(d.groupId, g2!.id);
+  assert.equal(e.groupId, g2!.id);
+  assert.equal(a.groupId, g!.id, "the first group is untouched");
+
+  // connecting two loose threads in words does the same: a group of their own
+  const f = ws.createThread({ title: "Solar storms" });
+  const h = ws.createThread({ title: "Aurora forecast" });
+  const tied = ws.tie(f.id, h.id);
+  assert.ok(tied.group && tied.group.id !== g!.id && tied.group.id !== g2!.id, "a tie between new threads made a new group");
+
   // a third joins the same group rather than making another
   assert.equal(ws.groupThreads(c.id, b.id)?.id, g!.id);
   assert.equal(ws.live.filter((t) => t.groupId === g!.id).length, 3);

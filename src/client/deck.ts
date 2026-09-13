@@ -36,7 +36,7 @@ panels.onChange();
 
 // Readings use the same visual vocabulary as the rows in their More sheets.
 const CHIP_ICONS: Record<string, string> = {
-  pillThreads: "threads", pillCpu: "compute", pillGpu: "graphics", pillDisk: "storage",
+  pillThreads: "threads", pillConversation: "conversation", pillCpu: "compute", pillGpu: "graphics", pillDisk: "storage",
   pillLan: "perimeter", pillNet: "uplink", pillWx: "environment",
 };
 for (const [id, name] of Object.entries(CHIP_ICONS)) $(id).insertAdjacentHTML("afterbegin", icon(name));
@@ -164,7 +164,7 @@ document.addEventListener("pointerdown", (e) => {
   const t = e.target as Element;
   if (mode !== "compact" || !(t instanceof Element)) return;
   for (const sheet of ["threads", "conversation"] as const) {
-    if (panels.isOpen(sheet) && !t.closest(`.panel.float[data-panel="${sheet}"], #pillThreads, #coreSay, .confirm-dialog, .confirm-backdrop`)) panels.hide(sheet);
+    if (panels.isOpen(sheet) && !t.closest(`.panel.float[data-panel="${sheet}"], #pillThreads, #pillConversation, #coreSay, .confirm-dialog, .confirm-backdrop`)) panels.hide(sheet);
   }
 });
 

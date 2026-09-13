@@ -459,7 +459,9 @@ export class Workspace {
     const a = this.thread(dragged), b = this.thread(onto);
     if (!a || !b || a.id === b.id) return null;
     const target = b.groupId !== GENERAL_ID ? this.group(b.groupId)! : a.groupId !== GENERAL_ID ? this.group(a.groupId)! : null;
-    const g = target ?? this.ensureGroup(title ?? b.title, "user");
+    // Two loose threads make a new group — never one that happens to share the
+    // name (two "New thread" windows once joined every earlier pair's group).
+    const g = target ?? this.newGroup(title ?? b.title, "user");
     if (a.groupId !== g.id) this.moveThread(a.id, g.id);
     if (b.groupId !== g.id) this.moveThread(b.id, g.id);
     return g;
@@ -577,6 +579,16 @@ export class Workspace {
   /* ---------------- groups ---------------- */
 
   /** A group by that name, made if it doesn't exist yet. */
+  /** A group that is certainly new: the name gets a number if one has it already. */
+  newGroup(title: string, origin: Group["origin"] = "user"): Group {
+    const base = capitalise(title.trim().slice(0, 26)) || "Group";
+    let name = base;
+    for (let n = 2; this.data.groups.some((g) => norm(g.title) === norm(name)); n++) name = `${base} ${n}`;
+    const g: Group = { id: uid("g"), title: name, createdAt: Date.now(), origin };
+    this.data.groups.push(g);
+    return g;
+  }
+
   ensureGroup(title: string, origin: Group["origin"] = "user"): Group {
     const clean = capitalise(title.trim().slice(0, 28)) || "Group";
     const found = this.data.groups.find((g) => norm(g.title) === norm(clean));
@@ -684,8 +696,9 @@ export class Workspace {
     if (A.groupId === B.groupId && A.groupId !== GENERAL_ID) return { group: this.groupOf(A), moved: [] };
     const rootOf = (t: Thread): Thread => { let r = t; while (this.parentOf(r)) r = this.parentOf(r)!; return r; };
     if (A.groupId === GENERAL_ID && B.groupId === GENERAL_ID) {
-      const title = /^related$/i.test(reason) ? rootOf(A).title : reason;
-      const g = this.ensureGroup(title, "jarvis");
+      // A reason names a subject, and a subject's group may already exist; a
+      // thread's own title never does — the pair gets a group of its own.
+      const g = /^related$/i.test(reason) ? this.newGroup(rootOf(A).title, "jarvis") : this.ensureGroup(reason, "jarvis");
       const moved = [...this.moveThread(rootOf(A).id, g.id), ...this.moveThread(rootOf(B).id, g.id)];
       return { group: g, moved };
     }
