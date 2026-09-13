@@ -19,6 +19,7 @@ import { partOfDay } from "./local.js";
 import { locate } from "./sensors.js";
 import { SERVERLESS } from "./server.js";
 import { conn, voice } from "./state.js";
+import { COPY_ICON, TICK_ICON } from "./connections.js";
 import { applyAddress } from "./voice-ui.js";
 
 const DONE = "jarvis.setupDone";
@@ -93,10 +94,17 @@ function providerCard(id: ProviderId): string {
         m.models.map((x) => `<option value="${esc(x)}"${x === m.model ? " selected" : ""}>${esc(x)}</option>`).join("") +
         `</select></div>`
       : "";
+    // the key line as on Connections: masked, with the copy icon where the key is kept in this browser
+    const masked = conn.maskedKeyOf(id);
+    const keyline = masked
+      ? `<div class="keyline"><span class="mask">${esc(masked)}</span>` +
+        (api.keyOf(id) !== null ? `<button class="copy" type="button" data-setup-copy="${id}" title="Copy the key" aria-label="Copy the key">${COPY_ICON}</button>` : "") +
+        `</div>`
+      : "";
     const use = active
       ? `<p class="blurb">JARVIS answers, hears and speaks through ${esc(meta.name)}.</p>`
       : `<div class="row" style="align-items:center"><p class="blurb grow">Connected, as a spare.</p><button class="btn sm" type="button" data-setup-use="${id}">Use ${esc(meta.name)}</button></div>`;
-    return `<div class="provider ready${active ? " active" : ""}">${head}${use}${models}</div>`;
+    return `<div class="provider ready${active ? " active" : ""}">${head}${keyline}${use}${models}</div>`;
   }
   return (
     `<div class="provider${err ? " bad" : ""}">${head}` +
@@ -270,6 +278,15 @@ body.addEventListener("click", (e) => {
   const target = e.target as HTMLElement;
   const connectBtn = target.closest<HTMLElement>("[data-setup-connect]");
   if (connectBtn) { void saveKey(connectBtn.dataset.setupConnect as ProviderId); return; }
+  const copyBtn = target.closest<HTMLElement>("[data-setup-copy]");
+  if (copyBtn) {
+    const key = api.keyOf(copyBtn.dataset.setupCopy as ProviderId);
+    if (key) {
+      void navigator.clipboard.writeText(key).then(() => { copyBtn.innerHTML = TICK_ICON; copyBtn.classList.add("done"); }).catch(() => undefined)
+        .then(() => window.setTimeout(() => { copyBtn.innerHTML = COPY_ICON; copyBtn.classList.remove("done"); }, 1500));
+    }
+    return;
+  }
   const useBtn = target.closest<HTMLElement>("[data-setup-use]");
   if (useBtn) { void api.setActive(useBtn.dataset.setupUse as ProviderId).then(() => conn.refresh()).then(render); return; }
   if (target.closest("#setupVoice")) {

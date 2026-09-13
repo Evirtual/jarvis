@@ -14,8 +14,8 @@ import { $, esc } from "./dom.js";
 import { SERVERLESS } from "./server.js";
 
 /** Two sheets, one over the other: copy. And the tick that replaces it for a moment once done. */
-const COPY_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2"/><path d="M10.5 5.5V3.7A1.2 1.2 0 0 0 9.3 2.5H3.7A1.2 1.2 0 0 0 2.5 3.7v5.6a1.2 1.2 0 0 0 1.2 1.2h1.8"/></svg>`;
-const TICK_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg>`;
+export const COPY_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2"/><path d="M10.5 5.5V3.7A1.2 1.2 0 0 0 9.3 2.5H3.7A1.2 1.2 0 0 0 2.5 3.7v5.6a1.2 1.2 0 0 0 1.2 1.2h1.8"/></svg>`;
+export const TICK_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg>`;
 
 export class Connections {
   private root: HTMLElement;
@@ -72,6 +72,12 @@ export class Connections {
 
   nameOf(id: ProviderId): string {
     return this.data.providers.find((p) => p.id === id)?.name ?? id;
+  }
+
+  /** A connected service's key, masked, for the guide's key line. */
+  maskedKeyOf(id: ProviderId): string | null {
+    const p = this.data.providers.find((x) => x.id === id);
+    return p?.status.state === "ready" ? p.status.maskedKey : null;
   }
 
   /** A connected service's models and the one chosen, for the setup guide's picker. */
