@@ -1130,7 +1130,7 @@ export class Stage {
         const box = this.boxes.get(g.id);
         this.sizeDrag = {
           kind: "group", id: g.id, pid: e.pointerId, sx: e.clientX, sy: e.clientY,
-          w: b.el.offsetWidth, h: b.list.offsetHeight, ex, ey,
+          w: b.el.offsetWidth, h: b.el.offsetHeight, ex, ey, // the bubble's own height: that is what the drag sets (applyGroupSize)
           ...(box ? { x: box.x, y: box.y } : {}),
         };
         bub.classList.add("sizing");
@@ -1236,10 +1236,13 @@ export class Stage {
       d.moved = true;
       const g = this.ws.group(d.id);
       if (!g) return;
+      // Carried where the pointer takes it, over the edge included — as a window
+      // is — and brought back onto the board when it is put down (place → shown).
       g.x = Math.round(e.clientX + d.dx - r.left);
       g.y = Math.round(e.clientY + d.dy - r.top);
+      const el = this.bubbles.get(d.id)?.el;
+      if (el) el.style.transform = `translate3d(${g.x}px, ${g.y}px, 0)`;
       this.overBin(e.clientX, e.clientY);
-      this.place();
       return;
     }
     if (this.cardDrag && e.pointerId === this.cardDrag.pid) {
@@ -1318,6 +1321,7 @@ export class Stage {
       // A tap on the name bar folds the group, a tap on the folded orb opens
       // it — as a thread's title bar folds and opens it.
       if (!d.moved) { this.setFolded(d.id, !d.node); return; }
+      this.place(); // put down: back inside the board if it was carried past the edge
       this.save();
       return;
     }

@@ -974,9 +974,11 @@ body.m-compact .setup-sheet {
 .ready .switch-row { margin-bottom: 8px; }
 .ready .switch-row .btn.sm { margin-top: 8px; justify-self: start; }
 .ready .switch-row.skipped .switch { opacity: .35; }
-/* hovering a row points at its switch — the thing to set — not at the way out beside it */
+/* Hovering a row lights its switch — the thing to set — and nothing else: the
+   buttons beside it keep their quiet look even under the pointer. */
 .ready .switch-row:hover .switch:not(:disabled) { border-color: var(--ice); }
-.ready .switch-row:hover .btn:not(:hover) { color: var(--ice-dim); border-color: var(--line); background: transparent; }
+.ready .switch-row .btn, .ready .switch-row .btn:hover, .ready .switch-row .btn:focus { color: var(--ice-dim); border-color: var(--line); background: transparent; box-shadow: none; transform: none; }
+.ready .switch-row .btn:focus-visible { outline: 1px solid var(--ice-dim); outline-offset: 2px; }
 .btn:hover:not(:disabled) { color: var(--ice); border-color: var(--ice); background: rgba(111,240,255,.07); }
 .btn:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
 .btn:disabled { opacity: .32; cursor: not-allowed; }
