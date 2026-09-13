@@ -178,9 +178,11 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
     const g = /^(?:all|everything)$/.test(colG[2]) ? "all" : colG[2];
     if (g === "all" || ctx.knowsGroup(g)) return /^(?:expand|unfold|open up)$/.test(colG[1]) ? { name: "expand_group", group: g } : { name: "collapse_group", group: g };
   }
-  // A group by its name alone — "expand Baltic incidents" — when no thread has that name.
+  // A group by its name alone — "expand Baltic incidents" — when no thread has
+  // that name; "collapse" and "expand" are the group's own words, so they take
+  // the group even when its first thread carries the same name.
   const bareG = /^(collapse|fold|minimi[sz]e|shrink|expand|unfold|open up|open)\s+(?:the\s+)?(.+)$/.exec(q);
-  if (bareG?.[1] && bareG[2] && ctx.knowsGroup(bareG[2]) && !ctx.knowsThread(bareG[2])) {
+  if (bareG?.[1] && bareG[2] && ctx.knowsGroup(bareG[2]) && (!ctx.knowsThread(bareG[2]) || /^(?:collapse|expand)$/.test(bareG[1]))) {
     return /^(?:expand|unfold|open up|open)$/.test(bareG[1]) ? { name: "expand_group", group: bareG[2] } : { name: "collapse_group", group: bareG[2] };
   }
   // Renaming by name: "rename Solar storms to Space weather", "call the Baltic group Incidents".

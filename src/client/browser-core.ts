@@ -10,6 +10,7 @@
 
 import type { AskRequest, AskStatus, ConnectionsResponse, ProviderId, SpeakRequest, StatusResponse } from "../shared/types.js";
 import { PROVIDER_IDS, isProviderId } from "../shared/types.js";
+import { PROVIDERS } from "../shared/services/index.js";
 import { ConsoleCore, type Validation } from "../shared/services/console.js";
 import { recall, store } from "./dom.js";
 
@@ -94,6 +95,9 @@ async function selectModel(id: ProviderId, model: string): Promise<ConnectionsRe
 }
 
 async function setActive(id: ProviderId): Promise<ConnectionsResponse> {
+  // A service without a key cannot answer: switching to it would only look
+  // like a switch, so it is refused — the console then opens Connections.
+  if (!saved.providers[id]) throw new Error(`${PROVIDERS[id].name} isn't connected.`);
   saved.active = id;
   persist();
   return connections();

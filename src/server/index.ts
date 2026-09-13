@@ -22,7 +22,8 @@ import type {
 } from "../shared/types.js";
 import { isProviderId } from "../shared/types.js";
 
-import { clearKey, loadConfig, setActive, setKey, setModel } from "./config.js";
+import { clearKey, loadConfig, resolveKey, setActive, setKey, setModel } from "./config.js";
+import { PROVIDERS } from "../shared/services/index.js";
 import { CoreError, SPEECH_RATE, core } from "./services.js";
 import { gateway, snapshot, startSampler } from "./system.js";
 import { runScan, scanState } from "./scan.js";
@@ -158,6 +159,11 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     const body = await readJson<SetActiveRequest>(req);
     if (!body || !isProviderId(body.provider)) {
       json(res, 400, { error: "unknown_provider" });
+      return;
+    }
+    // A service without a key cannot answer: switching to it would only look like a switch.
+    if (!resolveKey(body.provider)) {
+      json(res, 409, { error: "not_connected", message: `${PROVIDERS[body.provider].name} isn't connected.` });
       return;
     }
     await setActive(body.provider);

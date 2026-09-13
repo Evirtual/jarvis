@@ -211,8 +211,18 @@ async function askCore(thread: Thread): Promise<void> {
       voice.endStream(streamed);
     }
   } catch (err) {
-    graph.detachLive(thread.id, body);
+    // The question leaves the history — it was never answered, and must not
+    // be sent again as if it had been — but it stays on screen with the
+    // reason, both kept live so the window's next redraw keeps them too.
+    const question = thread.turns[thread.turns.length - 1];
     thread.turns.pop();
+    graph.detachLive(thread.id, body);
+    if (question?.role === "user") {
+      const askedLine = line("user", question.content);
+      body.before(askedLine);
+      graph.attachLive(thread.id, askedLine);
+    }
+    graph.attachLive(thread.id, body);
     const msg = addressed(err instanceof Error ? err.message : String(err));
     setBody(msg);
     voice.speak(msg);
