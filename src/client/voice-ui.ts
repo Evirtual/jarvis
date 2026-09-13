@@ -49,6 +49,9 @@ requestAnimationFrame(function pumpGlobe(): void {
 });
 
 voice.onNotice = sys;
+// A tap to talk with nothing connected and no dictation in this browser would
+// otherwise be a six-second line and nothing more. The way to fix it opens.
+voice.onCannotHear = (): void => setDrawer(true, "connections");
 voice.onState = (): void => {
   paintCoreState();
   const note = $("voiceNote");

@@ -7,8 +7,13 @@
 
 import { api } from "./api.js";
 
-/** When the browser can't take dictation (Brave has none; Chrome's needs Google's service). */
-const NO_DICTATION = "This browser can't take dictation, sir. Connect Gemini or ChatGPT in Configuration and I'll hear you through it — or type instead.";
+/**
+ * Nothing can hear: no service is connected and the browser can't take
+ * dictation (Brave has none; Chrome's needs Google's service). One line, short
+ * enough for a phone's one-line notice; the Connections screen, opened at the
+ * same time (onCannotHear), carries the rest.
+ */
+const NO_DICTATION = "I can't hear you yet, sir — connect Gemini or ChatGPT, or type.";
 
 /** What the voice lends its ear: the audio graph, and the live level it measures. */
 export interface HearingHost {
@@ -33,6 +38,8 @@ export class Hearing {
 
   onState: (() => void) | null = null;
   onNotice: ((msg: string) => void) | null = null;
+  /** Nothing could hear a tap to talk: the console shows where to connect a service. */
+  onCannotHear: (() => void) | null = null;
   onRecognised: ((text: string, final: boolean) => void) | null = null;
 
   constructor(private readonly host: HearingHost) {
@@ -182,6 +189,7 @@ export class Hearing {
         // Deliberately no automatic retry: restarting the mic unasked is what
         // made it flick on and off.
         this.onNotice?.(NO_DICTATION);
+        this.onCannotHear?.();
       } else if (c !== "aborted") {
         this.onNotice?.(`Voice input error: ${c}.`);
       }
@@ -192,6 +200,7 @@ export class Hearing {
   private startRecognition(): void {
     if (!this.recog) {
       this.onNotice?.(NO_DICTATION);
+      this.onCannotHear?.();
       return;
     }
     try { this.recog.start(); } catch { /* already running */ }

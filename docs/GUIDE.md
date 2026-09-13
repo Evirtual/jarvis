@@ -192,9 +192,10 @@ round each piece is trimmed so they join without dead air.
 **Hearing** is the connected service's, everywhere: the microphone records in
 the page and the recording goes to Gemini or ChatGPT, primed with the console's
 vocabulary so names and commands come back spelled right. Recording stops about
-a second after you stop talking, and never runs while he is speaking. With
+a second after you stop talking, and never runs while JARVIS is speaking. With
 nothing connected, the browser's own dictation is used where it exists (Brave
-has none).
+has none); where nothing can hear, a tap to talk says so and opens
+Connections, and typing always works.
 
 ## Everything by conversation
 

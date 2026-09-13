@@ -1174,9 +1174,10 @@ body.m-compact .panel.float {
 body.m-compact .panel.float > h2.drag { cursor: default; }
 @keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } }
 body.m-compact .drawer { width: 100%; max-width: 100%; }
-/* A confirmation, too, is a sheet above the deck on a phone. */
+/* A confirmation, too, is a sheet above the deck on a phone — the same small
+   gap from the sides and the bottom as the Threads list and the More sheets. */
 body.m-compact .confirm-dialog {
-  left: 0; right: 0; top: auto; bottom: env(safe-area-inset-bottom, 0px);
+  left: var(--edge); right: var(--edge); top: auto; bottom: var(--sheet-bottom);
   width: auto; transform: none;
   box-shadow: 0 18px 44px rgba(0,0,0,.55);
   animation: sheetUp .26s cubic-bezier(.2,.9,.3,1);
@@ -1276,8 +1277,8 @@ body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="th
    100px — deck height + 4px. While one is open, JARVIS's status word and
    notices step aside rather than show through it. */
 /* Where the Threads list and the More menus stop on a phone: the same small
-   gap from the bottom as from the sides, over the deck. (The guide and a
-   confirmation run to the edge, full width: see their own rules.) */
+   gap from the bottom as from the sides, over the deck; a confirmation sits
+   the same way. (The guide runs to the edge, full width: see its own rules.) */
 body.m-compact { --sheet-bottom: calc(var(--edge) + env(safe-area-inset-bottom, 0px)); }
 body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden])) :is(.core-label, .toast) {
   opacity: 0;

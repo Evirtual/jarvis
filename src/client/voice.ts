@@ -93,6 +93,8 @@ export class Voice {
 
   onState: (() => void) | null = null;
   onNotice: ((msg: string) => void) | null = null;
+  /** A tap to talk that nothing could hear — no service connected, no dictation in this browser. */
+  onCannotHear: (() => void) | null = null;
   onRecognised: ((text: string, final: boolean) => void) | null = null;
 
   constructor() {
@@ -103,6 +105,7 @@ export class Voice {
     this.hearing = new Hearing({ graph: () => this.graph(), level: () => this.amplitude });
     this.hearing.onState = () => this.onState?.();
     this.hearing.onNotice = (msg) => this.onNotice?.(msg);
+    this.hearing.onCannotHear = () => this.onCannotHear?.();
     this.hearing.onRecognised = (text, final) => this.onRecognised?.(text, final);
     this.watchSystemVoices();
     this.pumpAmplitude();
