@@ -29,18 +29,22 @@ const base = `http://127.0.0.1:${server.address().port}/`;
 /* ---------------- the fake service ---------------- */
 let failNext = null; let failLeft = 0; // a status to return for the next question, however often the client retries it
 const asked = [];    // every question the console sent, in order
+// Every reply says where it belongs in its first words, as the real service is told to:
+// conversation at the core, a follow-up in the thread in front, research in a thread of its own.
 function replyFor(question) {
   const q = question.toLowerCase();
-  if (q.includes('plan a trip')) return 'Certainly, sir: a thread for it.\n\n[[do: new_thread title="Lisbon" ask="What is the weather in Lisbon"]]';
-  if (q.includes('weather in lisbon')) return 'Mild and bright in Lisbon, sir: **21°** and clear.';
-  if (q.includes('link them')) return 'Linked, sir.\n\n[[do: link_threads a="Lisbon" b="Journeys" why="travel"]]';
-  if (q.includes('rename this')) return 'As you wish, sir.\n\n[[do: rename_thread title="Renamed by JARVIS"]]';
-  if (q.includes('open access')) return 'Opening it, sir.\n\n[[do: open_config tab="access"]]';
-  if (q.includes('naughty')) return 'Of course not, sir.\n\n[[do: rm -rf /]]\n[[do: delete_all]]\n[[do: new_thread title="<img src=x onerror=alert(1)>" ask="say hi"]]';
-  if (q.includes('say hi')) return 'Hello, sir.';
-  if (q.includes('markdown')) return '## Report\n\n- one\n- two\n  1. nested\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```js\nlet x = 1;\n```\n\n<script>alert(1)</script> and <img src=x onerror=alert(2)>';
-  if (q.includes('slow')) return 'S'.repeat(2000) + '. Done, sir.';
-  return `Noted, sir: “${question.slice(0, 40)}”. All well within tolerance.`;
+  if (q.includes('plan a trip')) return '[[at: core]] Certainly, sir: a thread for it.\n\n[[do: new_thread title="Lisbon" ask="What is the weather in Lisbon"]]';
+  if (q.includes('weather in lisbon')) return '[[at: thread]] Mild and bright in Lisbon, sir: **21°** and clear.';
+  if (q.includes('link them')) return '[[at: core]] Linked, sir.\n\n[[do: link_threads a="Lisbon" b="Journeys" why="travel"]]';
+  if (q.includes('rename this')) return '[[at: core]] As you wish, sir.\n\n[[do: rename_thread title="Renamed by JARVIS"]]';
+  if (q.includes('open access')) return '[[at: core]] Opening it, sir.\n\n[[do: open_config tab="access"]]';
+  if (q.includes('naughty')) return '[[at: core]] Of course not, sir.\n\n[[do: rm -rf /]]\n[[do: delete_all]]\n[[do: new_thread title="<img src=x onerror=alert(1)>" ask="say hi"]]';
+  if (q.includes('say hi')) return '[[at: thread]] Hello, sir.';
+  if (q.includes('markdown')) return '[[at: new "Markdown report"]] ## Report\n\n- one\n- two\n  1. nested\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```js\nlet x = 1;\n```\n\n<script>alert(1)</script> and <img src=x onerror=alert(2)>';
+  if (q.includes('slow')) return '[[at: new "The slow one"]] ' + 'S'.repeat(2000) + '. Done, sir.';
+  if (q.includes('follow up')) return '[[at: thread]] Following on, sir.';
+  if (q.includes('no marker')) return 'Marked nowhere, sir.';
+  return `[[at: core]] Noted, sir: “${question.slice(0, 40)}”. All well within tolerance.`;
 }
 const sse = (text) => { const parts = []; for (let i = 0; i < text.length; i += 9) parts.push(text.slice(i, i + 9)); return [
   `event: response.created\ndata: ${JSON.stringify({ type: 'response.created', response: { id: 'r', object: 'response', status: 'in_progress', output: [] } })}\n\n`,
@@ -77,7 +81,9 @@ page.on('request', (r) => {
 /* ---------------- helpers ---------------- */
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const say = async (text) => { await page.evaluate((t) => { const i = document.getElementById('input'); i.value = t; i.form.requestSubmit(); }, text); };
-const untilIdle = async (timeout = 20000) => { await page.waitForFunction(() => !document.querySelector('.cw-msg.jarvis') || ![...document.querySelectorAll('.cw-msg.jarvis')].some((m) => /Thinking…|Searching the web…/.test(m.textContent)), { timeout }).catch(() => null); await wait(400); };
+const untilIdle = async (timeout = 20000) => { await page.waitForFunction(() => !/Thinking|Searching/.test(document.getElementById('logState')?.textContent || '') && ![...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].some((m) => /Thinking…|Searching the web…/.test(m.textContent)), { timeout }).catch(() => null); await wait(400); };
+/** What JARVIS last said at the core (the line under him), whole. */
+const coreSaid = () => page.evaluate(() => document.getElementById('coreSay')?.textContent || '');
 const ws = () => page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.workspace') || '{}'));
 const board = () => page.evaluate(() => ({
   windows: [...document.querySelectorAll('section.chatwin')].map((w) => ({ id: w.dataset.id, title: w.querySelector('.cw-title')?.textContent.trim(), msgs: w.querySelectorAll('.cw-msg').length, folded: w.querySelector('.cw-body')?.childElementCount === 0 })),
@@ -123,18 +129,38 @@ await check('guide: connect a key from the card, model picker, spare/use, permis
   return { chosen, masked, mic, done: await page.evaluate(() => localStorage.getItem('jarvis.setupDone')) };
 });
 
-await check('local commands: help, time, date, hi, status answer without a model', async () => {
+await check('local commands: help, time, date, hi, status answer at the core, without a model or a thread', async () => {
   const before = asked.length;
   for (const c of ['help', 'what time is it', "what's the date", 'hello', 'status']) { await say(c); await wait(700); }
   const b = await board();
-  const sysList = await page.evaluate(() => document.querySelectorAll('.cw-msg.sys ul li').length);
+  const sysList = await page.evaluate(() => document.querySelectorAll('#coreChat .cw-msg.sys ul li').length);
   assert(asked.length === before, 'a local command went to the model');
-  assert(sysList >= 10, 'help list items: ' + sysList);
+  assert(b.windows.length === 0, 'a local command opened a thread');
+  assert(sysList >= 10, 'help list items in the conversation: ' + sysList);
+  assert(/tolerance|percent|load/i.test(await coreSaid()), 'status not said at the core: ' + await coreSaid());
+  await say('close all panels'); await wait(400);
   return { windows: b.windows.length, helpItems: sysList };
 });
 
-await check('model: markdown reply renders, injection stays text, two quick questions answer in order', async () => {
+await check('conversation: talk stays at the core, is kept, and is not a thread; a reply with no marker is the core too', async () => {
+  const before = (await board()).windows.length;
+  await say('how are you today'); await untilIdle();
+  const said = await coreSaid();
+  assert(/Noted, sir/.test(said), 'not answered at the core: ' + said);
+  assert((await board()).windows.length === before, 'conversation opened a thread');
+  await say('and with no marker'); await untilIdle();
+  assert(/Marked nowhere/.test(await coreSaid()), 'a reply without a marker did not land at the core: ' + await coreSaid());
+  assert((await board()).windows.length === before, 'a markerless reply opened a thread');
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.core') || '[]').map((l) => l.role + ':' + l.content.slice(0, 20)));
+  assert(kept.some((l) => l.startsWith('user:how are you')) && kept.some((l) => l.startsWith('assistant:Noted')), 'transcript: ' + JSON.stringify(kept));
+  // the model hears the recent conversation: the question sent carries what was said before it
+  return { said: said.slice(0, 30), kept: kept.length };
+});
+
+await check('model: research opens its own thread, markdown renders, injection stays text, two quick questions answer in order at the core', async () => {
   await say('give me a markdown report'); await untilIdle();
+  const b0 = await board();
+  assert(b0.windows.length === 1 && /markdown report/i.test(b0.windows[0].title), 'no thread named by the model: ' + JSON.stringify(b0.windows));
   const md = await page.evaluate(() => { const w = document.querySelector('section.chatwin'); const b = w.querySelector('.cw-body'); return { table: b.querySelectorAll('table').length, li: b.querySelectorAll('li').length, pre: b.querySelectorAll('pre').length, scripts: b.querySelectorAll('script').length, imgs: b.querySelectorAll('img').length, scriptAsText: b.textContent.includes('<script>alert(1)</script>') }; });
   assert(md.table === 1 && md.li >= 3 && md.pre === 1, 'markdown: ' + JSON.stringify(md));
   assert(md.scripts === 0 && md.imgs === 0 && md.scriptAsText, 'injection: ' + JSON.stringify(md));
@@ -144,6 +170,10 @@ await check('model: markdown reply renders, injection stays text, two quick ques
   await untilIdle(30000);
   const order = asked.slice(n);
   assert(order.length === 2 && order[0].includes('first') && order[1].includes('second'), 'order: ' + JSON.stringify(order));
+  assert((await board()).windows.length === 1, 'a quick question opened a thread');
+  await say('a follow up please'); await untilIdle();
+  const w = await ws();
+  assert(w.threads[0].turns.some((t) => /Following on/.test(t.content)), 'a follow-up did not land in the thread in front: ' + JSON.stringify(w.threads[0].turns.map((t) => t.content.slice(0, 20))));
   return { md, order };
 });
 
@@ -229,15 +259,15 @@ await check('threads list: put away, restore, put all away, restore, tidy, delet
 });
 
 await check('error paths: 429 then 500 from the service give a friendly line, then it recovers', async () => {
-  const untilAnswered = async () => { for (let i = 0; i < 80; i++) { const st = await page.evaluate(() => ({ busy: document.getElementById('logState')?.textContent, thinking: [...document.querySelectorAll('.cw-msg.jarvis')].some((m) => /Thinking…|Searching/.test(m.textContent)) })); if (!st.thinking && st.busy !== 'Thinking' && st.busy !== 'Searching the web') break; await wait(250); } await wait(600); };
+  const untilAnswered = async () => { for (let i = 0; i < 80; i++) { const st = await page.evaluate(() => ({ busy: document.getElementById('logState')?.textContent })); if (st.busy !== 'Thinking' && st.busy !== 'Searching the web') break; await wait(250); } await wait(600); };
   failNext = 429; failLeft = 5; await say('are you there'); await untilAnswered();
-  let last = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.jarvis')].pop()?.textContent);
+  let last = await coreSaid();
   assert(/limit|busy|moment|try again/i.test(last || ''), '429 line: ' + last);
   failNext = 500; failLeft = 5; await say('still there'); await untilAnswered();
-  last = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.jarvis')].pop()?.textContent);
+  last = await coreSaid();
   assert(last && !/Thinking/.test(last), '500 left it thinking: ' + last);
   await say('and now'); await untilAnswered();
-  last = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.jarvis')].pop()?.textContent);
+  last = await coreSaid();
   assert(/Noted, sir/.test(last || ''), 'did not recover: ' + last);
   return { recovered: last.slice(0, 40) };
 });
@@ -251,8 +281,9 @@ await check('input edges: empty, whitespace, 5000 characters cut to 4000 with a 
   const capNote = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.sys')].some((m) => /4,000/.test(m.textContent)) || /4,000/.test(document.getElementById('toast')?.textContent || ''));
   assert(capNote, 'no notice about the 4,000-character cap');
   await say('give me something slow'); await untilIdle(30000); await wait(500);
-  const len = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.jarvis')].pop()?.textContent.length);
+  const len = await page.evaluate(() => [...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].pop()?.textContent.length);
   assert(len > 1900, 'long reply cut: ' + len);
+  assert((await board()).windows.some((w) => /slow one/i.test(w.title)), 'the long research reply did not get its thread');
   return { sent: asked[n].length, replied: len };
 });
 
@@ -341,7 +372,7 @@ await check('configuration: quick queries run, voice choice persists, the guide 
   const n = asked.length;
   await page.evaluate(() => document.querySelector('#quick [data-cmd="status"]').click()); await wait(900);
   assert(asked.length === n, 'status went to the model');
-  const statusLine = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.jarvis')].pop()?.textContent);
+  const statusLine = await coreSaid();
   assert(/load|percent|tolerance/i.test(statusLine || ''), 'status: ' + statusLine);
   await page.evaluate(() => document.querySelector('.tab[data-tab="voice"]').click()); await wait(200);
   const options = await page.evaluate(() => [...document.querySelectorAll('#voiceSel option')].map((x) => x.value).filter((v) => v.includes(':')));

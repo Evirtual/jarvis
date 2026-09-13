@@ -47,8 +47,10 @@ and writes, his own notices included.
 
 ## The board
 
-- **A clean screen is the starting state.** No thread exists until you ask
-  something; the first question opens the thread it belongs in.
+- **A clean screen is the starting state, and talk keeps it clean.** Saying
+  something to JARVIS opens nothing: the answer is spoken and shown under him,
+  and kept in the conversation (Threads → Conversation). A thread opens when
+  JARVIS has to look something up for you, or when you ask for one.
 - **A thread is a window.** One thread on its own is just that — no group, no
   label around it. Each gets its own colour, and a `#ABCD` tag so two threads
   with the same name can be told apart ("close Research #7F2K"). Drag its title
@@ -233,6 +235,18 @@ news in Cambodia"* opens a window and asks that question in it.
   an API key straight into the chat; it's stored locally and never sent to a
   model
 
+**Conversation first.** JARVIS listens and talks back; the console follows.
+Anything he can answer from what he knows is said at the core, however long,
+and kept in the conversation transcript, where lists and tables render in
+full. Anything he had to find on the web is research, and research is kept: it
+goes in a thread of its own, named by him, with its sources — unless you say
+"just tell me", in which case the searched answer is said at the core. Ask for
+a thread, a window, or to keep something, and it is a thread. Pictures and
+footage always get a window, since they can't be spoken. A follow-up to the
+thread in front goes into that thread. He decides all of this from your words,
+and says where each reply belongs before he says it; the console never opens
+a thread of its own accord.
+
 Phrasings the built-in patterns miss still work: JARVIS can operate the same
 actions himself, from a fixed whitelist. He can open, group, connect, rename,
 fold and put away threads — he can never delete anything, answer a
@@ -245,9 +259,11 @@ are based on that thread alone — a new subthread also hears the tail of the
 thread it grew from, and nothing else bleeds across.
 
 Short questions about this machine ("status", "my IP", "weather") are answered
-instantly from live readings; anything longer goes to the service, with web
-search. A question asked while an answer is still arriving is queued, and
-questions are answered in the order asked.
+instantly from live readings, at the core; anything else goes to the service,
+which searches the web only when you ask it to find, look up or check
+something, or ask for current facts — searching costs, talking doesn't. A
+question asked while an answer is still arriving is queued, and questions are
+answered in the order asked.
 
 ## Installing it as an app
 

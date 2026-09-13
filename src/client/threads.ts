@@ -10,6 +10,8 @@ import { type Thread } from "./stage.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { graph, input, panels, ws } from "./state.js";
 import { announce, noteIn, toast } from "./say.js";
+import { coreChat } from "./core-chat.js";
+import { line } from "./message.js";
 import { deleteGroup, deleteThread } from "./confirm.js";
 import { runAction } from "./actions.js";
 import { mode } from "./deck.js";
@@ -126,8 +128,48 @@ $("newThread").addEventListener("click", () => {
  * as a tree, and what's been put away, with restore and delete.
  * --------------------------------------------------------------------- */
 
+/**
+ * The conversation at the core, above the board's list: what was said outside
+ * any thread, oldest first, drawn as replies are drawn in a window.
+ */
+export function paintCoreChat(): void {
+  if (!panels.isOpen("threads")) return;
+  const box = $("coreChat");
+  const rows = coreChat.lines.slice(-40);
+  const key = rows.map((l) => `${l.role}:${l.at}:${l.content.length}`).join("|");
+  if (box.dataset.key === key) return;
+  box.dataset.key = key;
+  box.replaceChildren();
+  const head = document.createElement("div");
+  head.className = "tl-g";
+  head.innerHTML = `<i style="background:#6ff0ff"></i>Conversation<span class="n">${coreChat.lines.length}</span>`;
+  box.append(head);
+  if (!rows.length) {
+    const e = document.createElement("div");
+    e.className = "tl-empty";
+    e.textContent = "Nothing said yet. What you and JARVIS say outside a thread is kept here.";
+    box.append(e);
+    return;
+  }
+  const list = document.createElement("div");
+  list.className = "tl-chat";
+  for (const l of rows) list.append(line(l.role === "assistant" ? "jarvis" : l.role, l.content));
+  box.append(list);
+  const foot = document.createElement("div");
+  foot.className = "tl-foot";
+  const clear = document.createElement("button");
+  clear.type = "button";
+  clear.textContent = "Clear conversation";
+  clear.addEventListener("click", () => coreChat.clear());
+  foot.append(clear);
+  box.append(foot);
+  list.scrollTop = list.scrollHeight;
+}
+coreChat.onChange = paintCoreChat;
+
 export function paintThreadList(): void {
   if (!panels.isOpen("threads")) return;
+  paintCoreChat();
   const hue = (g: Group): string => getComputedStyle(document.querySelector<HTMLElement>(`.bubble[data-gid="${g.id}"]`) ?? document.body).getPropertyValue("--hue") || "#6ff0ff";
   const rows: string[] = [];
   for (const g of ws.visibleGroups) {

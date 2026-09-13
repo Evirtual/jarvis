@@ -122,7 +122,7 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       return `“${t.title}” is put away${subs ? ` with its ${subs} subthread${subs === 1 ? "" : "s"}` : ""}, not deleted — restore it from the Threads list, sir.${clean}`;
     }
     case "restore_thread": {
-      const r = resolve(a.title, { archived: true });
+      const r = a.last ? (ws.archived[0] ?? "Nothing is put away, sir.") : resolve(a.title, { archived: true });
       if (typeof r === "string") return r;
       ws.restore(r.id);
       graph.commit();

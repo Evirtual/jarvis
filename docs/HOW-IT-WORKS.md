@@ -103,8 +103,10 @@ anything moves and every other frame at rest.
 ## What leaves your machine
 
 - **The connected service** sees your questions, your recorded speech and the
-  text it speaks — nothing else. Each question carries a snapshot of the board
-  (thread titles and one-line summaries) and the live readings it may need.
+  text it speaks — nothing else. Each question carries the last few lines of
+  your conversation at the core, a snapshot of the board (thread titles and
+  one-line summaries, and the last exchanges of the thread in front) and the
+  live readings it may need.
 - **Two services see your IP for readings** on the PC: ip-api.com and
   open-meteo.com. Set `JARVIS_OFFLINE=1` to disable both — the console then
   reports it has no uplink data rather than inventing any. The web version asks

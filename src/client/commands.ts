@@ -22,7 +22,7 @@ export type Action =
   | { name: "new_thread"; branch?: boolean; title?: string; ask?: string; parent?: string; parentId?: string; group?: string }
   | { name: "link_threads"; a: string; b: string; why?: string }
   | { name: "archive_thread"; title?: string }
-  | { name: "restore_thread"; title: string }
+  | { name: "restore_thread"; title: string; last?: boolean }
   | { name: "delete_thread"; title?: string }
   | { name: "switch_thread"; title: string }
   | { name: "rename_thread"; title: string; target?: string }
@@ -225,6 +225,12 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
     const open = /^(?:open up|unfold|maximi[sz]e|expand|open)$/.test(fold[1]);
     if (!foldName || fold[2] || ctx.knowsThread(foldName)) return { name: "fold_thread", open, ...(foldName && !fold[2] ? { title: foldName } : {}) };
   }
+  // The one put away most recently: "restore the last one", "open the thread I just closed", "undo that close".
+  if (/\b(?:restore|reopen|bring back|unarchive|recover)\s+(?:the\s+|my\s+)?(?:last|latest|previous|most recent)\b/.test(q) ||
+      (/\b(?:open|restore|reopen|bring back|get back|recover|unarchive)\b/.test(q) && /\b(?:one|thread|chat|conversation|window)\s+(?:that\s+|which\s+)?(?:i|you|we)\s+(?:just\s+|last\s+|recently\s+)?(?:closed|put away|archived|hid|dismissed)\b/.test(q)) ||
+      /^(?:restore|undo\s+(?:that\s+|the\s+|last\s+)?(?:close|closing|put away|archive|archiving))$/.test(q)) {
+    return { name: "restore_thread", title: "", last: true };
+  }
   const rs = /\b(?:restore|reopen|bring back|unarchive)\s+(?:the\s+)?(.+?)(?:\s+(?:thread|chat|conversation))?$/.exec(q);
   if (rs?.[1]) return { name: "restore_thread", title: orig(rs[1]) };
   if (/^(?:clear|wipe)(?:\s+(?:this|the))?(?:\s+(?:thread|chat|window|conversation))?$/.test(q)) return { name: "clear_thread" };
@@ -301,6 +307,35 @@ const MAX_DIRECTIVES = 8;
  * actions. Anything not on the whitelist — deleting, approving, anything
  * unknown — is dropped, not guessed at.
  */
+/**
+ * Where a reply belongs, declared by the model in its first words:
+ * [[at: core]] — conversation, said under the core and kept in the transcript;
+ * [[at: thread]] — the thread in front (or one named: [[at: thread "Title"]]);
+ * [[at: new "Title"]] — a thread opened for it. The console follows; it never
+ * decides this itself.
+ */
+export type Route = { at: "core" } | { at: "thread"; title?: string } | { at: "new"; title?: string };
+const ROUTE = /^\s*\[\[\s*at:\s*(core|thread|new)(?:\s+"([^"]*)")?\s*\]\]\s*/i;
+
+/**
+ * The route at the start of a reply, and the reply without it. While a reply
+ * is still arriving, its first characters may be a marker not yet complete:
+ * `undecided` then, and nothing should be shown yet. No marker at all means
+ * the core.
+ */
+export function parseRoute(text: string): { route: Route | null; text: string; undecided: boolean } {
+  const m = ROUTE.exec(text);
+  if (m) {
+    const at = m[1]!.toLowerCase() as Route["at"];
+    const title = m[2]?.trim();
+    const route: Route = at === "core" ? { at } : { at, ...(title ? { title } : {}) };
+    return { route, text: text.slice(m[0].length), undecided: false };
+  }
+  const head = text.trimStart();
+  if (/^\[\[?/.test(head) && !head.includes("]]") && head.length < 60) return { route: null, text: "", undecided: true };
+  return { route: null, text, undecided: false };
+}
+
 export function extractDirectives(reply: string): { text: string; actions: Action[] } {
   const actions: Action[] = [];
   const text = reply.replace(DIRECTIVE, (_m, name: string, argStr: string) => {
@@ -333,7 +368,7 @@ function directiveToAction(n: string, args: Record<string, string>): Action | nu
     case "tidy_board":
       return { name: "tidy_board" };
     case "restore_thread":
-      return args.title ? { name: "restore_thread", title: args.title } : null;
+      return args.title ? { name: "restore_thread", title: args.title } : /^(?:yes|true|1)$/i.test(args.last ?? "") ? { name: "restore_thread", title: "", last: true } : null;
     case "switch_thread":
       return args.title ? { name: "switch_thread", title: args.title } : null;
     case "rename_thread":

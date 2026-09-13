@@ -5,13 +5,12 @@
 
 import { addressed } from "./address.js";
 import { $ } from "./dom.js";
-import { reduceMotion } from "./motion.js";
 import { line } from "./message.js";
 import { graph, voice } from "./state.js";
 import { drainQueue, queued } from "./ask.js";
 import { pendingConfirm } from "./confirm.js";
+import { coreChat } from "./core-chat.js";
 import { S } from "./readings.js";
-import { refreshLinks } from "./threads.js";
 
 /* ===================================================================== *
  * Transcript
@@ -25,11 +24,6 @@ let typing: number | null = null;
 /** Stop a reply being typed out (a new question interrupts it). */
 export function stopTyping(): void {
   if (typing) { clearTimeout(typing); typing = null; }
-}
-
-function scrollActive(): void {
-  const b = graph.activeBody();
-  if (b) b.scrollTop = b.scrollHeight;
 }
 
 /**
@@ -76,47 +70,50 @@ export function noteIn(threadId: string, text: string): void { addMsg("sys", tex
 // have focus when it occurred. Thread-local notices use noteIn explicitly.
 export function sys(t: string): void { announce(t); }
 
+/* ---------- what JARVIS says at the core ---------- */
+
+const coreSay = $("coreSay");
+let sayTimer: number | null = null;
+
 /**
- * JARVIS speaks. Replies are kept in the thread, so a window you return to
- * still shows what was said — and the reasoning core sees it as history.
+ * A line said at the core — under JARVIS, drawn as a reply would be in a
+ * thread, so a list or a bold word comes out right. It stays while it is
+ * being spoken and a while after, or until tapped. `final` false while the
+ * text is still arriving.
+ */
+export function say(text: string, final = true): void {
+  coreSay.replaceChildren(...line("jarvis", text).childNodes);
+  coreSay.hidden = false;
+  coreSay.parentElement?.style.setProperty("--say-h", `${coreSay.offsetHeight}px`); // a notice sits above it
+  requestAnimationFrame(() => coreSay.classList.add("in"));
+  if (sayTimer) clearTimeout(sayTimer);
+  sayTimer = null;
+  if (final) sayTimer = window.setTimeout(sayFades, 14_000);
+}
+
+/** After its time, and once it has been said in full. */
+function sayFades(): void {
+  if (voice.speaking) { sayTimer = window.setTimeout(sayFades, 3000); return; }
+  hideSay();
+}
+
+export function hideSay(): void {
+  if (sayTimer) clearTimeout(sayTimer);
+  sayTimer = null;
+  coreSay.classList.remove("in");
+  window.setTimeout(() => { if (!coreSay.classList.contains("in")) coreSay.hidden = true; }, 320);
+}
+coreSay.addEventListener("click", hideSay);
+
+/**
+ * JARVIS speaks, at the core: a line of conversation, kept in the transcript
+ * (Threads → Conversation) and spoken. Threads hold research; this is talk.
  */
 export function jarvis(text: string, opts: { speak?: boolean; record?: boolean } = {}): void {
   text = addressed(text);
-  const thread = graph.active;
-  if (opts.record !== false && thread) {
-    thread.turns.push({ role: "assistant", content: text });
-    graph.save();
-    refreshLinks();
-  }
-  // Nothing on the board: say it under the core, whole, rather than typing it
-  // into a window that doesn't exist.
-  if (!graph.activeBody()) {
-    toast(text);
-    if (opts.speak !== false) voice.speak(text);
-    return;
-  }
-  const body = addMsg("jarvis", "");
+  if (opts.record !== false) coreChat.add("assistant", text);
+  say(text);
   if (opts.speak !== false) voice.speak(text);
-
-  if (reduceMotion) {
-    body.textContent = text;
-    scrollActive();
-    return;
-  }
-  let i = 0;
-  const caret = document.createElement("span");
-  caret.className = "caret";
-  body.append(caret);
-  const step = (): void => {
-    i += 2;
-    caret.remove();
-    body.textContent = text.slice(0, i);
-    body.append(caret);
-    scrollActive();
-    if (i < text.length) typing = window.setTimeout(step, 11);
-    else caret.remove();
-  };
-  typing = window.setTimeout(step, 11);
 }
 
 let busyLabel = "Thinking";

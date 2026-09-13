@@ -83,6 +83,8 @@
           <span class="core-thread" id="threadName" hidden>—</span>
         </div>
         <div class="toast glass" id="toast" role="status" aria-live="polite"></div>
+        <!-- What JARVIS says at the core: conversation, drawn as a reply and kept in the transcript. -->
+        <div class="core-say glass" id="coreSay" role="status" aria-live="polite" hidden></div>
 
         <div class="windows" id="windows"></div>
         <!-- On a phone, the blurred veil behind an open sheet (More, Threads). -->
@@ -91,6 +93,7 @@
         <div class="overlays" id="overlays">
           <section class="panel float glass" data-panel="threads" hidden>
             <h2 class="drag">Threads<span class="tail"></span><span class="aux" id="threadsAux">—</span><button class="p-x" type="button" aria-label="Close Threads" title="Close Threads"></button></h2>
+            <div class="tl-core" id="coreChat"></div>
             <div class="tl" id="threadList"></div>
           </section>
 

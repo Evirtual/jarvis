@@ -3,9 +3,9 @@
  */
 
 import { gib, hhmm } from "./dom.js";
-import { reduceMotion } from "./motion.js";
-import { voice } from "./state.js";
-import { addMsg, jarvis } from "./say.js";
+import { panels, voice } from "./state.js";
+import { jarvis } from "./say.js";
+import { coreChat } from "./core-chat.js";
 import { S, T, W } from "./readings.js";
 import { SERVERLESS } from "./server.js";
 
@@ -55,8 +55,9 @@ export function localCommand(raw: string): boolean {
   const elsewhere = /\b(?:in|at|for|near)\s+(?!here\b|home\b)[a-z]/.test(q);
 
   if (/^(help|commands|what can you do|what can i say)$/.test(q)) {
-    jarvis("Here's what I answer to directly, sir — and you can ask me to operate anything on this console in plain words:");
-    setTimeout(() => addMsg("sys", HELP), reduceMotion ? 0 : 420);
+    jarvis("Here's what I answer to directly, sir — it's in the conversation, and you can ask me to operate anything on this console in plain words.");
+    coreChat.add("sys", HELP);
+    panels.show("threads"); // where the conversation is read
     return true;
   }
   if (short && /^(?:what(?:'s| is) the )?time(?: is it)?$|^what time is it$/.test(q)) {
@@ -119,11 +120,10 @@ export function localCommand(raw: string): boolean {
         ? `I can identify ${named.length} of them — ${named.slice(0, 4).map((h) => h.vendor).join(", ")}.`
         : "Most are using randomised addresses."),
     );
-    setTimeout(() => {
-      addMsg("sys", S.hosts
-        .map((h) => `${h.ip.padEnd(16)}${`${Math.round(h.rttMs)}ms`.padStart(6)}  ${h.hostname ?? h.vendor ?? h.mac ?? "unidentified"}`)
-        .join("\n"));
-    }, 500);
+    coreChat.add("sys", "```\n" + S.hosts
+      .map((h) => `${h.ip.padEnd(16)}${`${Math.round(h.rttMs)}ms`.padStart(6)}  ${h.hostname ?? h.vendor ?? h.mac ?? "unidentified"}`)
+      .join("\n") + "\n```");
+    panels.show("threads");
     return true;
   }
   if (short && /\b(?:uplink|wi-?fi|my ip|ip address|isp|am i online|connection status|internet (?:status|connection|speed))\b/.test(q)) {

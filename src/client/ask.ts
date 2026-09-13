@@ -6,8 +6,9 @@
 import type { ProviderId } from "../shared/types.js";
 import { api } from "./api.js";
 import {
-  extractDirectives, parseUtterance, type Action,
+  extractDirectives, parseRoute, parseUtterance, type Action, type Route,
 } from "./commands.js";
+import { coreChat } from "./core-chat.js";
 import { addressed, getAddress } from "./address.js";
 import { $, gib } from "./dom.js";
 import { line } from "./message.js";
@@ -15,8 +16,8 @@ import { type Thread } from "./stage.js";
 import { clip } from "./text.js";
 import { threadRef } from "./workspace.js";
 import { conn, graph, input, panels, voice, ws } from "./state.js";
-import { addMsg, announce, busy, jarvis, noteIn, setBusy, stopTyping, sys, toast } from "./say.js";
-import { interceptKey, KEY_PATTERNS, parseCtx, runAction } from "./actions.js";
+import { addMsg, announce, busy, hideSay, jarvis, noteIn, say, setBusy, stopTyping, sys, toast } from "./say.js";
+import { interceptKey, KEY_PATTERNS, parseCtx, resolve, runAction } from "./actions.js";
 import { S, T, W } from "./readings.js";
 import { boardLinks, paintThread, paintThreadName, refreshLinks, relatedContext } from "./threads.js";
 import { localCommand } from "./local.js";
@@ -133,45 +134,96 @@ function cleanReply(s: string): string {
   return cleaned.trim();
 }
 
-/** Ask the connected service: the thread's history (its newest question last), streamed back into its window. */
-async function askCore(thread: Thread): Promise<void> {
-  setBusy(true, "Thinking");
-  graph.streamingId = thread.id;
-  const body = addMsg("jarvis", "Thinking…", thread.id);
-  graph.attachLive(thread.id, body);
-  const setBody = (text: string): void => {
-    // Drawn as the finished reply will be, so a list doesn't jump into shape at the end.
-    body.replaceChildren(...line("jarvis", text).childNodes);
-    const b = graph.bodyOf(thread.id);
-    if (b) b.scrollTop = b.scrollHeight;
-  };
+/** The thread in front, with its last exchanges: what a follow-up is a follow-up to. */
+function frontContext(t: Thread): string {
+  const tail = t.turns.slice(-6).map((x) => `${x.role === "user" ? "User" : "You"}: ${clip(x.content, 400)}`);
+  return `[The thread in front on the console is “${t.title} #${threadRef(t)}”${tail.length ? `; its last exchanges: ${tail.join(" / ")}` : ", empty so far"}. A follow-up to it belongs there ([[at: thread]]); anything else is conversation at the core.]`;
+}
 
-  const turns = ws.historyFor(thread);
+/** Where a reply is being written: under the core, or into a thread's window. */
+type Target = { kind: "core" } | { kind: "thread"; thread: Thread; body: HTMLElement };
+
+/**
+ * Ask the connected service. The model hears the recent conversation at the
+ * core and sees the console — the thread in front with its last exchanges —
+ * and says in its first words where the reply belongs (parseRoute): the
+ * core, the thread in front, or a thread opened for it. Nothing is written
+ * anywhere until it has said so; then the reply streams to that place.
+ */
+async function askCore(question: string): Promise<void> {
+  setBusy(true, "Thinking");
+  voice.beginStream();
+  const front = graph.active && !graph.active.archivedAt ? graph.active : null;
+  let target: Target | null = null;
+  const current = (): Target | null => target;
+  let streamed = "";
   let pendingActions: Action[] = [];
   let housekeeping: Action[] = [];
 
-  // Speak as it's written: each sentence goes to the voice the moment it's complete.
-  voice.beginStream();
-  let streamed = "";
+  /** Follow the model's word: the place is made ready and the question written there. Once. */
+  const place = (route: Route | null): Target => {
+    if (target) return target;
+    let thread: Thread | null = null;
+    if (route?.at === "thread") {
+      const named = route.title ? resolve(route.title) : null;
+      thread = (named && typeof named !== "string" ? named : null) ?? front;
+    }
+    // a thread asked for, or "the thread in front" when there is none: one opened for it
+    if (route?.at === "new" || (route?.at === "thread" && !thread)) {
+      thread = ws.createThread(route.title ? { title: route.title } : {});
+      if (!route.title) graph.titleFrom(question, thread.id); // a stand-in name until the model gives it one
+    }
+    if (!thread) {
+      target = { kind: "core" };
+      return target;
+    }
+    if (!ws.isOpen(thread)) ws.setOpen(thread.id, true);
+    graph.commit();
+    graph.focus(thread.id);
+    paintThread();
+    hideSay(); // the reply is written in the window, not under the core
+    addMsg("user", question, thread.id);
+    thread.turns.push({ role: "user", content: question });
+    coreChat.forget("user", question); // it is the thread's, not the conversation's
+    graph.streamingId = thread.id;
+    const body = addMsg("jarvis", "Thinking…", thread.id);
+    graph.attachLive(thread.id, body);
+    target = { kind: "thread", thread, body };
+    return target;
+  };
+  const setBody = (t: Target, text: string): void => {
+    if (t.kind === "core") { say(text, false); return; }
+    // Drawn as the finished reply will be, so a list doesn't jump into shape at the end.
+    t.body.replaceChildren(...line("jarvis", text).childNodes);
+    const b = graph.bodyOf(t.thread.id);
+    if (b) b.scrollTop = b.scrollHeight;
+  };
 
   try {
-    const ctx = [appSnapshot(), contextBlock(), relatedContext(thread)].filter(Boolean).join("\n");
+    const ctx = [appSnapshot(), contextBlock(), front ? frontContext(front) : "", front ? relatedContext(front) : ""].filter(Boolean).join("\n");
+    // The recent conversation, then the question — which is already the transcript's last line (ask_), so not twice.
+    const recent = coreChat.recent(11);
+    if (recent[recent.length - 1]?.role === "user" && recent[recent.length - 1]?.content === question) recent.pop();
+    const turns = [...recent.slice(-10), { role: "user" as const, content: question }];
     const request = { turns, ...(ctx ? { context: ctx } : {}), address: getAddress() };
     // A service at its limit or out of credit, with another one connected:
     // ask that one instead of stopping — before a word has been said.
     const askVia = (provider?: ProviderId): Promise<string> => api.ask(
       { ...request, ...(provider ? { provider } : {}) },
       (full) => {
+        const r = parseRoute(full);
+        if (r.undecided) return; // the marker is still arriving: nothing to show yet
+        const t = place(r.route);
         // Hide console directives while they stream in; they are acted on, not read.
-        const visible = full.split("[[")[0] ?? "";
+        const visible = r.text.split("[[")[0] ?? "";
         streamed = visible;
-        setBody(visible);
+        setBody(t, visible);
         voice.pushText(visible);
       },
       (status) => {
         if (status === "searching") {
           setBusy(true, "Searching the web");
-          if (body.textContent === "Thinking…") setBody("Searching the web…");
+          if (target?.kind === "thread" && target.body.textContent === "Thinking…") setBody(target, "Searching the web…");
         }
       },
     );
@@ -186,50 +238,67 @@ async function askCore(thread: Thread): Promise<void> {
       sys(`${why} Meanwhile I'm answering through ${conn.nameOf(spare)}.`);
       raw = await askVia(spare);
     }
-    const d = extractDirectives(raw);
+    const routed = parseRoute(raw);
+    const t = place(routed.route); // a reply of directives alone still has a place
+    const d = extractDirectives(routed.text);
     // his own housekeeping — naming the thread, moving a new subject — waits
     // until the exchange is recorded; the rest are the console operations asked for
     housekeeping = d.actions.filter(isHousekeeping);
     pendingActions = d.actions.filter((a) => !isHousekeeping(a));
     const out = cleanReply(d.text);
-    graph.detachLive(thread.id, body);
-    if (!out && pendingActions.length) {
-      body.remove();
-      voice.stop();
-    } else if (!out) {
-      thread.turns.pop();
-      setBody("I've nothing useful on that, sir.");
-      voice.speak(body.textContent ?? "");
+    if (t.kind === "core") {
+      if (!out && pendingActions.length) { hideSay(); voice.stop(); }
+      else {
+        const said = out || "I've nothing useful on that, sir.";
+        coreChat.add("assistant", said);
+        say(said);
+        if (out) voice.endStream(streamed); // most of it has been spoken already; this sends the last sentence
+        else voice.speak(said);
+      }
     } else {
-      // Streaming starts as plain text. Replace its final row with the normal
-      // thread renderer so source links, images and video players appear now
-      // as well as after this thread is reopened.
-      const rendered = line("jarvis", out);
-      body.replaceWith(rendered);
-      thread.turns.push({ role: "assistant", content: out });
-      // Most of it has been spoken already; this sends the last sentence.
-      voice.endStream(streamed);
+      graph.detachLive(t.thread.id, t.body);
+      if (!out && pendingActions.length) {
+        t.body.remove();
+        voice.stop();
+      } else if (!out) {
+        t.thread.turns.pop();
+        setBody(t, "I've nothing useful on that, sir.");
+        voice.speak(t.body.textContent ?? "");
+      } else {
+        // Streaming starts as plain text. Replace its final row with the normal
+        // thread renderer so source links, images and video players appear now
+        // as well as after this thread is reopened.
+        t.body.replaceWith(line("jarvis", out));
+        t.thread.turns.push({ role: "assistant", content: out });
+        voice.endStream(streamed);
+      }
     }
   } catch (err) {
-    // The question leaves the history — it was never answered, and must not
-    // be sent again as if it had been — but it stays on screen with the
-    // reason, both kept live so the window's next redraw keeps them too.
-    const question = thread.turns[thread.turns.length - 1];
-    thread.turns.pop();
-    graph.detachLive(thread.id, body);
-    if (question?.role === "user") {
-      const askedLine = line("user", question.content);
-      body.before(askedLine);
-      graph.attachLive(thread.id, askedLine);
-    }
-    graph.attachLive(thread.id, body);
     const msg = addressed(err instanceof Error ? err.message : String(err));
-    setBody(msg);
+    const t = current() ?? place(null);
+    if (t.kind === "core") {
+      say(msg);
+    } else {
+      // The question leaves the history — it was never answered, and must not
+      // be sent again as if it had been — but it stays on screen with the
+      // reason, both kept live so the window's next redraw keeps them too.
+      const asked = t.thread.turns[t.thread.turns.length - 1];
+      t.thread.turns.pop();
+      graph.detachLive(t.thread.id, t.body);
+      if (asked?.role === "user") {
+        const askedLine = line("user", asked.content);
+        t.body.before(askedLine);
+        graph.attachLive(t.thread.id, askedLine);
+      }
+      graph.attachLive(t.thread.id, t.body);
+      setBody(t, msg);
+    }
     voice.speak(msg);
     void conn.refresh();
   }
   graph.streamingId = null;
-  housekeep(thread, housekeeping);
+  const done = current(); // assigned inside the callbacks above, which the type checker does not follow
+  if (done?.kind === "thread") housekeep(done.thread, housekeeping);
   graph.save();
   refreshLinks();
   setBusy(false);
@@ -237,25 +306,13 @@ async function askCore(thread: Thread): Promise<void> {
   // The core asked to operate the console. Its reply already acknowledged the
   // request, so report the outcome quietly rather than talking over it.
   for (const a of pendingActions) {
-    if (a.name === "new_thread" && a.branch && !a.parent) a.parentId = thread.id;
+    if (a.name === "new_thread" && a.branch && !a.parent && done?.kind === "thread") a.parentId = done.thread.id;
     const note = await runAction(a, true);
-    if (note) noteIn(graph.activeId, note);
-  }
-
-  // A window made only to carry a request typed at an empty board, which
-  // JARVIS carried out by opening other threads, has done its job: it doesn't
-  // stay behind as a thread named after the instruction.
-  const scratch = madeForAsk.delete(thread.id);
-  const opened = pendingActions.some((a) => (a.name === "new_thread" && !a.branch) || a.name === "new_group");
-  if (scratch && opened && thread.turns.length <= 2 && ws.live.some((t) => t.id !== thread.id && !t.parentId)) {
-    ws.remove(thread.id);
-    graph.commit();
-    paintThread();
+    if (!note) continue;
+    if (done?.kind === "thread") noteIn(graph.activeId, note);
+    else toast(note);
   }
 }
-
-/** Threads made only to carry a message typed at an empty board. */
-const madeForAsk = new Set<string>();
 
 const isHousekeeping = (a: Action): boolean => a.name === "title_thread" || a.name === "new_subject";
 
@@ -383,32 +440,18 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
 }
 
 /**
- * Put a question into the window in front and get it answered. On a clean
- * screen the question opens a thread of its own. If it turns out to be on a
- * new subject, JARVIS says so in his reply and the exchange moves to a
- * thread of its own afterwards (housekeep).
+ * What you said, answered: by the console itself when it is one of the things
+ * it answers directly, otherwise by the connected service — which says where
+ * the reply belongs (askCore). The console makes no thread of its own accord.
  */
 async function ask_(t: string): Promise<void> {
-  const thread = graph.active ?? (() => {
-    const fresh = ws.createThread({});
-    madeForAsk.add(fresh.id);
-    graph.commit();
-    paintThread();
-    return fresh;
-  })();
-  // A thread being asked something opens itself, so the answer is where you can see it.
-  if (!ws.isOpen(thread)) { ws.setOpen(thread.id, true); graph.commit(); }
   // The server keeps 4,000 characters of a question; say so rather than cut quietly.
   if (t.length > 4000) { sys("That's over 4,000 characters, sir — I'll take the first 4,000."); t = t.slice(0, 4000); }
-  addMsg("user", t, thread.id);
-  // Every message is kept; the service is sent only the last dozen (prepareTurns).
-  thread.turns.push({ role: "user", content: t });
-  graph.titleFrom(t, thread.id);
-  graph.save();
-  paintThreadName();
-
+  // What you said goes in the conversation first; a reply that turns out to
+  // belong in a thread takes it back out (askCore).
+  coreChat.add("user", t);
   if (localCommand(t)) return;
-  if (conn.anyReady) await askCore(thread);
+  if (conn.anyReady) await askCore(t);
   else {
     jarvis("That needs a reasoning core, sir, and none is connected. Open Config and connect Gemini — it's free — or paste a key right here in the chat.");
     setDrawer(true, "connections");
