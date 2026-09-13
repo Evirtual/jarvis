@@ -155,8 +155,9 @@ async function permissionState(need: Need): Promise<PermissionState | "unknown">
 
 function needRow(need: Need, name: string, how: string): string {
   return (
-    `<div class="need" data-need="${need}"><div class="k"><b>${name}</b><p class="how">${how}</p><p class="err" hidden></p></div>` +
-    `<span class="st">…</span><button class="btn" type="button" data-setup-perm="${need}">Allow</button></div>`
+    `<div class="need" data-need="${need}">` +
+    `<div class="need-h"><b>${name}</b><span class="st">…</span><button class="btn" type="button" data-setup-perm="${need}">Allow</button></div>` +
+    `<p class="how">${how}</p><p class="err" hidden></p></div>`
   );
 }
 
@@ -172,8 +173,8 @@ function needs(): string {
     `<p class="lead">Three things the browser asks about. Each is yours to allow, and none is needed to type to him.</p>` +
     needRow("mic", "Microphone", "To talk to him. Tapping JARVIS asks for it too, the first time.") +
     needRow("geo", "Location", "For the weather where you stand, to a few streets. Without it he uses your connection's city.") +
-    `<div class="need"><div class="k"><b>Sound when the console opens</b><p class="how">${soundHow}</p></div>` +
-    `<span class="st${sound ? " ok" : ""}">${sound ? "Allowed" : "Blocked"}</span>${install}</div>`
+    `<div class="need"><div class="need-h"><b>Sound when the console opens</b><span class="st${sound ? " ok" : ""}">${sound ? "Allowed" : "Blocked"}</span>${install}</div>` +
+    `<p class="how">${soundHow}</p></div>`
   );
 }
 

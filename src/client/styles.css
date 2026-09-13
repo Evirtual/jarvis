@@ -677,12 +677,13 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .setup-body .ok { font-family: var(--f-hud); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
 .setup-body .ctl { margin: 12px 0; }
 .setup-body .btn.wide { margin-bottom: 12px; }
-/* What he needs: one row a permission — its name and why, its state, and the button that asks. */
-.need { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+/* What he needs: one row a permission — its name, state and button on one line, and why beneath at full width. */
+.need { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .need:last-child { border-bottom: 0; }
-.need .k { flex: 1; min-width: 0; }
-.need .how { margin: 3px 0 0; font-size: 11px; color: var(--ice-dim); }
-.need .err { margin: 3px 0 0; font-size: 11px; color: var(--red); }
+.need-h { display: flex; align-items: center; gap: 10px; min-height: 28px; }
+.need-h b { flex: 1; min-width: 0; }
+.need .how { margin: 4px 0 0; font-size: 11px; color: var(--ice-dim); }
+.need .err { margin: 4px 0 0; font-size: 11px; color: var(--red); }
 .need .st { flex: none; font-family: var(--f-hud); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ice-dim); }
 .need .st.ok { color: var(--green); }
 .need .st.bad { color: var(--red); }
