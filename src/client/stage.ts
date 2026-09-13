@@ -445,7 +445,7 @@ export class Stage {
       `</header><div class="cw-body" aria-live="polite"></div>` +
       ["n", "s", "e", "w", "nw", "ne", "sw", "se"].map((corner) => `<span class="cw-grip" data-corner="${corner}" title="Drag to resize · double-click to reset" aria-hidden="true"></span>`).join("") +
       // phone: the grip at the bottom of the thread in front — drag for a height of your own, double-tap to let it share again
-      `<span class="cw-grip-m" aria-hidden="true"><svg viewBox="0 0 24 10"><path d="M6 9l8-8M11 9l8-8M16 9l8-8"/></svg></span>`;
+      `<span class="cw-grip-m" aria-hidden="true"><svg viewBox="0 0 14 14"><path d="M13.5 1.5L1.5 13.5M13.5 6.5L6.5 13.5M13.5 11.5L11.5 13.5"/></svg></span>`;
     c = {
       el,
       body: el.querySelector(".cw-body")!,
@@ -1023,8 +1023,14 @@ export class Stage {
     for (const b of this.bubbles.values()) {
       if (b.el.offsetHeight === 0 || b.el.classList.contains("collapsed") || b.list.offsetHeight === 0) { groups.set(b.el, null); continue; }
       const kids = [...b.list.children].filter((k): k is HTMLElement => k instanceof HTMLElement && k.offsetHeight > 0);
-      const gaps = Math.max(0, kids.length - 1) * px(getComputedStyle(b.list).rowGap);
-      const chrome = b.el.offsetHeight - kids.reduce((sum, k) => sum + k.offsetHeight, 0) - gaps; // the group's name and frame
+      const bs = getComputedStyle(b.el), ls = getComputedStyle(b.list);
+      const gaps = Math.max(0, kids.length - 1) * px(ls.rowGap);
+      // The group's name and frame, from their own measures — never from the
+      // bubble's current height, which may be stretched (see held()).
+      const head = b.el.querySelector<HTMLElement>(".bb-head");
+      const chrome = px(bs.paddingTop) + px(bs.paddingBottom) + px(bs.borderTopWidth) + px(bs.borderBottomWidth)
+        + px(ls.paddingTop) + px(ls.paddingBottom) + px(ls.borderTopWidth) + px(ls.borderBottomWidth)
+        + (head && head.offsetHeight > 0 ? head.offsetHeight + px(getComputedStyle(head).marginTop) + px(getComputedStyle(head).marginBottom) : 0);
       let max = chrome + gaps, min = chrome + gaps;
       for (const k of kids) { const n = cards.get(k); max += n?.max ?? k.offsetHeight; min += n?.min ?? k.offsetHeight; }
       groups.set(b.el, { max: Math.ceil(max), min: Math.ceil(min) });

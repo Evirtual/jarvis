@@ -391,6 +391,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .bubble.loose {
   inset: 0; width: auto; height: auto; max-height: none;
   border: 0; background: none; box-shadow: none; padding: 0;
+  -webkit-backdrop-filter: none; backdrop-filter: none; /* a host, not a pane: nothing behind it is blurred */
   pointer-events: none; animation: none; transform: none !important;
   /* no stacking context: each loose window stacks on its own (stack.ts) */
   clip-path: none; will-change: auto;
@@ -1090,7 +1091,7 @@ body.m-compact .stage::after {
   content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; /* under the canvas (1): the core keeps its light */
   background:
     linear-gradient(to bottom, #060e15, transparent var(--header-h)),
-    linear-gradient(to top, #060e15, rgba(6,14,21,.7) 40%, transparent calc(var(--deck-h, 96px) - 24px));
+    linear-gradient(to top, #060e15, rgba(6,14,21,.7) 20px, transparent calc(var(--deck-h, 96px) - 24px));
 }
 body.m-compact .core-seat { width: 120px; }
 body.m-compact .pill.more { height: 30px; padding: 0 9px; }
@@ -1172,13 +1173,14 @@ body.m-compact .chatwin .cw-grip { display: none; }
    that one thread only, so the list stays clean. */
 .cw-grip-m { display: none; }
 body.m-compact .chatwin.on .cw-grip-m {
-  display: grid; place-items: center; position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
-  width: 56px; height: 16px; touch-action: none; cursor: ns-resize; color: var(--hue); opacity: .7;
+  display: grid; place-items: end; position: absolute; right: 0; bottom: 0;
+  width: 32px; height: 32px; touch-action: none; cursor: nwse-resize; color: var(--hue); opacity: .75;
 }
-body.m-compact .chatwin.on .cw-grip-m svg { width: 24px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; }
+/* the usual resize corner: parallel 45° lines, each ending on the right and the bottom border */
+body.m-compact .chatwin.on .cw-grip-m svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.2; }
 body.m-compact .chatwin.sizing { box-shadow: 0 0 0 1px var(--hue), var(--surface-depth); }
 body.m-compact .chatwin.sizing .cw-grip-m { opacity: 1; }
-body.m-compact .chatwin.on .cw-body { padding-bottom: 18px; } /* room for the grip under the last line */
+body.m-compact .chatwin.on .cw-body { padding-bottom: 16px; } /* room for the grip beside the last line */
 body.m-compact .cw-head { cursor: pointer; padding: 10px 12px; }
 
 /* the command line hugs the bottom edge, above the home indicator */
