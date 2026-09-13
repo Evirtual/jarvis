@@ -219,10 +219,10 @@ test("voice words that aren't a voice's name are not read as one", () => {
   assert.deepEqual(intentOf("voice to emma", ctx()), { name: "set_voice", voice: "emma" });
 });
 
-test("naming a thread and moving a new subject are JARVIS's own housekeeping", () => {
-  const d = extractDirectives('Antonelli, sir.\n[[do: new_subject title="Formula 1 results"]]');
-  assert.equal(d.text, "Antonelli, sir.");
-  assert.deepEqual(d.actions, [{ name: "new_subject", title: "Formula 1 results" }]);
-  assert.deepEqual(extractDirectives('Mild, sir. [[do: title_thread title="Lisbon in October"]]').actions, [{ name: "title_thread", title: "Lisbon in October" }]);
-  assert.equal(intentOf("new subject Formula 1", ctx()), null, "not something typed or said");
+test("naming a thread is JARVIS's own housekeeping, never something typed or said", () => {
+  const d = extractDirectives('Mild, sir. [[do: title_thread title="Lisbon in October"]]');
+  assert.equal(d.text, "Mild, sir.");
+  assert.deepEqual(d.actions, [{ name: "title_thread", title: "Lisbon in October" }]);
+  assert.deepEqual(extractDirectives('[[do: new_subject title="Formula 1 results"]]').actions, [], "a directive that no longer exists is ignored");
+  assert.equal(intentOf("title thread Lisbon", ctx()), null);
 });

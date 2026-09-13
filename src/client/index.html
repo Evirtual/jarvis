@@ -86,9 +86,11 @@
         <div class="core-label">
           <span class="core-state" id="logState" hidden></span>
         </div>
-        <div class="toast glass" id="toast" role="status" aria-live="polite"></div>
-        <!-- What JARVIS says at the core: conversation, drawn as a reply and kept in the transcript. -->
-        <div class="core-say glass" id="coreSay" role="status" aria-live="polite" hidden></div>
+        <!-- The line under the core: a passing notice, and the reply JARVIS is saying, in one box (say.ts). -->
+        <div class="core-line glass" id="coreLine" role="status" aria-live="polite" hidden>
+          <div class="core-notice" id="coreNotice" hidden></div>
+          <div class="core-reply" id="coreReply" hidden></div>
+        </div>
 
         <div class="windows" id="windows"></div>
         <!-- On a phone, the blurred veil behind an open sheet (More, Threads). -->

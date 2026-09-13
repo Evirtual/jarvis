@@ -18,7 +18,7 @@ import { line } from "./message.js";
 import { conn, graph, voice, ws } from "./state.js";
 import { setDrawer } from "./drawer.js";
 import { needs, needsChange, paintNeeds, permissionWatchers, setSetupClosed } from "./setup.js";
-import { announce } from "./say.js";
+import { notice } from "./say.js";
 import { paintThread } from "./threads.js";
 import { type Thread } from "./workspace.js";
 
@@ -39,7 +39,6 @@ function ensure(): Thread {
   if (!t) {
     t = ws.createThread({ title: READINESS_TITLE });
     t.kind = "setup";
-    t.named = true;
   }
   if (!ws.isOpen(t)) ws.setOpen(t.id, true);
   graph.commit();
@@ -106,7 +105,7 @@ function checkDone(box: HTMLElement): void {
   ws.remove(t.id);
   graph.commit();
   paintThread();
-  announce("Everything's set, sir — the card has gone.");
+  notice("Everything's set, sir — the card has gone.");
 }
 
 /** Draw the card's rows again from the current state, where it is open. */

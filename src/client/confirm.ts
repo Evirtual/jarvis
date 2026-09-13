@@ -5,7 +5,7 @@
 import { $ } from "./dom.js";
 import { type Group, type Thread } from "./workspace.js";
 import { graph, ws } from "./state.js";
-import { announce, paintCoreState } from "./say.js";
+import { notice, paintCoreState } from "./say.js";
 import { paintThread } from "./threads.js";
 
 export let pendingConfirm: { run: () => string; question: string; yesLabel: string } | null = null;
@@ -27,7 +27,7 @@ export function confirmFirst(question: string, yesLabel: string, run: () => stri
   pendingConfirm = { run, question, yesLabel };
   paintConfirm();
   paintCoreState();
-  announce(`${question} Say yes to ${yesLabel.toLowerCase()}, or no.`);
+  notice(`${question} Say yes to ${yesLabel.toLowerCase()}, or no.`);
   return null;
 }
 
@@ -48,11 +48,11 @@ function cancelConfirm(): void {
 
 $("confirmAccept").addEventListener("click", () => {
   const note = answerConfirm(true);
-  if (note) announce(note);
+  if (note) notice(note);
 });
 $("confirmCancel").addEventListener("click", () => {
   const note = answerConfirm(false);
-  if (note) announce(note);
+  if (note) notice(note);
 });
 
 /** Delete one thread for good — always after asking. Its subthreads move up a level (workspace.remove). */

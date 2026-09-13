@@ -45,9 +45,11 @@ away again. In **Config → Voice** you can make tapping him open the keyboard
 instead. Enter sends.
 
 The word just above him says what he's doing — listening, transcribing,
-thinking, speaking, sweeping — and is gone when he's idle. One-off results
-("Sweep complete — 12 hosts") appear as a short notice **on that same line**,
-and so does the bin; they take turns rather than stacking. On a phone that line
+thinking, speaking, sweeping — and is gone when he's idle. What he says
+appears in one box on that line: a passing notice ("Sweep complete — 12
+hosts", "Put away") above, the reply he is saying below; a tap on the box
+opens the Conversation, which keeps both. The bin takes the line over while
+something is carried. On a phone that line
 always has room: sheets stop above it and never cover him.
 
 He calls you **sir** — or **ma'am**, if you'd rather: **Config → Voice →
@@ -68,14 +70,11 @@ and writes, his own notices included.
   comes back into view if it would be off the edge. Dragging a window with a
   video playing doesn't interrupt the video (moving it into a *different* group
   does reload the player).
-- **A new subject, a new thread — and a proper name.** A question goes to the
-  thread in front, and JARVIS, who reads the whole conversation, judges whether
-  it carries it on ("is Sintra worth a day trip?" in a Lisbon thread) or starts
-  something else ("find me a carbonara recipe"). A new subject moves, question
-  and answer, to a thread of its own as soon as he has answered, and he says so.
-  A thread starts out named after its first question; with his first answer he
-  gives it a proper two-to-four-word name ("Lisbon in October"), so "switch to
-  the Lisbon thread" finds it. Both come in the same reply — no extra wait.
+- **A thread is named by him.** A thread he opens for research is named in
+  the same reply that fills it — two to four words for its subject ("Lisbon in
+  October") — so "switch to the Lisbon thread" finds it. One you open yourself
+  without a name is called New thread until he first answers in it, when he
+  names it. Rename any thread by hand or by word.
 - **Windows stay as you leave them.** The first click on a window only brings
   it forward; clicking the title bar of the window you're in folds it to a bar.
   Nothing folds or shrinks on its own. A conversation stays on its latest line

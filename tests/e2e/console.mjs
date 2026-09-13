@@ -96,7 +96,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const say = async (text) => { await page.evaluate((t) => { const i = document.getElementById('input'); i.value = t; i.form.requestSubmit(); }, text); };
 const untilIdle = async (timeout = 20000) => { await page.waitForFunction(() => !/Thinking|Searching/.test(document.getElementById('logState')?.textContent || '') && ![...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].some((m) => /Thinking…|Searching the web…/.test(m.textContent)), { timeout }).catch(() => null); await wait(400); };
 /** What JARVIS last said at the core (the line under him), whole. */
-const coreSaid = () => page.evaluate(() => document.getElementById('coreSay')?.textContent || '');
+const coreSaid = () => page.evaluate(() => document.getElementById('coreReply')?.textContent || '');
 // which services hold a key and which is in use — never the keys themselves
 const cores = () => page.evaluate(() => { const s = JSON.parse(localStorage.getItem('jarvis.cores') || '{}'); return { active: s.active, with: Object.keys(s.providers || {}) }; });
 const ws = () => page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.workspace') || '{}'));
@@ -104,7 +104,7 @@ const board = () => page.evaluate(() => ({
   windows: [...document.querySelectorAll('section.chatwin')].map((w) => ({ id: w.dataset.id, title: w.querySelector('.cw-title')?.textContent.trim(), msgs: w.querySelectorAll('.cw-msg').length, folded: w.querySelector('.cw-body')?.childElementCount === 0 })),
   groups: [...document.querySelectorAll('section.bubble')].map((b) => ({ gid: b.dataset.gid, title: b.querySelector('.bb-title')?.textContent.trim(), threads: b.querySelectorAll('section.chatwin').length, cls: b.className })),
   panels: [...document.querySelectorAll('.panel.float')].filter((p) => !p.hidden).map((p) => p.dataset.panel),
-  toast: document.getElementById('toast')?.textContent,
+  notice: document.getElementById('coreNotice')?.textContent,
   drawerOpen: document.getElementById('drawer').classList.contains('open'),
   activeTab: document.querySelector('.tab.on')?.textContent,
   guideOpen: !document.getElementById('setup').hidden,
@@ -288,17 +288,16 @@ await check('closing the thread in front: nothing takes its place, a follow-up o
   w = await ws();
   assert(w.threads.find((t) => t.id === front.id)?.archivedAt, 'the thread in front was not put away');
   assert(w.activeId === '', 'another thread was put in front after the close: ' + w.activeId);
-  // a reply the model addresses to "the thread" now goes to a thread of its own, not into whichever was open
+  // a reply the model addresses to "the thread" with none in front is conversation: said at the core, written nowhere
   await say('follow up'); await untilIdle(); await wait(400);
   w = await ws();
-  const fresh = w.threads.filter((t) => !t.archivedAt && !liveBefore.includes(t.id));
-  assert(fresh.length === 1 && fresh[0].turns.some((t) => t.content === 'follow up'), 'the follow-up did not open its own thread: ' + JSON.stringify(w.threads.map((t) => [t.title, t.turns.length, !!t.archivedAt])));
-  assert(w.threads.filter((t) => !t.archivedAt && liveBefore.includes(t.id)).every((t) => !t.turns.some((x) => x.content === 'follow up')), 'the follow-up was written into an older thread');
-  assert(w.activeId === fresh[0].id, 'the new thread is not the one in front');
-  // with it closed too, "this thread" names nothing: a line says so, no thread is touched
+  assert(/Following on/.test(await coreSaid()), 'the follow-up was not said at the core: ' + await coreSaid());
+  assert(w.threads.filter((t) => !t.archivedAt).length === liveBefore.length - 1, 'the follow-up opened a thread: ' + JSON.stringify(w.threads.map((t) => [t.title, !!t.archivedAt])));
+  assert(w.threads.every((t) => !t.turns.some((x) => x.content === 'follow up')), 'the follow-up was written into a thread');
+  assert(w.activeId === '', 'something is in front after a follow-up at the core: ' + w.activeId);
+  // "this thread" names nothing: a line says so, no thread is touched
   await say('close this chat'); await wait(800);
-  await say('close this chat'); await wait(800);
-  const line = (await board()).toast;
+  const line = (await board()).notice;
   assert(/no thread in front/i.test(line || ''), 'no word that nothing is in front: ' + line);
   w = await ws();
   assert(w.threads.filter((t) => !t.archivedAt).length === liveBefore.length - 1, 'a thread that was not in front was closed');
@@ -307,7 +306,7 @@ await check('closing the thread in front: nothing takes its place, a follow-up o
   await say('restore ' + front.title); await wait(600);
   w = await ws();
   assert(!w.threads.find((t) => t.id === front.id)?.archivedAt, 'restore by name failed: ' + front.title);
-  return { closed: front.title, opened: fresh[0].title };
+  return { closed: front.title };
 });
 
 await check('threads list: put away, restore, put all away, restore, tidy, delete everything with confirm', async () => {
@@ -364,17 +363,14 @@ await check('a spare service: answers when the first is busy, with one notice; b
   // ChatGPT at its limit: the notice says so and names the spare; the spare answers at the core
   failNext = 429; failLeft = 5; await say('who is there'); await untilAnswered();
   let b = await board(); line = await coreSaid();
-  assert(/answering through Gemini/i.test(b.toast || ''), 'no word of the spare: ' + b.toast);
+  assert(/answering through Gemini/i.test(b.notice || ''), 'no word of the spare: ' + b.notice);
   assert(/Gemini here/.test(line), 'the spare did not answer: ' + line);
   // both down: one line under the core carrying both reasons, and no notice left over it
   failNext = 429; failLeft = 5; geminiFail = 503; geminiFailLeft = 5; await say('anyone there'); await untilAnswered();
   line = await coreSaid();
-  const shown = await page.evaluate(() => ({ toast: document.getElementById('toast').classList.contains('in'), say: document.getElementById('coreSay').classList.contains('in') }));
+  const shown = await page.evaluate(() => ({ notice: !document.getElementById('coreNotice').hidden, reply: !document.getElementById('coreReply').hidden, boxes: document.querySelectorAll('.core-line').length }));
   assert(/limit|quota/i.test(line) && /Gemini is busy/i.test(line), 'not both reasons in one line: ' + line);
-  assert(shown.say && !shown.toast, 'two notices at once: ' + JSON.stringify(shown));
-  // the two boxes are drawn the same: same corners, padding and border
-  const boxes = await page.evaluate(() => { const g = (id) => { const c = getComputedStyle(document.getElementById(id)); return [c.borderRadius, c.padding, c.borderWidth, c.fontSize].join('|'); }; return { toast: g('toast'), say: g('coreSay') }; });
-  assert(boxes.toast === boxes.say, 'the notice and the line under the core differ: ' + JSON.stringify(boxes));
+  assert(shown.reply && !shown.notice && shown.boxes === 1, 'a notice left over the line, or two boxes: ' + JSON.stringify(shown));
   } finally {
   // put Gemini away again — whatever came of the checks — so the rest of the suite sees one service
   failNext = null; failLeft = 0; geminiFail = null; geminiFailLeft = 0;
@@ -397,7 +393,7 @@ await check('input edges: empty, whitespace, 5000 characters cut to 4000 with a 
   assert(asked.length === n, 'empty input reached the model');
   await say('x'.repeat(5000)); await untilIdle(30000);
   assert(asked.length === n + 1 && asked[n].length === 4000, 'long input should be cut to 4000: ' + asked[n]?.length + ' ' + JSON.stringify(asked.slice(n).map((q) => q.slice(0, 12) + '…' + q.slice(3990, 4060))));
-  const capNote = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.sys')].some((m) => /4,000/.test(m.textContent)) || /4,000/.test(document.getElementById('toast')?.textContent || ''));
+  const capNote = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.sys')].some((m) => /4,000/.test(m.textContent)) || /4,000/.test(document.getElementById('coreNotice')?.textContent || ''));
   assert(capNote, 'no notice about the 4,000-character cap');
   await say('give me something slow'); await untilIdle(30000); await wait(500);
   const len = await page.evaluate(() => [...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].pop()?.textContent.length);
@@ -481,8 +477,8 @@ await check('voice commands: mute, unmute, switch to a service that is not conne
   await say('switch to Gemini'); await wait(800);
   const b = await board();
   assert(b.title.includes('ChatGPT'), 'switched to an unconnected service: ' + b.title + ' ' + JSON.stringify(await cores()));
-  assert(/gemini/i.test(b.toast || ''), 'no word about Gemini not being connected: ' + b.toast);
-  return { toast: b.toast };
+  assert(/gemini/i.test(b.notice || ''), 'no word about Gemini not being connected: ' + b.notice);
+  return { notice: b.notice };
 });
 
 await check('configuration: quick queries run, voice choice persists, the guide reopens from Connections', async () => {

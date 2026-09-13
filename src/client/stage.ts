@@ -287,35 +287,6 @@ export class Stage {
     this.onFocus?.(id);
   }
 
-  /** Name a thread after the subject of its first question, not the instruction. */
-  titleFrom(text: string, id = this.ws.activeId): void {
-    const t = this.ws.thread(id);
-    if (!t || t.named) return;
-    // Name it for its subject: "What is the latest on the Baltic cable damage?"
-    // becomes "Baltic cable damage", "show me images of the Eagle S" becomes
-    // "Eagle S".
-    let name = text
-      // greetings and his name, however many of them open the sentence
-      .replace(/^(?:(?:ok(?:ay)?|so|please|jarvis|hey|hi|hello|good (?:morning|afternoon|evening))[,!.\s]+)+/gi, "")
-      .replace(/^(?:can you|could you|would you|please)\s+/i, "")
-      .replace(/^(?:show|find|get|give|bring)(?:\s+me)?\s+(?:some\s+)?(?:images?|pictures?|photos?|videos?|clips?|footage)\s+(?:of|about|on|from)\s+/i, "")
-      .replace(/^(?:what(?:'s| is| are)|tell me|give me)\s+(?:the\s+)?(?:latest(?:\s+news)?|news|updates?|current situation|state of play)\s+(?:on|about|with|in|regarding)\s+/i, "")
-      .replace(/^(?:what(?:'s| is)\s+(?:happening|going on)|what happened)\s+(?:with|in|to|at|on)\s+/i, "")
-      .replace(/^(?:search(?:\s+for)?|find(?:\s+me)?(?:\s+on\s+(?:the\s+)?internet)?|look\s+up|tell\s+me(?:\s+about)?|google)\s+/i, "")
-      .replace(/^the\s+/i, "")
-      .replace(/[.?!]+$/, "")
-      .trim() || text;
-    if (!/[\p{L}\p{N}]/u.test(name)) return; // nothing to name it after yet
-    name = name.charAt(0).toUpperCase() + name.slice(1);
-    t.title = name.length > 30 ? `${name.slice(0, 28).trim()}…` : name;
-    t.named = true;
-    // only a stand-in: JARVIS names it properly with his first answer (ask.ts)
-    t.provisional = true;
-    this.save();
-    this.paintHead(t);
-    this.onChange?.();
-  }
-
   /**
    * Tidy the board: every thread is folded to its title bar, then everything
    * is seated by the plan in tidy.ts — one column down the middle, more to a

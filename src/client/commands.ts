@@ -37,10 +37,8 @@ export type Action =
   | { name: "tidy_board" }
   | { name: "delete_all" }
   | { name: "clear_archived" }
-  /** From JARVIS only: a proper name for the thread we're in, which has only a stand-in. */
+  /** From JARVIS only: a name for the thread we're in, which has none yet. */
   | { name: "title_thread"; title: string }
-  /** From JARVIS only: the last question and answer are a new subject — move them to a thread of their own. */
-  | { name: "new_subject"; title: string }
   | { name: "collapse_group"; group: string }
   | { name: "expand_group"; group: string }
   | { name: "approve" }
@@ -377,8 +375,6 @@ function directiveToAction(n: string, args: Record<string, string>): Action | nu
     // Housekeeping JARVIS does on his own, applied quietly by ask.ts
     case "title_thread":
       return args.title ? { name: "title_thread", title: args.title } : null;
-    case "new_subject":
-      return args.title ? { name: "new_subject", title: args.title } : null;
     case "clear_thread":
       return { name: "clear_thread" };
     case "fold_thread":

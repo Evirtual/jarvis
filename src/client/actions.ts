@@ -11,7 +11,7 @@ import { type Thread } from "./stage.js";
 import { editDistance } from "./text.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { conn, graph, panels, voice, ws } from "./state.js";
-import { announce } from "./say.js";
+import { notice } from "./say.js";
 import { answerConfirm, confirmFirst, deleteGroup, deleteThread, lostWords, pendingConfirm } from "./confirm.js";
 import { bringBack, paintThread, putAway, refreshLinks } from "./threads.js";
 import { enqueue } from "./ask.js";
@@ -251,8 +251,7 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       );
     }
     case "title_thread":
-    case "new_subject":
-      return null; // applied by ask.ts, together with the exchange they are about
+      return null; // applied by ask.ts, together with the exchange it is about
     case "clear_archived": {
       const away = ws.archived;
       if (!away.length) return "Nothing is put away, sir — there's nothing to clear.";
@@ -373,15 +372,15 @@ export async function interceptKey(text: string): Promise<boolean> {
   for (const [id, rx] of KEY_PATTERNS) {
     const m = rx.exec(text);
     if (!m) continue;
-    announce(`${coreLabel(id)} key received — checking it. It stays on this machine and is not sent to any model.`);
+    notice(`${coreLabel(id)} key received — checking it. It stays on this machine and is not sent to any model.`);
     try {
       await api.saveKey(id, m[0]);
       await conn.refresh();
       await api.setActive(id).catch(() => undefined);
       await conn.refresh();
-      announce(`${coreLabel(id)} is connected and in use, sir.`);
+      notice(`${coreLabel(id)} is connected and in use, sir.`);
     } catch (err) {
-      announce(`That key didn't work, sir: ${err instanceof Error ? err.message : String(err)}`);
+      notice(`That key didn't work, sir: ${err instanceof Error ? err.message : String(err)}`);
     }
     return true;
   }

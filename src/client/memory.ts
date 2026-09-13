@@ -16,7 +16,7 @@
  */
 
 import { graph } from "./state.js";
-import { announce } from "./say.js";
+import { notice } from "./say.js";
 
 /** Characters: the allowance of the least generous common browser. */
 const ROOM = 5_000_000;
@@ -29,16 +29,16 @@ graph.onSaved = (kept: boolean, size: number): void => {
   if (!kept) {
     if (!refused) {
       refused = true;
-      announce("This browser's storage is full, sir — the latest changes aren't saved. Everything on screen stays until you close the page; say “clear the put-away threads” to make room.");
+      notice("This browser's storage is full, sir — the latest changes aren't saved. Everything on screen stays until you close the page; say “clear the put-away threads” to make room.");
     }
     return;
   }
   if (refused) {
     refused = false;
-    announce("There's room again, sir — everything is saved.");
+    notice("There's room again, sir — everything is saved.");
   }
   if (size > WARN_AT && !warned) {
     warned = true;
-    announce("The board has used most of the room this browser gives it, sir. Say “clear the put-away threads” when you'd like to make space.");
+    notice("The board has used most of the room this browser gives it, sir. Say “clear the put-away threads” when you'd like to make space.");
   }
 };

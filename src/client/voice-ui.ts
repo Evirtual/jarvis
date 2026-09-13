@@ -7,7 +7,7 @@ import { addressed, getAddress, setAddress, type Address } from "./address.js";
 import { $ } from "./dom.js";
 import { KEY, recall, store } from "./storage.js";
 import { graph, input, panels, voice } from "./state.js";
-import { announce, busy, paintCoreState } from "./say.js";
+import { busy, notice, paintCoreState } from "./say.js";
 import { answerConfirm, pendingConfirm } from "./confirm.js";
 import { T } from "./readings.js";
 import { submit } from "./ask.js";
@@ -21,7 +21,7 @@ document.addEventListener("keydown", (e) => {
   // Whatever is on top goes first, in the order they stack on screen: the
   // confirmation (Esc means "no") over everything, then the setup guide, the
   // configuration drawer, the deck's menus, the web, the keyboard, the front panel.
-  if (pendingConfirm) { const note = answerConfirm(false); if (note) announce(note); return; }
+  if (pendingConfirm) { const note = answerConfirm(false); if (note) notice(note); return; }
   if (setupOpen()) { closeSetup(); return; }
   if ($("drawer").classList.contains("open")) { setDrawer(false); return; }
   if (menuOpen()) { closeMenus(); return; }
@@ -50,7 +50,7 @@ requestAnimationFrame(function pumpGlobe(): void {
   requestAnimationFrame(pumpGlobe);
 });
 
-voice.onNotice = announce;
+voice.onNotice = (msg): void => notice(msg);
 // A tap to talk with nothing connected and no dictation in this browser would
 // otherwise be a six-second line and nothing more. The way to fix it opens.
 voice.onCannotHear = (): void => setDrawer(true, "connections");
@@ -142,7 +142,7 @@ applyAddress(getAddress());
 addressSel.addEventListener("change", () => {
   applyAddress(addressSel.value === "madam" ? "madam" : "sir");
   voice.markUserActed();
-  announce("Very good, sir.");
+  notice("Very good, sir.");
 });
 
 const voiceOut = $<HTMLInputElement>("voiceOut");

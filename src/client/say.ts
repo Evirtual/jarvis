@@ -1,5 +1,6 @@
 /**
- * How JARVIS speaks to you: notices under the core, lines written into a
+ * How JARVIS speaks to you: the line under the core — the reply he is
+ * saying, and a passing notice above it, in one box — lines written into a
  * thread's window, his status word, and whether he is busy.
  */
 
@@ -12,45 +13,112 @@ import { pendingConfirm } from "./confirm.js";
 import { coreChat } from "./core-chat.js";
 import { S } from "./readings.js";
 
-/* ===================================================================== *
- * Transcript
- * ===================================================================== */
-
 const logState = $("logState");
 /** Whether an answer is on its way — the queue waits on it. */
 export let busy = false;
 
+/* ===================================================================== *
+ * The line under the core: one box, two rows
+ *
+ *   the notice  what the console did or couldn't do — "Put away", "Queued",
+ *               the greeting — for a few seconds, above the reply;
+ *   the reply   what JARVIS is saying, drawn as a reply would be in a
+ *               thread, while it is spoken and a while after.
+ *
+ * The box shows while either row does; a tap on it opens the Conversation,
+ * where both are kept.
+ * ===================================================================== */
+
+const box = $("coreLine");
+const noticeRow = $("coreNotice");
+const replyRow = $("coreReply");
+let noticeTimer: number | null = null;
+let replyTimer: number | null = null;
+let hideTimer: number | null = null;
+
+function paintLine(): void {
+  const any = !noticeRow.hidden || !replyRow.hidden;
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  if (any) {
+    box.hidden = false;
+    requestAnimationFrame(() => box.classList.add("in"));
+  } else {
+    box.classList.remove("in");
+    hideTimer = window.setTimeout(() => { if (!box.classList.contains("in")) box.hidden = true; }, 320);
+  }
+}
+
 /**
- * With nothing on the board there is no window to write in, so notices appear
- * under the core for a few seconds instead — the clean screen stays clean.
+ * A passing notice. Spoken unless told not to; kept in the Conversation as a
+ * note unless it is only passing ("Queued").
  */
-let toastTimer: number | null = null;
-export function toast(text: string): void {
-  const el = $("toast");
-  el.textContent = addressed(text);
-  el.classList.add("in");
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => el.classList.remove("in"), 6000);
+export function notice(text: string, opts: { speak?: boolean; record?: boolean } = {}): void {
+  text = addressed(text);
+  noticeRow.textContent = text;
+  noticeRow.hidden = false;
+  if (noticeTimer) clearTimeout(noticeTimer);
+  noticeTimer = window.setTimeout(hideNotice, 6000);
+  paintLine();
+  if (opts.record !== false) coreChat.add("sys", text);
+  if (opts.speak !== false) voice.speak(text);
 }
 
 /** A notice taken back before its time — what it announced did not come to pass. */
-export function hideToast(): void {
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = null;
-  $("toast").classList.remove("in");
+export function hideNotice(): void {
+  if (noticeTimer) clearTimeout(noticeTimer);
+  noticeTimer = null;
+  noticeRow.hidden = true;
+  paintLine();
 }
 
-/** App operations live at the core, never inside an unrelated thread. */
-export function announce(text: string, speak = true): void {
-  toast(text);
-  if (speak) voice.speak(text);
+/**
+ * The reply being said. It stays while it is spoken and a while after, or
+ * until tapped. `partial`: the text is still arriving.
+ */
+export function reply(text: string, opts: { partial?: boolean } = {}): void {
+  replyRow.replaceChildren(...line("jarvis", text).childNodes);
+  replyRow.hidden = false;
+  if (replyTimer) clearTimeout(replyTimer);
+  replyTimer = null;
+  if (!opts.partial) replyTimer = window.setTimeout(replyFades, 14_000);
+  paintLine();
 }
+
+/** After its time, and once it has been said in full. */
+function replyFades(): void {
+  if (voice.speaking) { replyTimer = window.setTimeout(replyFades, 3000); return; }
+  hideReply();
+}
+
+export function hideReply(): void {
+  if (replyTimer) clearTimeout(replyTimer);
+  replyTimer = null;
+  replyRow.hidden = true;
+  paintLine();
+}
+
+box.addEventListener("click", () => { panels.show("conversation"); hideReply(); hideNotice(); });
+
+/**
+ * JARVIS speaks, at the core: a line of conversation, kept in the transcript
+ * (the Conversation panel) and spoken. Threads hold research; this is talk.
+ */
+export function jarvis(text: string, opts: { speak?: boolean; record?: boolean } = {}): void {
+  text = addressed(text);
+  if (opts.record !== false) coreChat.add("assistant", text);
+  reply(text);
+  if (opts.speak !== false) voice.speak(text);
+}
+
+/* ===================================================================== *
+ * Lines in a thread's window
+ * ===================================================================== */
 
 /** Add a line to a thread's window — the one in front unless another is named. */
 export function addMsg(kind: "user" | "jarvis" | "sys", text: string, threadId = graph.activeId): HTMLElement {
   const body = graph.bodyOf(threadId) ?? graph.activeBody();
   if (!body) {
-    toast(text);
+    notice(text, { speak: false });
     return line(kind, text); // nowhere to put it; the caller may still animate into it
   }
   // An empty window carries a placeholder line; the first real message replaces it.
@@ -68,52 +136,9 @@ export function addMsg(kind: "user" | "jarvis" | "sys", text: string, threadId =
 
 export function noteIn(threadId: string, text: string): void { addMsg("sys", text, threadId); }
 
-/* ---------- what JARVIS says at the core ---------- */
-
-const coreSay = $("coreSay");
-let sayTimer: number | null = null;
-
-/**
- * A line said at the core — under JARVIS, drawn as a reply would be in a
- * thread, so a list or a bold word comes out right. It stays while it is
- * being spoken and a while after, or until tapped. `final` false while the
- * text is still arriving.
- */
-export function say(text: string, final = true): void {
-  coreSay.replaceChildren(...line("jarvis", text).childNodes);
-  coreSay.hidden = false;
-  coreSay.parentElement?.style.setProperty("--say-h", `${coreSay.offsetHeight}px`); // a notice sits above it
-  requestAnimationFrame(() => coreSay.classList.add("in"));
-  if (sayTimer) clearTimeout(sayTimer);
-  sayTimer = null;
-  if (final) sayTimer = window.setTimeout(sayFades, 14_000);
-}
-
-/** After its time, and once it has been said in full. */
-function sayFades(): void {
-  if (voice.speaking) { sayTimer = window.setTimeout(sayFades, 3000); return; }
-  hideSay();
-}
-
-export function hideSay(): void {
-  if (sayTimer) clearTimeout(sayTimer);
-  sayTimer = null;
-  coreSay.classList.remove("in");
-  window.setTimeout(() => { if (!coreSay.classList.contains("in")) coreSay.hidden = true; }, 320);
-}
-// A tap on the line opens the whole conversation, and puts the line away.
-coreSay.addEventListener("click", () => { panels.show("conversation"); hideSay(); });
-
-/**
- * JARVIS speaks, at the core: a line of conversation, kept in the transcript
- * (the Conversation panel) and spoken. Threads hold research; this is talk.
- */
-export function jarvis(text: string, opts: { speak?: boolean; record?: boolean } = {}): void {
-  text = addressed(text);
-  if (opts.record !== false) coreChat.add("assistant", text);
-  say(text);
-  if (opts.speak !== false) voice.speak(text);
-}
+/* ===================================================================== *
+ * His status word
+ * ===================================================================== */
 
 let busyLabel = "Thinking";
 

@@ -48,13 +48,6 @@ export interface Thread {
   groupId: string;
   /** A subthread: it hangs off this thread and inherits its context. */
   parentId?: string;
-  /** True once the thread has a real name (from its first question or given one). */
-  named?: boolean;
-  /**
-   * The name is only its first question, cut short — until JARVIS or the
-   * user gives it a proper one. Any rename clears it.
-   */
-  provisional?: boolean;
   /** Deliberate connections to other threads, with the reason. */
   ties?: { to: string; why: string }[];
   /** Set when put away; the thread is kept and can be restored. */
@@ -118,6 +111,8 @@ export type Match =
   | { kind: "none" };
 
 export const GENERAL_ID = "g-general";
+/** A thread opened without a name is called this until JARVIS names it with his first answer in it. */
+export const DEFAULT_TITLE = "New thread";
 const TITLE_MAX = 40;
 /** A name cut to fit: at a word boundary where there is one, marked with an ellipsis. */
 function fitTitle(s: string): string {
@@ -203,7 +198,6 @@ function fromV1(list: LegacyThread[], activeHint: string | null): WorkspaceData 
       groupId: GENERAL_ID,
       color: THREAD_HUES[index % THREAD_HUES.length],
       ...(typeof t.parentId === "string" && t.parentId ? { parentId: t.parentId } : {}),
-      named: t.named === undefined ? String(t.title ?? "") !== "New thread" : Boolean(t.named),
       ...(asTies(t.ties) ? { ties: asTies(t.ties)! } : {}),
     }));
   if (!threads.length) return migrate(null);
@@ -415,11 +409,10 @@ export class Workspace {
   createThread(opts: { title?: string; parentId?: string; groupId?: string } = {}): Thread {
     const parent = this.thread(opts.parentId);
     const groupId = parent ? parent.groupId : this.group(opts.groupId) ? opts.groupId! : GENERAL_ID;
-    const title = fitTitle(opts.title ?? "New thread") || "New thread";
+    const title = fitTitle(opts.title ?? DEFAULT_TITLE) || DEFAULT_TITLE;
     const t: Thread = {
       id: uid("t"), title, turns: [], createdAt: Date.now(), groupId,
       color: THREAD_HUES[this.data.threads.length % THREAD_HUES.length],
-      named: title !== "New thread",
       ...(parent && !parent.archivedAt ? { parentId: parent.id } : {}),
     };
     this.data.threads.push(t);
@@ -489,22 +482,6 @@ export class Workspace {
     const t = this.thread(id);
     if (!t) return;
     t.title = fitTitle(title) || t.title;
-    t.named = true;
-    delete t.provisional;
-  }
-
-  /**
-   * The last question and its answer turned out to be about something else:
-   * move them into a thread of their own, named for that subject, which
-   * becomes the one in front. Null when there's nothing to leave behind.
-   */
-  splitLast(id: string, title: string): Thread | null {
-    const t = this.thread(id);
-    if (!t || t.turns.length <= 2) return null;
-    const moved = t.turns.splice(-2);
-    const fresh = this.createThread({ title });
-    fresh.turns = moved;
-    return fresh;
   }
 
   /** Empty a thread's history. The thread stays where it is. */

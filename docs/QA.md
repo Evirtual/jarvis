@@ -22,7 +22,7 @@ run entirely locally.
 loose, two grouped) without asking a model anything, then reload:
 
 ```js
-const now = Date.now(), T = (id, title, color, g, q, a, x, y) => ({ id, title, named: true, color, groupId: g, createdAt: now - 1000 * +id.slice(1), turns: [{ role: "user", content: q }, { role: "assistant", content: a }], ...(x !== undefined ? { x, y } : {}) });
+const now = Date.now(), T = (id, title, color, g, q, a, x, y) => ({ id, title, color, groupId: g, createdAt: now - 1000 * +id.slice(1), turns: [{ role: "user", content: q }, { role: "assistant", content: a }], ...(x !== undefined ? { x, y } : {}) });
 localStorage.setItem("jarvis.workspace", JSON.stringify({ version: 2, anchor: "corner", activeId: "t1",
   groups: [{ id: "g-general", title: "General", createdAt: 0, origin: "system" }, { id: "g1", title: "Baltic incidents", createdAt: now, origin: "user", x: 420, y: 380 }],
   threads: [

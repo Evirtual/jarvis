@@ -14,9 +14,9 @@ import { $, gib } from "./dom.js";
 import { line } from "./message.js";
 import { type Thread } from "./stage.js";
 import { clip } from "./text.js";
-import { threadRef } from "./workspace.js";
+import { DEFAULT_TITLE, threadRef } from "./workspace.js";
 import { conn, graph, input, panels, voice, ws } from "./state.js";
-import { addMsg, announce, busy, hideSay, hideToast, jarvis, noteIn, say, setBusy, toast } from "./say.js";
+import { addMsg, busy, hideNotice, hideReply, jarvis, notice, noteIn, reply, setBusy } from "./say.js";
 import { interceptKey, KEY_PATTERNS, parseCtx, resolve, runAction } from "./actions.js";
 import { S, T, W } from "./readings.js";
 import { boardLinks, paintThread, paintThreadCount, refreshLinks, relatedContext } from "./threads.js";
@@ -81,7 +81,7 @@ function appSnapshot(): string {
       if (t.kind) continue; // the readiness card is the console's, not a conversation
       const indent = "  ".repeat(1 + ws.depth(t));
       const here = t.id !== ws.activeId ? ""
-        : t.provisional ? " (the one we're in — its title is only a stand-in)" : " (the one we're in)";
+        : t.title === DEFAULT_TITLE ? " (the one we're in — not yet named)" : " (the one we're in)";
       const qs = t.turns.filter((x) => x.role === "user");
       const lastA = t.turns.filter((x) => x.role === "assistant").pop();
       const body = !t.turns.length
@@ -138,7 +138,8 @@ function cleanReply(s: string): string {
 /** The thread in front, with its last exchanges: what a follow-up is a follow-up to. */
 function frontContext(t: Thread): string {
   const tail = t.turns.slice(-6).map((x) => `${x.role === "user" ? "User" : "You"}: ${clip(x.content, 400)}`);
-  return `[The thread in front on the console is “${t.title} #${threadRef(t)}”${tail.length ? `; its last exchanges: ${tail.join(" / ")}` : ", empty so far"}. A follow-up to it belongs there ([[at: thread]]); anything else is conversation at the core.]`;
+  const unnamed = t.title === DEFAULT_TITLE ? ' It has no name yet: end your reply with [[do: title_thread title="…"]].' : "";
+  return `[The thread in front on the console is “${t.title} #${threadRef(t)}”${tail.length ? `; its last exchanges: ${tail.join(" / ")}` : ", empty so far"}. A follow-up to it belongs there ([[at: thread]]); anything else is conversation at the core.${unnamed}]`;
 }
 
 /** Where a reply is being written: under the core, or into a thread's window. */
@@ -166,14 +167,11 @@ async function askCore(question: string): Promise<void> {
     if (target) return target;
     let thread: Thread | null = null;
     if (route?.at === "thread") {
+      // the thread named, else the one in front — and with none in front, a follow-up is conversation
       const named = route.title ? resolve(route.title) : null;
       thread = (named && typeof named !== "string" ? named : null) ?? front;
     }
-    // a thread asked for, or "the thread in front" when there is none: one opened for it
-    if (route?.at === "new" || (route?.at === "thread" && !thread)) {
-      thread = ws.createThread(route.title ? { title: route.title } : {});
-      if (!route.title) graph.titleFrom(question, thread.id); // a stand-in name until the model gives it one
-    }
+    if (route?.at === "new") thread = ws.createThread(route.title ? { title: route.title } : {});
     if (!thread) {
       target = { kind: "core" };
       return target;
@@ -182,7 +180,7 @@ async function askCore(question: string): Promise<void> {
     graph.commit();
     graph.focus(thread.id);
     paintThread();
-    hideSay(); // the reply is written in the window, not under the core
+    hideReply(); // the reply is written in the window, not under the core
     addMsg("user", question, thread.id);
     thread.turns.push({ role: "user", content: question });
     coreChat.forget("user", question); // it is the thread's, not the conversation's
@@ -193,7 +191,7 @@ async function askCore(question: string): Promise<void> {
     return target;
   };
   const setBody = (t: Target, text: string): void => {
-    if (t.kind === "core") { say(text, false); return; }
+    if (t.kind === "core") { reply(text, { partial: true }); return; }
     // Drawn as the finished reply will be, so a list doesn't jump into shape at the end.
     t.body.replaceChildren(...line("jarvis", text).childNodes);
     const b = graph.bodyOf(t.thread.id);
@@ -236,12 +234,12 @@ async function askCore(question: string): Promise<void> {
       const spare = conn.readyIds().find((p) => p !== conn.active);
       if (streamed || !spare || !/limit|out of credit|needs credit|busy|rate-limiting|quota/i.test(why)) throw err;
       // the service's own reason ("…busy at the moment…"), then what happens instead
-      announce(`${why} Meanwhile I'm answering through ${conn.nameOf(spare)}.`);
+      notice(`${why} Meanwhile I'm answering through ${conn.nameOf(spare)}.`);
       try {
         raw = await askVia(spare);
       } catch (err2) {
         // the spare failed too: one line with both reasons, not two boxes at once
-        hideToast();
+        hideNotice();
         throw new Error(`${why} ${err2 instanceof Error ? err2.message : String(err2)}`);
       }
     }
@@ -254,11 +252,11 @@ async function askCore(question: string): Promise<void> {
     pendingActions = d.actions.filter((a) => !isHousekeeping(a));
     const out = cleanReply(d.text);
     if (t.kind === "core") {
-      if (!out && pendingActions.length) { hideSay(); voice.stop(); }
+      if (!out && pendingActions.length) { hideReply(); voice.stop(); }
       else {
         const said = out || "I've nothing useful on that, sir.";
         coreChat.add("assistant", said);
-        say(said);
+        reply(said);
         if (out) voice.endStream(streamed); // most of it has been spoken already; this sends the last sentence
         else voice.speak(said);
       }
@@ -284,7 +282,7 @@ async function askCore(question: string): Promise<void> {
     const msg = addressed(err instanceof Error ? err.message : String(err));
     const t = current() ?? place(null);
     if (t.kind === "core") {
-      say(msg);
+      reply(msg);
     } else {
       // The question leaves the history — it was never answered, and must not
       // be sent again as if it had been — but it stays on screen with the
@@ -317,34 +315,16 @@ async function askCore(question: string): Promise<void> {
     const note = await runAction(a, true);
     if (!note) continue;
     if (done?.kind === "thread") noteIn(graph.activeId, note);
-    else toast(note);
+    else notice(note, { speak: false });
   }
 }
 
-const isHousekeeping = (a: Action): boolean => a.name === "title_thread" || a.name === "new_subject";
+const isHousekeeping = (a: Action): boolean => a.name === "title_thread";
 
-/**
- * JARVIS's own housekeeping, from the reply just given: a proper name for a
- * thread that only has its first question as a stand-in, and — when the
- * question turned out to be about something else — the question and answer
- * moved to a thread of their own, which becomes the one in front. A name
- * needs no announcement; a move gets a notice, so the jump is explained.
- */
+/** JARVIS's own housekeeping, from the reply just given: a name for a thread that has none yet. No announcement. */
 function housekeep(thread: Thread, actions: Action[]): void {
   for (const a of actions) {
-    if (a.name === "new_subject") {
-      const moved = ws.splitLast(thread.id, a.title);
-      if (moved) {
-        graph.redraw(thread.id);
-        graph.commit();
-        paintThread();
-        toast(`A new subject, sir — it has a thread of its own: “${moved.title}”.`);
-      } else if (thread.provisional) {
-        // nothing to leave behind: it is this thread's own subject, so it's the name
-        ws.rename(thread.id, a.title);
-        paintThreadCount();
-      }
-    } else if (a.name === "title_thread" && thread.provisional) {
+    if (a.name === "title_thread" && thread.title === DEFAULT_TITLE) {
       ws.rename(thread.id, a.title);
       graph.commit();
       paintThreadCount();
@@ -422,7 +402,7 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
     // Asked in the thread you were looking at when you asked, even if JARVIS
     // has moved on to another window by the time he gets to it.
     queued.push({ text: t, ...(graph.activeId ? { threadId: graph.activeId } : {}) });
-    if (busy) announce(`Queued — I'll take “${clip(t, 60)}” next.`);
+    if (busy) notice(`Queued — I'll take “${clip(t, 60)}” next.`, { record: false });
     else setTimeout(drainQueue, 0);
     return;
   }
@@ -434,10 +414,10 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
       if (n) notes.push(n);
     }
     if (!ask) {
-      if (notes.length) announce(notes.join(" "));
+      if (notes.length) notice(notes.join(" "));
       return;
     }
-    if (notes.length) announce(notes.join(" "));
+    if (notes.length) notice(notes.join(" "));
     await answer(ask);
     return;
   }
@@ -452,7 +432,7 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
  */
 async function answer(t: string): Promise<void> {
   // The server keeps 4,000 characters of a question; say so rather than cut quietly.
-  if (t.length > 4000) { announce("That's over 4,000 characters, sir — I'll take the first 4,000."); t = t.slice(0, 4000); }
+  if (t.length > 4000) { notice("That's over 4,000 characters, sir — I'll take the first 4,000."); t = t.slice(0, 4000); }
   // What you said goes in the conversation first; a reply that turns out to
   // belong in a thread takes it back out (askCore).
   coreChat.add("user", t);

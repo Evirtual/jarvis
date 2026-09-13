@@ -70,7 +70,7 @@ the web version answers the same API calls in the browser
 | `src/client/surface.ts` | What every box on the board shares — window, bubble, panel: one pointer gesture at a time (tap or drag), sizing from corners and edges within one set of limits, carry past the edge and put down inside the board. The stage and `panels.ts` build on it; the pure parts are tested |
 | `src/client/board-geometry.ts`, `tidy.ts` | Pure and tested: keeping a window inside the board and clear of JARVIS, a free seat, bubbles nudged apart; the Tidy-up plan |
 | `src/client/message.ts` | One line in a window: links, and pictures and players for image and video results |
-| `src/client/ask.ts` | The command line, the queue, what JARVIS is told, the streamed answer, his housekeeping (naming threads, moving a new subject) |
+| `src/client/ask.ts` | The command line, the queue, what JARVIS is told, the streamed answer, his housekeeping (naming a thread that has none) |
 | `src/client/commands.ts` | What can be said or written as a directive, and what the model may not do |
 | `src/client/actions.ts` | Carrying out every action, by you or by JARVIS's directives |
 | `src/client/confirm.ts` | Anything destructive waits for a yes — by button or by word |
@@ -85,7 +85,7 @@ the web version answers the same API calls in the browser
 | `src/client/readings.ts` | Painting the live readings, and receiving them |
 | `src/client/threads.ts`, `links.ts`, `web.ts` | The Threads list; which threads are about the same things; the context web |
 | `src/client/deck.ts`, `panels.ts`, `drawer.ts` | The deck and title row; the instrument panels; the configuration drawer |
-| `src/client/say.ts`, `address.ts` | Notices, lines in a window, his status word; sir or ma'am |
+| `src/client/say.ts`, `address.ts` | The line under the core (a notice and the reply, one box), lines in a window, his status word; sir or ma'am |
 | `src/client/radar.ts`, `core-draw.ts`, `icons.ts`, `stack.ts`, `motion.ts` | The Perimeter radar, JARVIS drawn, every icon, one stacking order, whether to hold still |
 | `src/client/styles.css` | Ends with the two shared materials, `.glass` (every box) and `.veil` (behind anything modal); use the class rather than restyling an element |
 | `src/client/public/` | The logo, app icons, manifest, the service worker that makes it installable, robots and sitemap |
@@ -104,7 +104,7 @@ asked, an account out of credit shown on its card, hearing, a spent speech
 model giving way to the next); migrations (including bringing an older save forward
 without losing a message), creating and branching threads, grouping and
 ungrouping, colours, where loose windows are kept, persistence round-trips, the
-archive/clear/delete rules, moving a new subject to its own thread,
+archive/clear/delete rules, naming,
 relatedness for the web, the command parser, how an
 older save's positions are converted, model ranking, and the directive
 whitelist (the model can't delete or confirm).

@@ -9,7 +9,7 @@ import { computeLinks, linkKey, relatedness, type Link } from "./links.js";
 import { type Thread } from "./stage.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { graph, input, panels, ws } from "./state.js";
-import { announce, noteIn, toast } from "./say.js";
+import { notice, noteIn } from "./say.js";
 import { coreChat } from "./core-chat.js";
 import { line } from "./message.js";
 import { deleteGroup, deleteThread } from "./confirm.js";
@@ -61,7 +61,7 @@ export function bringBack(t: Thread): string {
 
 graph.onArchive = (id): void => {
   const t = ws.thread(id);
-  if (t) announce(putAway(t));
+  if (t) notice(putAway(t));
 };
 graph.onBranch = (id): void => {
   const parent = ws.thread(id);
@@ -83,7 +83,7 @@ graph.onDropDelete = (kind, id): void => {
   const note = kind === "group"
     ? (() => { const g = ws.group(id); return g ? deleteGroup(g) : null; })()
     : (() => { const t = ws.thread(id); return t ? deleteThread(t) : null; })();
-  if (note) announce(note);
+  if (note) notice(note);
 };
 
 /* ---------------------------------------------------------------------
@@ -106,7 +106,7 @@ export function refreshLinks(announce = true): void {
       if (knownLinks.has(k) || !announce || l.manual) continue;
       const other = l.a === graph.activeId ? l.b : l.b === graph.activeId ? l.a : null;
       const t = other ? ws.thread(other) : null;
-      if (t) toast(`Related to “${t.title}” — both mention ${l.why.join(" and ")}. Press ⌗ to see the web.`);
+      if (t) notice(`Related to “${t.title}” — both mention ${l.why.join(" and ")}. Press ⌗ to see the web.`, { speak: false });
     }
     knownLinks = new Set(boardLinks.map(linkKey));
   }, 250);
@@ -237,7 +237,7 @@ $("threadList").addEventListener("click", (e) => {
     const NAMES = { delete: "delete_all", "clear-away": "clear_archived", tidy: "tidy_board", archive: "archive_all" } as const;
     const name = NAMES[all.dataset.all as keyof typeof NAMES] ?? "archive_all";
     void runAction({ name }).then((n) => {
-      if (n) announce(n);
+      if (n) notice(n);
     });
     return;
   }
@@ -247,7 +247,7 @@ $("threadList").addEventListener("click", (e) => {
   if (!t) return;
   const act = (e.target as HTMLElement).closest<HTMLElement>("button[data-act]")?.dataset.act;
   if (act === "archive") graph.onArchive?.(t.id);
-  else if (act === "restore") announce(bringBack(t));
+  else if (act === "restore") notice(bringBack(t));
   else if (act === "delete") deleteThread(t);
   else if (!t.archivedAt) { graph.focus(t.id); paintThread(); }
 });
