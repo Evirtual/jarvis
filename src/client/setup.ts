@@ -151,16 +151,22 @@ function needRow(need: Need, name: string, how: string): string {
 }
 
 function needs(): string {
-  const app = matchMedia("(display-mode: standalone)").matches;
-  const sound = app || voice.soundOnOpen === "yes";
+  // Sound is the browser's to give, not the page's to ask for. The switch
+  // shows whether it is on right now: from the moment the console opened, or
+  // since the first click or key — the browser's rule for a tab — or not yet.
+  const fromOpening = matchMedia("(display-mode: standalone)").matches || voice.soundOnOpen === "yes";
+  const sinceClick = !fromOpening && (navigator.userActivation?.hasBeenActive || voice.acted);
+  const on = fromOpening || sinceClick;
+  const how = fromOpening
+    ? "On from the moment the console opens: the greeting and every reply are spoken."
+    : sinceClick
+      ? "On since your first click. A browser tab starts with sound off until the first click or key, so on a reload the greeting is written and speech begins with your first click. To have it on from the moment the console opens: set Sound to Allow for this site in the browser's site settings, or install the console as an app."
+      : "Off until your first click or key, which is the browser's rule for a tab. After that, everything is spoken.";
   return (
     needRow("mic", "Microphone", "To talk to JARVIS.") +
     needRow("geo", "Location", "For the weather where you are.") +
-    // No page can ask for this one: the switch shows the browser's answer, and the line says where the real one is.
-    `<label class="switch-row need"><span><b>Voice on opening</b><small>${sound
-      ? "JARVIS greets you aloud the moment the console opens."
-      : "Replies are spoken once you have clicked or typed; only the greeting at opening is not. To hear that too: in the browser's site settings for this site, set Sound to Allow, then reload. Installed as an app, it is allowed already."}</small></span>` +
-    `<input type="checkbox" class="switch" disabled${sound ? " checked" : ""} aria-label="Voice on opening"></label>`
+    `<label class="switch-row need"><span><b>Sound</b><small>${how}</small></span>` +
+    `<input type="checkbox" class="switch" disabled${on ? " checked" : ""} aria-label="Sound"></label>`
   );
 }
 

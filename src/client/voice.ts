@@ -122,6 +122,8 @@ export class Voice {
   setPitch(v: number): void { this.pitch = v; store("jarvis.pitch", String(v)); }
   setRate(v: number): void { this.rate = v; store("jarvis.rate", String(v)); }
   markUserActed(): void { this.userActed = true; }
+  /** Whether the user has clicked, tapped or typed on this page — after which the browser lets sound start. */
+  get acted(): boolean { return this.userActed; }
 
   /**
    * Whether a line may be said right now, before any click or tap: in an
