@@ -2,9 +2,7 @@
  * The configuration drawer and its tabs.
  */
 
-import {
-  type ConfigTab,
-} from "./commands.js";
+import { type ConfigTab } from "../shared/directives.js";
 import { $ } from "./dom.js";
 import { conn } from "./state.js";
 

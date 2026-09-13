@@ -2,63 +2,25 @@
  * Running the console by conversation.
  *
  * Everything you can click can also be said. An utterance is split into
- * clauses; clauses that are instructions to the console ("open a new chat",
- * "use the Lewis voice") become actions, and whatever is left is the actual
- * question — asked in whichever window is in front once the actions have run.
+ * clauses; a clause that is one of the console's own commands becomes an
+ * action, and whatever is left is the question — asked once the actions
+ * have run.
  *
- * The reasoning core can operate the same actions by writing directives —
- * `[[do: new_thread title="…" ask="…"]]` — but only from a whitelist: it can
- * never delete a thread or paste keys.
+ * The console's own commands are the few it must answer with nothing
+ * connected, or at once: a yes or no to a confirmation, the voice and the
+ * settings, the panels, opening, closing, restoring and deleting threads,
+ * the whole board. Organising the board — grouping, moving, linking,
+ * renaming, folding by name — is said to JARVIS, who does it with a
+ * directive (shared/directives.ts: the one table of what he may do).
  *
  * Pure: no DOM. What it needs to know about the console comes in through
  * ParseContext, so the rules can be tested on their own.
  */
 
-import type { ProviderId } from "../shared/types.js";
-import { PANEL_NAMES, type PanelName } from "./panels.js";
-export type ConfigTab = "connections" | "voice" | "quick" | "access";
+import { type Action, type PanelName, coreFrom, directiveToAction } from "../shared/directives.js";
 
-export type Action =
-  | { name: "new_thread"; branch?: boolean; title?: string; ask?: string; parent?: string; parentId?: string; group?: string }
-  | { name: "link_threads"; a: string; b: string; why?: string }
-  | { name: "archive_thread"; title?: string }
-  | { name: "restore_thread"; title: string; last?: boolean }
-  | { name: "delete_thread"; title?: string }
-  | { name: "switch_thread"; title: string }
-  | { name: "rename_thread"; title: string; target?: string }
-  | { name: "clear_thread" }
-  | { name: "fold_thread"; title?: string; open: boolean }
-  | { name: "list_threads" }
-  | { name: "new_group"; title: string; threads?: string[] }
-  | { name: "move_thread"; thread: string; group: string }
-  | { name: "rename_group"; group: string; title: string }
-  | { name: "delete_group"; group: string }
-  | { name: "archive_all" }
-  | { name: "tidy_board" }
-  | { name: "delete_all" }
-  | { name: "clear_archived" }
-  /** From JARVIS only: a name for the thread we're in, which has none yet. */
-  | { name: "title_thread"; title: string }
-  | { name: "collapse_group"; group: string }
-  | { name: "expand_group"; group: string }
-  | { name: "approve" }
-  | { name: "deny" }
-  | { name: "switch_core"; provider: ProviderId }
-  | { name: "set_model"; model: string }
-  | { name: "set_voice"; voice: string }
-  | { name: "set_speed"; delta?: number; value?: number }
-  | { name: "set_address"; address: "sir" | "madam" }
-  | { name: "mute" }
-  | { name: "unmute" }
-  | { name: "open_config"; tab?: ConfigTab }
-  /** The first-run guide, brought back. */
-  | { name: "open_setup" }
-  | { name: "close_config" }
-  | { name: "sweep" }
-  | { name: "show_panel"; panel: PanelName }
-  | { name: "hide_panel"; panel: PanelName | "all" };
-
-export type ActionName = Action["name"];
+export type { Action, ActionName, ConfigTab, PanelName } from "../shared/directives.js";
+export { NEEDS_CONFIRMATION } from "../shared/directives.js";
 
 /** What the parser needs to know about the console right now. */
 export interface ParseContext {
@@ -72,27 +34,14 @@ export interface ParseContext {
 
 const NO_CONTEXT: ParseContext = { knowsThread: () => false, knowsGroup: () => false, pendingApproval: false };
 
-const CORE_NAMES: Record<string, ProviderId> = {
-  chatgpt: "openai", "open ai": "openai", openai: "openai", gpt: "openai",
-  gemini: "gemini", google: "gemini",
-};
-
-function coreFrom(word: string): ProviderId | null {
-  const k = word.toLowerCase().replace(/\s+/g, " ").trim();
-  return CORE_NAMES[k] ?? null;
-}
-
 const NEW_THREAD =
   /\b(?:new|another|fresh|separate|second|different)\s+(?:chat|thread|conversation|window|session|tab)\b|\b(?:create|start|open|make|begin|spin up)\s+(?:up\s+)?(?:a\s+)?(?:new\s+)?(?:one|chat|thread|conversation|window)\b|\bbranch(?:\s+(?:off|out))?\b|\bsub-?thread\b/;
 const BRANCH = /\bbranch|\bsub-?thread\b|\b(?:based on|continu\w* (?:this|that|it)|carry (?:this|that) over|from (?:this|here|that))\b/;
 
-/** One clause in, one console action out — or null if it's part of the question. */
+/** One clause in, one console command out — or null: it is part of the question, or something for JARVIS. */
 export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action | null {
   const q = clause.toLowerCase().replace(/[?!.]+$/, "").trim();
   if (!q) return null;
-  // The same clause with its capitals kept, for names that are spoken into it.
-  const raw = clause.trim().replace(/[?!.]+$/, "").trim();
-  const orig = (s: string): string => { const at = q.lastIndexOf(s); return (at < 0 ? s : raw.slice(at, at + s.length)).replace(/["”]$/, ""); };
 
   // Destructive-action questions. Only while one is actually waiting, so a
   // bare "yes" is never mistaken for anything else.
@@ -100,37 +49,32 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
     if (/^(?:yes|yeah|yep|sure|approve(?:d)?|allow(?: it)?|go ahead|do it|proceed|ok(?:ay)?|fine)(?:,? (?:please|jarvis|sir))?$/.test(q)) return { name: "approve" };
     if (/^(?:no|nope|deny|denied|don'?t|reject|refuse|cancel that|not that)(?:,? (?:please|jarvis|sir|thanks))?$/.test(q)) return { name: "deny" };
   }
-  // Reasoning core. Checked before thread switching so "switch to Gemini"
-  // is never read as a thread called Gemini.
+
+  // The service — local, so it works when the one in use has stopped answering.
   const core = /\b(?:switch|change|use|talk|go|move)\b(?:\s+\w+){0,3}?\s+(?:to|with|via|over to)?\s*(chatgpt|open ?ai|gpt|gemini|google)\b(?!\s+code)|\buse\s+(chatgpt|gemini)\b(?!\s+code)/.exec(q);
   if (core) {
     const p = coreFrom(core[1] ?? core[2] ?? "");
     if (p) return { name: "switch_core", provider: p };
   }
-
   const model = /\b(?:use|switch to|set)\s+(?:the\s+)?(?:model\s+)?((?:gpt|o\d|gemini)-[\w.-]+)/.exec(q);
   if (model?.[1]) return { name: "set_model", model: model[1] };
 
-  // The first-run guide — "run setup", "show me the guide"
+  // The first-run guide and Configuration — before the voice rules, so "open
+  // voice settings" is never read as a voice called "settings".
   if (/\b(?:run|open|show|start|redo|repeat)\s+(?:me\s+)?(?:the\s+)?(?:setup|set-up|onboarding|first[- ]run)(?:\s+guide)?\b|\bshow me the guide\b|^(?:setup|setup guide|guide)$/.test(q)) return { name: "open_setup" };
-
-  // Config — before the voice rules, so "open voice settings" is never read as
-  // a voice called "settings"
   if (/\b(?:open|show)\s+(?:me\s+)?(?:the\s+)?voice settings\b/.test(q)) return { name: "open_config", tab: "voice" };
   if (/\b(?:open|show)\s+(?:me\s+)?(?:the\s+)?(?:access|permissions?)(?:\s+settings)?\b/.test(q)) return { name: "open_config", tab: "access" };
   if (/\b(?:open|show)\s+(?:me\s+)?(?:the\s+)?(?:config|configuration|settings|connections|preferences)\b|^(?:config|settings)$/.test(q)) return { name: "open_config", tab: "connections" };
   if (/\bclose\s+(?:the\s+)?(?:config|configuration|settings|drawer)\b/.test(q)) return { name: "close_config" };
 
-  // Voice — "use the Fable voice", "change the voice to Ash", "voice to Emma".
-  // Only as a request for the change, so "which voice are you using?" stays
-  // a question.
+  // The voice — "use the Fable voice", "change the voice to Ash". Only as a
+  // request for the change, so "which voice are you using?" stays a question.
   const vm = /\b(?:use|switch to|set|change(?: to)?|give me)\s+(?:the\s+)?(?!(?:the|your|my|a)\b)([a-z]+)(?:'s)?\s+voice\b|(?:\b(?:set|change|switch)\s+(?:the\s+|your\s+)?voice\s+(?:to\s+)?|^voice\s+to\s+)([a-z]+)\b/.exec(q);
   if (vm) {
     const nm = vm[1] ?? vm[2] ?? "";
     // words that follow "voice" without being a voice's name: "voice off", "voice settings"
     if (!/^(a|the|your|my|different|another|new|other|settings?|speed|options?|menu|off|on|output|replies|please)$/.test(nm)) return { name: "set_voice", voice: nm };
   }
-  // How he addresses you: "call me ma'am", "address me as sir"
   const addr = /\b(?:call|address|refer to)\s+me\s+(?:as\s+)?(sir|ma'?am|madam|miss)\b/.exec(q);
   if (addr?.[1]) return { name: "set_address", address: addr[1] === "sir" ? "sir" : "madam" };
   if (/\b(?:speak|talk)\s+(?:a (?:bit|little) )?(?:faster|quicker)\b|\bspeed (?:it )?up\b/.test(q)) return { name: "set_speed", delta: 0.1 };
@@ -143,10 +87,10 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   // all…"), so "delete all the put-away threads" means just those.
   if (/\b(?:clear|delete|remove|empty|bin|get rid of|throw away)\s+(?:out\s+)?(?:all\s+)?(?:of\s+)?(?:the\s+|my\s+)?(?:put[- ]away|archived)(?:\s+(?:threads?|chats?|conversations?|ones))?\b|\bempty\s+the\s+archive\b/.test(q)) return { name: "clear_archived" };
 
-  // Threads list — before panels, so "show me the threads" isn't a panel
+  // The Threads list — before the panels, so "show me the threads" isn't a panel.
   if (/\b(?:what|which|list|show)(?:\s+me)?\s+(?:all\s+)?(?:the\s+)?(?:threads|chats|conversations|windows|groups)\b|\bhow many (?:threads|chats)\b|\b(?:archived|put away) (?:threads|chats)\b/.test(q)) return { name: "list_threads" };
 
-  // System panels — "show me the radar", "close the weather", "hide everything"
+  // The instrument panels — "show me the radar", "close the weather", "hide everything".
   const PANEL_WORDS: [RegExp, PanelName][] = [
     [/\b(?:perimeter|radar|network map|lan|devices)\b/, "perimeter"],
     [/\b(?:environment|weather|sky|forecast)\b/, "environment"],
@@ -167,41 +111,17 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
     if (hit) return hideP && !showP ? { name: "hide_panel", panel: hit[1] } : { name: "show_panel", panel: hit[1] };
   }
 
-  // Network — only ever on request
+  // The network — only ever on request.
   if (/^(?:scan|sweep)$|\b(?:scan|sweep)\s+(?:the\s+|my\s+)?(?:network|perimeter|lan|wifi)\b/.test(q)) return { name: "sweep" };
 
-  // Board
-  const colG = /\b(collapse|fold|minimi[sz]e|shrink|expand|unfold|open up)\s+(?:the\s+)?(all|everything|.+?)(?:\s+(?:group|bubble|groups|bubbles))$/.exec(q)
-    ?? /\b(collapse|fold|expand|unfold)\s+(all|everything)\b/.exec(q);
-  if (colG?.[1] && colG[2]) {
-    const g = /^(?:all|everything)$/.test(colG[2]) ? "all" : colG[2];
-    if (g === "all" || ctx.knowsGroup(g)) return /^(?:expand|unfold|open up)$/.test(colG[1]) ? { name: "expand_group", group: g } : { name: "collapse_group", group: g };
-  }
-  // A group by its name alone — "expand Baltic incidents" — when no thread has
-  // that name; "collapse" and "expand" are the group's own words, so they take
-  // the group even when its first thread carries the same name.
-  const bareG = /^(collapse|fold|minimi[sz]e|shrink|expand|unfold|open up|open)\s+(?:the\s+)?(.+)$/.exec(q);
-  if (bareG?.[1] && bareG[2] && ctx.knowsGroup(bareG[2]) && (!ctx.knowsThread(bareG[2]) || /^(?:collapse|expand)$/.test(bareG[1]))) {
-    return /^(?:expand|unfold|open up|open)$/.test(bareG[1]) ? { name: "expand_group", group: bareG[2] } : { name: "collapse_group", group: bareG[2] };
-  }
-  // Renaming by name: "rename Solar storms to Space weather", "call the Baltic group Incidents".
-  const rnBy = /\b(?:rename|call)\s+(?:the\s+)?(.+?)(?:\s+(thread|chat|conversation|group|bubble))?\s+(?:to|as)\s+["“]?(.+?)["”]?$/.exec(q);
-  if (rnBy?.[1] && rnBy[3] && !/^(?:this|it|that|this one|current)$/.test(rnBy[1])) {
-    const isGroup = /^(?:group|bubble)$/.test(rnBy[2] ?? "");
-    if (!isGroup && ctx.knowsThread(rnBy[1])) return { name: "rename_thread", target: rnBy[1], title: orig(rnBy[3]) };
-    if (!/^(?:thread|chat|conversation)$/.test(rnBy[2] ?? "") && ctx.knowsGroup(rnBy[1])) return { name: "rename_group", group: rnBy[1], title: orig(rnBy[3]) };
-  }
-  const mv = /\b(?:move|put|add|drop)\s+(?:the\s+)?(.+?)\s+(?:thread\s+)?(?:in|into|to|under)\s+(?:the\s+)?(.+?)(?:\s+(?:group|bubble))?$/.exec(q);
-  if (mv?.[1] && mv[2] && ctx.knowsThread(mv[1]) && !/^(?:it|this)$/.test(mv[2])) return { name: "move_thread", thread: mv[1], group: orig(mv[2]).replace(/\s+(?:group|bubble)$/i, "") };
-  const ng = /\b(?:new|create|make|start)\s+(?:a\s+)?(?:new\s+)?(?:group|bubble)\s+(?:called|named|for)?\s*["“]?(.+?)["”]?$/.exec(q);
-  if (ng?.[1]) return { name: "new_group", title: orig(ng[1]) };
+  // Deleting a group is for good, so it is the console's own word, never the model's.
   const dg = /\b(?:delete|remove|get rid of|bin|scrap)\s+(?:the\s+)?(.+?)\s+(?:group|bubble)$/.exec(q);
   if (dg?.[1] && ctx.knowsGroup(dg[1])) return { name: "delete_group", group: dg[1] };
 
-  // Tidying: "tidy up", "arrange the windows", "clean up the board" — nothing is removed
+  // Tidying: "tidy up", "arrange the windows", "clean up the board" — nothing is removed.
   if (/^(?:please\s+)?(?:tidy|arrange|rearrange|organi[sz]e|sort out|clean up|neaten)(?:\s+up)?(?:\s+(?:the|my|all(?:\s+the)?))?(?:\s+(?:board|screen|desk|windows?|threads?|layout|everything|mess))?(?:,?\s+(?:please|jarvis))?$/.test(q)) return { name: "tidy_board" };
 
-  // The whole board — clearing it out, or putting it all away
+  // The whole board — clearing it out, or putting it all away.
   if (/\b(?:delete|wipe|erase|clear|remove|get rid of|bin)\s+(?:all|every|everything|the whole)\b(?:\s+\w+){0,2}?\s*(?:threads?|chats?|conversations?|groups?|bubbles?|board|screen|everything)?\b/.test(q)
       && /\b(?:all|every|everything|whole)\b/.test(q) && !/\bpanels?\b/.test(q)) {
     return /\b(?:put|close|archive|tuck)\b/.test(q) ? { name: "archive_all" } : { name: "delete_all" };
@@ -211,19 +131,13 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   if (/\bput\s+(?:all|every(?:thing)?)\s+(?:(?:of\s+)?(?:the\s+)?(?:threads?|chats?|conversations?)\s+)?away\b/.test(q) && !/\bpanels?\b/.test(q)) return { name: "archive_all" };
   if (/\b(?:start|begin)\s+(?:again|fresh|over|from scratch)\b|\bclean slate\b|\bempty the board\b/.test(q)) return { name: "delete_all" };
 
-  // Threads
+  // This thread: deleting for good, putting away, folding, clearing.
   if (/\b(?:delete|erase|destroy)\s+(?:this|the|that|current)?\s*(?:thread|chat|conversation|window)\s+(?:permanently|for good|forever)\b|\bpermanently delete\b/.test(q)) return { name: "delete_thread" };
   if (/\b(?:close|delete|remove|kill|get rid of|bin|archive|put away)\s+(?:this|the|that|current)?\s*(?:thread|chat|conversation|window)\b/.test(q)) return { name: "archive_thread" };
-  // Folding a window away, or opening it again — by name or "this one"
-  // "open the Baltic thread" is the same as unfolding it (and it comes to the front).
-  const fold = /\b(minimi[sz]e|fold|shrink|open up|unfold|maximi[sz]e|expand|open)\s+(?:the\s+)?(this|it|current)?\s*(.*?)(?:\s+(?:thread|chat|window|conversation))?$/.exec(q);
-  const foldName = (fold?.[3] ?? "").trim();
-  // "open a new thread" asks for a new one; it never names an existing thread
-  const fresh = /^(?:a|an|another|new|fresh|second|different|separate)\b/.test(foldName);
-  if (fold?.[1] && !fresh && (/\b(?:thread|chat|window|conversation)\b/.test(q) || (foldName && ctx.knowsThread(foldName)))) {
-    const open = /^(?:open up|unfold|maximi[sz]e|expand|open)$/.test(fold[1]);
-    if (!foldName || fold[2] || ctx.knowsThread(foldName)) return { name: "fold_thread", open, ...(foldName && !fold[2] ? { title: foldName } : {}) };
-  }
+  const fold = /^(minimi[sz]e|fold|shrink|open up|unfold|maximi[sz]e|expand|open)\s+(?:this|the|that|current|it)(?:\s+(?:thread|chat|window|conversation|one))?$/.exec(q);
+  if (fold?.[1]) return { name: "fold_thread", open: /^(?:open up|unfold|maximi[sz]e|expand|open)$/.test(fold[1]) };
+  if (/^(?:clear|wipe)(?:\s+(?:this|the))?(?:\s+(?:thread|chat|window|conversation))?$/.test(q)) return { name: "clear_thread" };
+
   // The one put away most recently: "restore the last one", "open the thread I just closed", "undo that close".
   if (/\b(?:restore|reopen|bring back|unarchive|recover)\s+(?:the\s+|my\s+)?(?:last|latest|previous|most recent)\b/.test(q) ||
       (/\b(?:open|restore|reopen|bring back|get back|recover|unarchive)\b/.test(q) && /\b(?:one|thread|chat|conversation|window)\s+(?:that\s+|which\s+)?(?:i|you|we)\s+(?:just\s+|last\s+|recently\s+)?(?:closed|put away|archived|hid|dismissed)\b/.test(q)) ||
@@ -231,22 +145,26 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
     return { name: "restore_thread", title: "", last: true };
   }
   const rs = /\b(?:restore|reopen|bring back|unarchive)\s+(?:the\s+)?(.+?)(?:\s+(?:thread|chat|conversation))?$/.exec(q);
-  if (rs?.[1]) return { name: "restore_thread", title: orig(rs[1]) };
-  if (/^(?:clear|wipe)(?:\s+(?:this|the))?(?:\s+(?:thread|chat|window|conversation))?$/.test(q)) return { name: "clear_thread" };
-  // (the longer ways of saying "this" first, or "this thread to Tokyo" is read as "this" + "thread to Tokyo")
-  const rn = /\b(?:rename|call|name)\s+(?:this thread|this chat|this one|the thread|this|it)\s+(?:to\s+|as\s+)?["“]?(.+?)["”]?$/.exec(q);
-  if (rn?.[1]) return { name: "rename_thread", title: orig(rn[1]) };
-  const sw = /\b(?:switch|go|jump|move|get|focus|select)\s+(?:(?:back\s+)?to\s+)?(?:the\s+)?(.+?)(?:\s+(?:thread|chat|window|conversation))?$/.exec(q);
+  if (rs?.[1]) return { name: "restore_thread", title: orig(clause, q, rs[1]) };
+
+  // Going to a thread by name — only one that exists; anything else is a
+  // question. ("move" is JARVIS's word: "move Travel into Trips".)
+  const sw = /\b(?:switch|go|jump|get|focus|select)\s+(?:(?:back\s+)?to\s+)?(?:the\s+)?(.+?)(?:\s+(?:thread|chat|window|conversation))?$/.exec(q);
   if (sw?.[1] && ctx.knowsThread(sw[1])) return { name: "switch_thread", title: sw[1] };
-  const tie = /\b(?:connect|link|tie|group)\s+(?:the\s+)?(.+?)\s+(?:thread\s+)?(?:with|to|and)\s+(?:the\s+)?(.+?)(?:\s+threads?)?$/.exec(q);
-  if (tie?.[1] && tie[2] && ctx.knowsThread(tie[1]) && ctx.knowsThread(tie[2])) return { name: "link_threads", a: tie[1], b: tie[2] };
-  // Keep a supplied name with the command instead of treating it as a
-  // follow-up question. This has to run before the general new-thread check.
+
+  // A new thread — named, plain, or branched off the one in front.
   const namedThread = /^\s*(?:please\s+)?(?:new|another|fresh|separate|second|different|create|start|open|make|begin)\s+(?:up\s+)?(?:a\s+)?(?:new\s+)?(?:chat|thread|conversation|window|session|tab)\s+(?:called|named)\s+["“]?(.+?)["”]?\s*$/i.exec(clause);
   if (namedThread?.[1]) return { name: "new_thread", branch: false, title: namedThread[1].trim() };
   if (NEW_THREAD.test(q)) return { name: "new_thread", branch: BRANCH.test(q) };
 
   return null;
+}
+
+/** A name as it was written, capitals and all, found again in the lowercased clause. */
+function orig(clause: string, q: string, s: string): string {
+  const raw = clause.trim().replace(/[?!.]+$/, "").trim();
+  const at = q.lastIndexOf(s);
+  return (at < 0 ? s : raw.slice(at, at + s.length)).replace(/["”]$/, "");
 }
 
 /** Leftover words that are about the window juggling, not the question. */
@@ -295,17 +213,9 @@ export function parseUtterance(text: string, ctx: ParseContext = NO_CONTEXT): Pa
 }
 
 /* ===================================================================== *
- * Directives written by the reasoning core
+ * What the reasoning core writes
  * ===================================================================== */
 
-const DIRECTIVE = /\[\[do:\s*([a-z_]+)((?:\s+[a-z_]+\s*=\s*"[^"]*")*)\s*\]\]/gi;
-const MAX_DIRECTIVES = 8;
-
-/**
- * Pull `[[do: …]]` directives out of a reply; return the clean text and the
- * actions. Anything not on the whitelist — deleting, approving, anything
- * unknown — is dropped, not guessed at.
- */
 /**
  * Where a reply belongs, declared by the model in its first words:
  * [[at: core]] — conversation, said under the core and kept in the transcript;
@@ -335,90 +245,22 @@ export function parseRoute(text: string): { route: Route | null; text: string; u
   return { route: null, text, undecided: false };
 }
 
+const DIRECTIVE = /\[\[do:\s*([a-z_]+)((?:\s+[a-z_]+\s*=\s*"[^"]*")*)\s*\]\]/gi;
+const MAX_DIRECTIVES = 8;
+
+/**
+ * Pull `[[do: …]]` directives out of a reply; return the clean text and the
+ * actions. Anything not in the table — deleting, approving, anything
+ * unknown — is dropped, not guessed at.
+ */
 export function extractDirectives(reply: string): { text: string; actions: Action[] } {
   const actions: Action[] = [];
   const text = reply.replace(DIRECTIVE, (_m, name: string, argStr: string) => {
     const args: Record<string, string> = {};
     for (const m of argStr.matchAll(/([a-z_]+)\s*=\s*"([^"]*)"/gi)) args[m[1]!.toLowerCase()] = m[2]!.trim();
-    const act = directiveToAction(name.toLowerCase(), args);
+    const act = directiveToAction(name, args);
     if (act && actions.length < MAX_DIRECTIVES) actions.push(act);
     return "";
   });
   return { text: text.replace(/\n{3,}/g, "\n\n").trim(), actions };
 }
-
-function directiveToAction(n: string, args: Record<string, string>): Action | null {
-  const yes = (v?: string): boolean => /^(yes|true|1)$/i.test(v ?? "");
-  const opt = <K extends string>(k: K, v: string | undefined): Partial<Record<K, string>> => (v ? ({ [k]: v } as Record<K, string>) : {});
-  switch (n) {
-    case "new_thread":
-      return {
-        name: "new_thread", branch: yes(args.branch),
-        ...opt("title", args.title), ...opt("ask", args.ask), ...opt("parent", args.parent), ...opt("group", args.group),
-      };
-    case "link_threads":
-      return args.a && args.b ? { name: "link_threads", a: args.a, b: args.b, ...opt("why", args.why) } : null;
-    case "close_thread":
-    case "archive_thread":
-      return { name: "archive_thread", ...opt("title", args.title) };
-    // Putting everything away is recoverable, so it's allowed; deleting is not.
-    case "archive_all":
-      return { name: "archive_all" };
-    case "tidy_board":
-      return { name: "tidy_board" };
-    case "restore_thread":
-      return args.title ? { name: "restore_thread", title: args.title } : /^(?:yes|true|1)$/i.test(args.last ?? "") ? { name: "restore_thread", title: "", last: true } : null;
-    case "switch_thread":
-      return args.title ? { name: "switch_thread", title: args.title } : null;
-    case "rename_thread":
-      return args.title ? { name: "rename_thread", title: args.title, ...opt("target", args.target) } : null;
-    // Housekeeping JARVIS does on his own, applied quietly by ask.ts
-    case "title_thread":
-      return args.title ? { name: "title_thread", title: args.title } : null;
-    case "clear_thread":
-      return { name: "clear_thread" };
-    case "fold_thread":
-      return { name: "fold_thread", open: /^(yes|true|1|open)$/i.test(args.open ?? ""), ...opt("title", args.title) };
-    case "new_group":
-      return args.title
-        ? { name: "new_group", title: args.title, ...(args.threads ? { threads: args.threads.split(/\s*[;|]\s*/).filter(Boolean) } : {}) }
-        : null;
-    case "move_thread":
-      return args.thread && args.group ? { name: "move_thread", thread: args.thread, group: args.group } : null;
-    case "rename_group":
-      return args.group && args.title ? { name: "rename_group", group: args.group, title: args.title } : null;
-    case "collapse_group":
-      return args.group ? { name: "collapse_group", group: args.group } : null;
-    case "expand_group":
-      return args.group ? { name: "expand_group", group: args.group } : null;
-    case "switch_core": {
-      const p = coreFrom(args.provider ?? "");
-      return p ? { name: "switch_core", provider: p } : null;
-    }
-    case "set_voice":
-      return args.name ? { name: "set_voice", voice: args.name } : null;
-    case "set_speed":
-      return Number.isFinite(Number(args.value)) && args.value ? { name: "set_speed", value: Number(args.value) } : null;
-    case "mute": return { name: "mute" };
-    case "unmute": return { name: "unmute" };
-    case "open_config": {
-      const tab = (["connections", "voice", "access", "quick"] as const).find((t) => t === args.tab) ?? "connections";
-      return { name: "open_config", tab };
-    }
-    case "open_setup": return { name: "open_setup" };
-    case "sweep_network": return { name: "sweep" };
-    case "show_panel":
-      return PANEL_NAMES.includes(args.name as PanelName) ? { name: "show_panel", panel: args.name as PanelName } : null;
-    case "hide_panel":
-      return args.name === "all" || PANEL_NAMES.includes(args.name as PanelName)
-        ? { name: "hide_panel", panel: args.name as PanelName | "all" } : null;
-    // Never from the model: delete_thread, delete_group, clear_archived, approve, deny, set_model.
-    default:
-      return null;
-  }
-}
-
-/** Actions that destroy something and must be confirmed by the user first. */
-export const NEEDS_CONFIRMATION: ReadonlySet<ActionName> = new Set<ActionName>([
-  "clear_thread", "delete_thread", "delete_group", "delete_all", "clear_archived",
-]);

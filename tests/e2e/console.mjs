@@ -37,6 +37,13 @@ const asked = [];    // every question the console sent, in order
 // conversation at the core, a follow-up in the thread in front, research in a thread of its own.
 function replyFor(question) {
   const q = question.toLowerCase();
+  // Organising the board is said to JARVIS and comes back as a directive (shared/directives.ts).
+  let m;
+  if ((m = /^new group called (.+)$/i.exec(question))) return `[[at: core]] Done, sir.\n\n[[do: new_group title="${m[1]}"]]`;
+  if ((m = /^move (.+) into (.+)$/i.exec(question))) return `[[at: core]] Moved, sir.\n\n[[do: move_thread thread="${m[1]}" group="${m[2]}"]]`;
+  if ((m = /^collapse (.+)$/i.exec(question))) return `[[at: core]] Folded, sir.\n\n[[do: collapse_group group="${m[1]}"]]`;
+  if ((m = /^expand (.+)$/i.exec(question))) return `[[at: core]] Opened, sir.\n\n[[do: expand_group group="${m[1]}"]]`;
+  if ((m = /^rename (.+) to (.+)$/i.exec(question))) return `[[at: core]] Renamed, sir.\n\n[[do: rename_thread target="${m[1]}" title="${m[2]}"]]`;
   if (q.includes('plan a trip')) return '[[at: core]] Certainly, sir: a thread for it.\n\n[[do: new_thread title="Lisbon" ask="What is the weather in Lisbon"]]';
   if (q.includes('weather in lisbon')) return '[[at: thread]] Mild and bright in Lisbon, sir: **21°** and clear.';
   if (q.includes('link them')) return '[[at: core]] Linked, sir.\n\n[[do: link_threads a="Lisbon" b="Journeys" why="travel"]]';
@@ -219,27 +226,27 @@ await check('threads: new thread, subthread, group, move, collapse, expand, rena
   await say('branch off'); await wait(800);
   let w = await ws(); const travel = w.threads.find((t) => /travel/i.test(t.title)); const sub = w.threads.find((t) => t.parentId === travel?.id);
   assert(sub, 'no subthread of Travel');
-  await say('new group called Trips'); await wait(800);
+  await say('new group called Trips'); await untilIdle(); await wait(400);
   b = await board(); assert(b.groups.some((g) => /trips/i.test(g.title)), 'no Trips group: ' + JSON.stringify(b.groups));
-  await say('move Travel into Trips'); await wait(800);
+  await say('move Travel into Trips'); await untilIdle(); await wait(400);
   w = await ws(); const trips = w.groups.find((g) => /trips/i.test(g.title)); const travelNow = w.threads.find((t) => /travel/i.test(t.title));
   assert(trips && travelNow.groupId === trips.id, 'Travel not in Trips');
-  await say('collapse Trips'); await wait(800);
+  await say('collapse Trips'); await untilIdle(); await wait(400);
   w = await ws(); assert(w.groups.find((g) => g.id === trips.id).collapsed === true, 'Trips not collapsed');
-  await say('expand Trips'); await wait(800);
+  await say('expand Trips'); await untilIdle(); await wait(400);
   w = await ws(); assert(!w.groups.find((g) => g.id === trips.id).collapsed, 'Trips still collapsed');
-  await say('rename Travel to Journeys'); await wait(800);
+  await say('rename Travel to Journeys'); await untilIdle(); await wait(400);
   w = await ws(); assert(w.threads.some((t) => t.title === 'Journeys'), 'rename failed: ' + w.threads.map((t) => t.title).join('|'));
   // Folding one group never opens another: with the thread in front inside Trips and the only
   // other group folded, folding Trips leaves both folded (it used to move into Second and open it).
-  await say('new group called Second'); await wait(600);
-  await say('collapse Second'); await wait(500);
+  await say('new group called Second'); await untilIdle(); await wait(400);
+  await say('collapse Second'); await untilIdle(); await wait(400);
   await say('go to Journeys'); await wait(500);
-  await say('collapse Trips'); await wait(800);
+  await say('collapse Trips'); await untilIdle(); await wait(400);
   w = await ws();
   const folded = w.groups.filter((g) => /trips|second/i.test(g.title)).map((g) => ({ title: g.title, collapsed: !!g.collapsed }));
   assert(folded.length === 2 && folded.every((g) => g.collapsed), 'folding one group opened another: ' + JSON.stringify(folded));
-  await say('expand Trips'); await say('expand Second'); await wait(600);
+  await say('expand Trips'); await untilIdle(); await say('expand Second'); await untilIdle(); await wait(400);
   await snap('threads');
   return { threads: w.threads.length, groups: w.groups.length };
 });
@@ -423,7 +430,7 @@ await check('configuration: tabs, copy icon, re-check, disconnect and reconnect'
 
 await check('persistence: reload keeps threads, groups, active thread and title', async () => {
   await say('new thread called Keep me'); await wait(500); await say('remember this'); await untilIdle();
-  await say('new group called Later'); await wait(500); await say('move Keep me into Later'); await wait(600);
+  await say('new group called Later'); await untilIdle(); await say('move Keep me into Later'); await untilIdle(); await wait(400);
   const before = await ws();
   await page.reload({ waitUntil: 'networkidle2' }); await wait(1500);
   const after = await ws(); const b = await board();
@@ -520,7 +527,7 @@ await check('configuration: quick queries run, voice choice persists, the guide 
 });
 
 await check('deleting: a group and a thread for good, both behind a confirm', async () => {
-  await say('new group called Doomed'); await wait(600);
+  await say('new group called Doomed'); await untilIdle(); await wait(400);
   await say('delete the Doomed group'); await wait(600);
   let dlg = await page.evaluate(() => !document.getElementById('confirmDialog').hidden);
   assert(dlg, 'no confirm for deleting a group');

@@ -6,6 +6,7 @@
  */
 
 import type { Address, AskEvent, Catalogue, ProviderMeta, Turn } from "../types.js";
+import { directiveCatalogue } from "../directives.js";
 
 /**
  * One connected service. The key is the user's own and is passed in with
@@ -50,12 +51,8 @@ export const PERSONA = [
   // before it is shown or spoken, and the client only accepts this fixed set.
   "You can operate this console. When the user asks you to do something to the console, put one directive per action on its own line at the very end of your reply, exactly in this form: [[do: ACTION key=\"value\"]].",
   "The board: you sit at the bottom of the screen and the user's threads fill the space above you. A thread on its own is just a window; two or more that belong together form a group (a bubble). A piece of research is a thread with more threads grouped beside it.",
-  "Windows fold: fold_thread open=\"no\" title=\"…\" folds one to its title bar, open=\"yes\" opens it again. Folding one never disturbs another.",
-  "Actions: new_thread (optional title=\"…\", ask=\"…\" to pose a question in the new window, branch=\"yes\" to make it a subthread of the current thread or parent=\"thread title\" of another, group=\"group title\" to put it in a group, made if needed); several new_thread directives may be given, and each ask is answered in its own window, in turn;",
-  "new_group title=\"…\" threads=\"title; title\" to gather two or more threads into a bubble; move_thread thread=\"…\" group=\"…\"; rename_group group=\"…\" title=\"…\"; collapse_group group=\"…|all\"; expand_group group=\"…|all\"; archive_all to put every thread away; tidy_board to rearrange every window and group neatly without closing anything;",
-  "link_threads a=\"thread title\" b=\"thread title\" why=\"two or three words\" to connect two threads — connected threads are put in the same group; switch_thread title=\"…\"; close_thread title=\"…\" (puts it away, recoverable); restore_thread title=\"…\"; rename_thread title=\"…\"; clear_thread (the user is asked to confirm). You cannot delete threads.",
-  "switch_core provider=\"gemini|chatgpt\"; set_voice name=\"…\" (one of the voices offered in Configuration → Voice, named in the console snapshot); set_speed value=\"0.7-1.3\"; mute; unmute; open_config tab=\"connections|voice|access\" (access: the microphone, location and sound-on-opening permissions); open_setup (the first-run guide, when asked for it); sweep_network (only when asked);",
-  "show_panel name=\"conversation|compute|graphics|storage|perimeter|uplink|environment\" (conversation: the transcript of what was said at the core); hide_panel name=\"…|all\".",
+  // the one table of what he may do (shared/directives.ts), as words
+  directiveCatalogue(),
   "Only use a directive when the user asked for that action. If you open a new thread with ask, do not answer the question yourself — acknowledge in a few words; it will be answered in the new window. If a thread name is ambiguous, ask which one instead of guessing.",
   "When you set up research as several new threads, give every one of them its own ask, so each window starts on its question straight away; a new research thread without an ask sits empty.",
   // Housekeeping he does on his own, without being asked, and never mentions.

@@ -257,8 +257,10 @@ or ask for a thread. He decides all of this from your words,
 and says where each reply belongs before he says it; the console never opens
 a thread of its own accord.
 
-Phrasings the built-in patterns miss still work: JARVIS can operate the same
-actions himself, from a fixed whitelist. He can open, group, connect, rename,
+The thread, panel, voice and setup lines above are the console's own and
+work with nothing connected. Grouping, moving, linking, renaming and folding
+by name — and any phrasing the console's own patterns miss — are said to
+JARVIS, who operates the console himself from one fixed list of actions. He can open, group, connect, rename,
 fold and put away threads — he can never delete anything, answer a
 confirmation on your behalf, or change a model.
 

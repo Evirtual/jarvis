@@ -50,6 +50,7 @@ the web version answers the same API calls in the browser
 | `src/shared/types.ts` | The client/server contract — both sides import it, so the API can't drift |
 | `src/shared/services/` | The two services behind one interface — `common.ts` (the interface, the persona, the helpers), `gemini.ts`, `openai.ts` — each answering, hearing and speaking; `index.ts` adds trying an account's models in turn, and plain-words errors |
 | `src/shared/services/console.ts` | The console's back end, once for both versions: given where the keys are kept, it checks a key and remembers what it can reach, says which service is in use, and answers, hears and speaks through it |
+| `src/shared/directives.ts` | Every action the console can do, and the one table of what the model may ask for: the persona tells the model about them from it, and the client parses a written directive with it |
 | `src/shared/weather.ts` | The weather from open-meteo, for both versions |
 | `src/server/index.ts` | The PC's HTTP server: the console's API, the live-readings stream, static files |
 | `src/server/services.ts`, `config.ts` | The console core with its keys in `config.json`; reading and writing that file |
@@ -71,7 +72,7 @@ the web version answers the same API calls in the browser
 | `src/client/board-geometry.ts`, `tidy.ts` | Pure and tested: keeping a window inside the board and clear of JARVIS, a free seat, bubbles nudged apart; the Tidy-up plan |
 | `src/client/message.ts` | One line in a window: links, and pictures and players for image and video results |
 | `src/client/ask.ts` | The command line, the queue, what JARVIS is told, the streamed answer, his housekeeping (naming a thread that has none) |
-| `src/client/commands.ts` | What can be said or written as a directive, and what the model may not do |
+| `src/client/commands.ts` | The console's own commands — the few that must work with nothing connected — the route at the head of a reply, and the directives at its end |
 | `src/client/actions.ts` | Carrying out every action, by you or by JARVIS's directives |
 | `src/client/confirm.ts` | Anything destructive waits for a yes — by button or by word |
 | `src/client/local.ts` | Questions answered from live readings, never from a model |

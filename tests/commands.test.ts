@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { NEEDS_CONFIRMATION, extractDirectives, intentOf, parseRoute, parseUtterance, type ParseContext } from "../src/client/commands.ts";
+import { DIRECTIVES, directiveCatalogue } from "../src/shared/directives.ts";
 import { rankModels } from "../src/shared/services/common.ts";
 
 const threads = ["General", "Lithuania", "Trip planning", "Cambodia news"];
@@ -56,12 +57,17 @@ test("switching needs a thread that exists; the core name wins over a thread nam
   assert.deepEqual(intentOf("talk to open ai", ctx()), { name: "switch_core", provider: "openai" });
 });
 
-test("connecting and moving threads, and folding groups", () => {
-  assert.deepEqual(intentOf("connect Lithuania with Trip planning", ctx()), { name: "link_threads", a: "lithuania", b: "trip planning" });
-  assert.deepEqual(intentOf("move Lithuania into Travel", ctx()), { name: "move_thread", thread: "lithuania", group: "Travel" });
-  assert.deepEqual(intentOf("collapse the research group", ctx()), { name: "collapse_group", group: "research" });
-  assert.deepEqual(intentOf("expand all", ctx()), { name: "expand_group", group: "all" });
-  assert.deepEqual(intentOf("create a group called Home lab", ctx()), { name: "new_group", title: "Home lab" });
+test("organising the board is said to JARVIS, not parsed: it reaches him as a question, and comes back as a directive", () => {
+  for (const s of ["connect Lithuania with Trip planning", "move Lithuania into Travel", "collapse the research group", "expand all", "create a group called Home lab", "rename Trip planning to Summer in Vilnius", "open the Lithuania thread"]) {
+    assert.equal(intentOf(s, ctx()), null, s);
+    assert.equal(parseUtterance(s, ctx()).ask, s, s);
+  }
+  assert.deepEqual(extractDirectives('[[do: move_thread thread="Lithuania" group="Travel"]] [[do: collapse_group group="Research"]] [[do: rename_group group="Research" title="Deep dive"]] [[do: fold_thread open="no" title="Lithuania"]]').actions, [
+    { name: "move_thread", thread: "Lithuania", group: "Travel" },
+    { name: "collapse_group", group: "Research" },
+    { name: "rename_group", group: "Research", title: "Deep dive" },
+    { name: "fold_thread", open: false, title: "Lithuania" },
+  ]);
 });
 
 test("deleting a group is understood, and always needs confirming", () => {
@@ -162,26 +168,27 @@ test("at most eight directives are taken from one reply", () => {
   assert.equal(r.actions.length, 8);
 });
 
-test("threads and groups are opened, folded and renamed by name, without asking the model", () => {
-  assert.deepEqual(intentOf("open the Lithuania thread", ctx()), { name: "fold_thread", open: true, title: "lithuania" });
-  assert.deepEqual(intentOf("open Trip planning", ctx()), { name: "fold_thread", open: true, title: "trip planning" });
-  assert.deepEqual(intentOf("minimise Cambodia news", ctx()), { name: "fold_thread", open: false, title: "cambodia news" });
+test("this thread folds and opens by the console's own word; a name goes to JARVIS", () => {
+  assert.deepEqual(intentOf("fold this thread", ctx()), { name: "fold_thread", open: false });
+  assert.deepEqual(intentOf("open up this thread", ctx()), { name: "fold_thread", open: true });
+  assert.deepEqual(intentOf("minimise it", ctx()), { name: "fold_thread", open: false });
+  assert.equal(intentOf("open the Lithuania thread", ctx()), null);
   // "open a new thread" is still a new thread, and "open the radar" still a panel
   assert.equal(intentOf("open a new thread", ctx())?.name, "new_thread");
   assert.deepEqual(intentOf("open the radar", ctx()), { name: "show_panel", panel: "perimeter" });
-  // a group by its name alone
-  assert.deepEqual(intentOf("expand Research", ctx()), { name: "expand_group", group: "research" });
-  assert.deepEqual(intentOf("fold the Travel", ctx()), { name: "collapse_group", group: "travel" });
-  // renaming keeps the capitals it was given, even with a full stop at the end
-  assert.deepEqual(intentOf("rename Trip planning to Summer in Vilnius.", ctx()), { name: "rename_thread", target: "trip planning", title: "Summer in Vilnius" });
-  assert.deepEqual(intentOf("rename the Research group to Deep Dive", ctx()), { name: "rename_group", group: "research", title: "Deep Dive" });
-  assert.deepEqual(intentOf("rename this to Budget.", ctx()), { name: "rename_thread", title: "Budget" });
-  assert.deepEqual(intentOf("rename this thread to Tokyo", ctx()), { name: "rename_thread", title: "Tokyo" });
-  assert.deepEqual(intentOf("call this chat Budget", ctx()), { name: "rename_thread", title: "Budget" });
-  // moving into a group keeps the group's name intact
-  assert.deepEqual(intentOf("move Lithuania into the Travel group", ctx()), { name: "move_thread", thread: "lithuania", group: "Travel" });
-  // an unknown name is a question, not a command
-  assert.equal(intentOf("rename Mars to Phobos", ctx()), null);
+  // restoring by name keeps the capitals it was given
+  assert.deepEqual(intentOf("restore Trip planning.", ctx()), { name: "restore_thread", title: "Trip planning" });
+});
+
+test("the directive table is the one place the model's actions live: every documented directive makes an action", () => {
+  const sample = { title: "T", ask: "q", parent: "P", group: "G", threads: "A; B", thread: "T", a: "A", b: "B", why: "w", open: "yes", provider: "gemini", name: "compute", value: "1.1", tab: "voice", last: "yes" };
+  for (const d of DIRECTIVES) {
+    if (!d.doc) continue;
+    assert.ok(d.make(sample), `${d.name} makes nothing of a full set of arguments`);
+    assert.ok(directiveCatalogue().includes(`${d.name}`), `${d.name} is not told to the model`);
+  }
+  assert.ok(!directiveCatalogue().includes("title_thread —"), "housekeeping is explained in its own words, not listed");
+  assert.match(directiveCatalogue(), /cannot delete/);
 });
 
 test("putting everything away is understood however it is said", () => {

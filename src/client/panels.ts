@@ -18,9 +18,9 @@ import { raise, stackKey, track } from "./stack.js";
 import { type Room } from "./board-geometry.js";
 import { gestures, putDown, resized, sidesAt, sizeCursor, sizeLimits } from "./surface.js";
 import { clamp } from "./num.js";
+import { PANEL_NAMES, type PanelName } from "../shared/directives.js";
 
-export const PANEL_NAMES = ["threads", "conversation", "compute", "graphics", "storage", "perimeter", "uplink", "environment"] as const;
-export type PanelName = (typeof PANEL_NAMES)[number];
+export { PANEL_NAMES, type PanelName } from "../shared/directives.js";
 
 /** Where each opens the first time: on the side of the deck its reading is on — this machine down the left, the world down the right. Threads opens under its corner button. */
 const DEFAULT_SEAT: Record<PanelName, { side: "l" | "r"; top: number }> = {
