@@ -172,15 +172,31 @@ export class Hearing {
     r.lang = "en-GB";
     r.interimResults = true;
     r.continuous = false;
-    r.onstart = (): void => { this.listening = true; void this.openMic(); this.onState?.(); };
-    r.onend = (): void => { this.listening = false; this.closeMic(); this.onState?.(); };
+    // What dictation has heard so far, and whether it ever called it final:
+    // on a phone it often ends with the words still marked provisional, and
+    // ending is as final as it gets.
+    let heard = "";
+    let settled = false;
+    let failed = false;
+    r.onstart = (): void => { heard = ""; settled = false; failed = false; this.listening = true; void this.openMic(); this.onState?.(); };
+    r.onend = (): void => {
+      this.listening = false; this.closeMic(); this.onState?.();
+      if (!settled && !failed) {
+        if (heard) this.onRecognised?.(heard, true);
+        else this.onNotice?.("I didn't hear anything, sir.");
+      }
+    };
     r.onresult = (e: SpeechRecognitionEvent): void => {
       let txt = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) txt += e.results[i]![0]!.transcript;
-      this.onRecognised?.(txt.trim(), e.results[e.results.length - 1]!.isFinal);
+      for (let i = 0; i < e.results.length; i++) txt += e.results[i]![0]!.transcript;
+      heard = txt.trim();
+      const final = e.results[e.results.length - 1]!.isFinal;
+      if (final) settled = true;
+      this.onRecognised?.(heard, final);
     };
     r.onerror = (e: SpeechRecognitionErrorEvent): void => {
       const c = e.error;
+      failed = true;
       if (c === "not-allowed" || c === "service-not-allowed") {
         this.onNotice?.("Microphone refused — the command line still works.");
       } else if (c === "no-speech") {

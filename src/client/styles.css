@@ -46,8 +46,9 @@
   /* A thread window is one fixed size, like an instrument panel: the screen
      changing width never resizes it; it only narrows if it cannot fit at all. */
   --thread-w: 440px;
-  /* the title row: nothing on the board reaches above this (HEADER_H in stage.ts) */
-  --header-h: 56px;
+  /* the title row: nothing on the board reaches above this (HEADER_H in stage.ts)
+     — below the phone's clock, where the page is drawn under it */
+  --header-h: calc(56px + env(safe-area-inset-top, 0px));
   /* One margin from the screen edge for everything that lines up with it —
      the title row, the deck, and on a phone the list and the sheets. */
   --edge: 16px;
@@ -118,7 +119,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
    top-right, level with the JARVIS title. The board never reaches up here
    (see HEADER_H in stage.ts and BOARD_TOP in panels.ts). */
 .topbar {
-  position: absolute; top: 8px; left: var(--edge); right: var(--edge); z-index: 200; height: 38px;
+  position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); left: var(--edge); right: var(--edge); z-index: 200; height: 38px;
   display: flex; align-items: center; justify-content: space-between;
   pointer-events: none;
 }
@@ -300,7 +301,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
     #050b11;
 }
 .masthead {
-  position: absolute; top: 18px; left: 50%; z-index: 2; transform: translateX(-50%);
+  position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); left: 50%; z-index: 2; transform: translateX(-50%);
   white-space: nowrap; pointer-events: none;
   font-family: var(--f-hud); font-size: 14px; font-weight: 700; letter-spacing: .24em;
   color: rgba(177,232,246,.82); text-shadow: 0 0 16px rgba(111,240,255,.25);
@@ -314,6 +315,12 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
   mask-image: linear-gradient(to top, #000, rgba(0,0,0,.82) 45%, transparent 100%);
 }
 #graph { position: absolute; inset: 0; z-index: 1; pointer-events: none; display: block; }
+/* The phone's bars over the page's edges, as two empty elements stage.ts can
+   measure: the core and the board keep clear of the gesture bar, the title row
+   of the clock. Zero everywhere else. */
+.safe-probe { position: absolute; left: 0; width: 0; visibility: hidden; pointer-events: none; }
+.safe-probe[data-edge="top"] { top: 0; height: env(safe-area-inset-top, 0px); }
+.safe-probe[data-edge="bottom"] { bottom: 0; height: env(safe-area-inset-bottom, 0px); }
 
 /* The status line: one fixed place just above JARVIS. His status word, a
    passing notice and the bin all sit on it, bottom edge on the line, so

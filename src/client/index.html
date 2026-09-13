@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#04080d">
+<meta name="theme-color" content="#060e15">
 <meta name="color-scheme" content="dark">
 <title>J.A.R.V.I.S. Console — a console that talks back</title>
 <meta name="description" content="An Iron Man–style console that talks back: real machine and network readings, a voice, and threads of research you run by talking.">
@@ -63,6 +63,9 @@
     <main class="centre">
       <section class="stage" id="stage">
         <canvas id="graph" aria-label="JARVIS and the conversations around it"></canvas>
+        <!-- The size of the phone's bars over the page's edges, for stage.ts to measure (see .safe-probe). -->
+        <div class="safe-probe" data-edge="top" aria-hidden="true"></div>
+        <div class="safe-probe" data-edge="bottom" aria-hidden="true"></div>
         <div class="masthead" aria-label="JARVIS Console">J.A.R.V.I.S.</div>
         <!-- The title row: your threads in the top-left corner, configuration
              in the top-right. Nothing on the board ever covers this row. -->

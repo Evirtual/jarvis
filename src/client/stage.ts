@@ -180,7 +180,7 @@ export class Stage {
       thread: (id) => this.ws.thread(id),
       hueOf: (t) => { const c = t.color ?? this.hueOf(this.ws.groupOf(t)); return /^#[0-9a-f]{6}$/i.test(c) ? c : THREAD_HUES[0]; },
       related: (id) => this.relatedFor?.(id) ?? [],
-      board: () => ({ top: HEADER_H + 8, bottom: this.h - DECK_H - 24 }),
+      board: () => ({ top: HEADER_H + this.inset.top + 8, bottom: this.floor - DECK_H - 24 }),
       pick: (id) => { this.focus(id); this.reveal(id); },
     });
 
@@ -776,13 +776,13 @@ export class Stage {
    */
   private core(): { cx: number; cy: number } {
     // Sitting in the deck, rising a little above it.
-    return { cx: this.w / 2, cy: this.h - CORE_R - CORE_BOTTOM_GAP };
+    return { cx: this.w / 2, cy: this.floor - CORE_R - CORE_BOTTOM_GAP };
   }
 
   /** Stage bounds the board must stay inside: the whole stage above the deck. */
   private get bounds(): { top: number; bottom: number; left: number; right: number } {
     // the same 16px edge margin as the title row, the deck and the panels (--edge)
-    return { top: HEADER_H + 4, bottom: this.h - DECK_H - 8, left: 16, right: this.w - 16 };
+    return { top: HEADER_H + this.inset.top + 4, bottom: this.floor - DECK_H - 8, left: 16, right: this.w - 16 };
   }
 
   /**
@@ -926,7 +926,7 @@ export class Stage {
     const coreTop = cy - (CORE_R * (DESIGN_R + 8)) / DESIGN_R;
     s.setProperty("--core-x", `${cx}px`);
     s.setProperty("--core-y", `${cy}px`);
-    s.setProperty("--deck-h", `${DECK_H}px`);
+    s.setProperty("--deck-h", `${DECK_H + this.inset.bottom}px`); // the deck grows by the inset, so its buttons keep their place beside the core
     s.setProperty("--status-y", `${Math.round(coreTop - 10)}px`);
     s.setProperty("--core-clear", `${Math.round(this.h - coreTop + 8)}px`);
   }
@@ -1289,10 +1289,22 @@ export class Stage {
 
   /* ---------------- canvas ---------------- */
 
+  /**
+   * The phone's own bars over the page's edges — the clock and the gesture
+   * bar — where the page is drawn under them (viewport-fit=cover). Two empty
+   * elements the size of each inset are measured, since the canvas can't
+   * read env() itself.
+   */
+  private inset = { top: 0, bottom: 0 };
+  /** Where the usable stage ends at the bottom: above the gesture bar, when there is one. */
+  private get floor(): number { return this.h - this.inset.bottom; }
+
   private resize(): void {
     const r = this.root.getBoundingClientRect();
     this.w = Math.max(280, r.width);
     this.h = Math.max(240, r.height);
+    const probe = (edge: string): number => this.root.querySelector<HTMLElement>(`.safe-probe[data-edge="${edge}"]`)?.offsetHeight ?? 0;
+    this.inset = { top: probe("top"), bottom: probe("bottom") };
     this.canvas.width = this.w * this.dpr;
     this.canvas.height = this.h * this.dpr;
     this.canvas.style.width = `${this.w}px`;
