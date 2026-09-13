@@ -25,13 +25,6 @@ export function hhmm(iso: string | null | undefined): string {
   return t ? t.slice(0, 5) : "—";
 }
 
-export function setMeter(fill: HTMLElement, pct: number | null | undefined): void {
-  const v = Math.max(0, Math.min(100, pct ?? 0));
-  fill.style.width = `${v}%`;
-  fill.classList.toggle("warn", v >= 75 && v < 90);
-  fill.classList.toggle("crit", v >= 90);
-}
-
 export function setPill(el: HTMLElement, warn: boolean, crit: boolean): void {
   el.classList.toggle("warn", warn && !crit);
   el.classList.toggle("crit", crit);

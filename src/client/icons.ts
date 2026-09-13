@@ -33,3 +33,7 @@ const INSTRUMENT: Record<string, string> = {
 };
 
 export const instrumentIcon = (name: string): string => draw(INSTRUMENT[name] ?? "", 1.4, "mi-ic");
+
+/** Two sheets, one over the other: copy. And the tick that replaces it for a moment once done. */
+export const COPY_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2"/><path d="M10.5 5.5V3.7A1.2 1.2 0 0 0 9.3 2.5H3.7A1.2 1.2 0 0 0 2.5 3.7v5.6a1.2 1.2 0 0 0 1.2 1.2h1.8"/></svg>`;
+export const TICK_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg>`;

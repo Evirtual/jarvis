@@ -1006,6 +1006,7 @@ body.m-compact .setup-sheet {
 .wx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin-top: 9px; }
 
 .spark { width: 100%; height: 34px; display: block; margin: 5px 0 2px; }
+.rows { display: block; }
 
 /* ---------- drawer ---------- */
 .scrim { position: fixed; inset: 0; z-index: 240; opacity: 0; pointer-events: none; transition: opacity .22s; }

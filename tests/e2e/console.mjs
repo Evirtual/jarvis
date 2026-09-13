@@ -128,13 +128,13 @@ await page.goto(base, { waitUntil: 'networkidle2', timeout: 60000 }); await wait
 await check('guide: opens on a first visit at step 1', async () => { const b = await board(); assert(b.guideOpen, 'guide not open'); return await page.evaluate(() => document.getElementById('setupTitle').textContent); });
 await check('guide: connect a key from the card, model picker, spare/use, permissions, done', async () => {
   await page.evaluate(() => document.getElementById('setupNext').click()); await wait(300);
-  await page.type('#setupBody input[data-setup-key="openai"]', 'sk-proj-' + 'A1b2C3d4'.repeat(8));
-  await page.evaluate(() => document.querySelector('#setupBody [data-setup-connect="openai"]').click());
+  await page.type('#setupBody input[data-key="openai"]', 'sk-proj-' + 'A1b2C3d4'.repeat(8));
+  await page.evaluate(() => document.querySelector('#setupBody [data-act="save"][data-id="openai"]').click());
   await page.waitForFunction(() => document.querySelector('#setupBody .provider.ready'), { timeout: 15000 });
-  const models = await page.$$eval('#setupBody select[data-setup-model] option', (o) => o.map((x) => x.value));
+  const models = await page.$$eval('#setupBody select[data-model] option', (o) => o.map((x) => x.value));
   assert(models.includes('gpt-4.1'), 'model list missing');
-  await page.select('#setupBody select[data-setup-model="openai"]', 'gpt-4.1'); await wait(600);
-  const chosen = await page.evaluate(() => document.querySelector('#setupBody select[data-setup-model="openai"]')?.value);
+  await page.select('#setupBody select[data-model="openai"]', 'gpt-4.1'); await wait(600);
+  const chosen = await page.evaluate(() => document.querySelector('#setupBody select[data-model="openai"]')?.value);
   assert(chosen === 'gpt-4.1', 'model change did not stick: ' + chosen);
   const masked = await page.evaluate(() => document.querySelector('#setupBody .keyline .mask')?.textContent);
   assert(masked && masked.includes('…'), 'masked key missing: ' + masked);

@@ -81,10 +81,10 @@ the web version answers the same API calls in the browser
 | `src/client/hearing.ts` | Speech in: the microphone, silence detection, the service's transcription, dictation as the fallback |
 | `src/client/pcm.ts`, `device-voices.ts` | Pure and tested: the samples a service sends and where the speech in them is; ranking the device's own voices |
 | `src/client/voice-ui.ts` | JARVIS as the microphone, the keyboard, Esc, the voice controls |
-| `src/client/connections.ts` | The Connections screen |
+| `src/client/connections.ts`, `provider-card.ts` | The Connections screen; a service's card, drawn once for it and for the guide |
 | `src/client/setup.ts`, `readiness.ts` | The first-run guide: where it's running, connecting a service, what J.A.R.V.I.S. needs (microphone, location, sound), saying hello with the Voice tab's own controls; and the readiness card left on the board when the guide is closed with something undone |
 | `src/client/memory.ts` | The board's room in the browser's storage |
-| `src/client/readings.ts` | Painting the live readings, and receiving them |
+| `src/client/readings.ts`, `panel-rows.ts` | The live readings painted — the deck's chips, and each open panel's body from rows, the PC's and a browser's with their own words — and received |
 | `src/client/threads.ts`, `threads-panel.ts`, `conversation-panel.ts`, `board-links.ts` | What the stage reports back and the counts; the Threads list; the Conversation panel; the links between threads on the board |
 | `src/client/links.ts`, `web.ts` | Which threads are about the same things (pure, tested); the context web |
 | `src/client/deck.ts`, `layout.ts`, `panels.ts`, `drawer.ts` | The deck and title row; which layout the screen gets; the instrument panels; the configuration drawer |

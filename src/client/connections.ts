@@ -11,11 +11,9 @@
 import type { ConnectionsResponse, ProviderId, ProviderView } from "../shared/types.js";
 import { api } from "./api.js";
 import { $, esc } from "./dom.js";
+import { COPY_ICON, TICK_ICON } from "./icons.js";
+import { providerCard } from "./provider-card.js";
 import { SERVERLESS } from "./server.js";
-
-/** Two sheets, one over the other: copy. And the tick that replaces it for a moment once done. */
-export const COPY_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2"/><path d="M10.5 5.5V3.7A1.2 1.2 0 0 0 9.3 2.5H3.7A1.2 1.2 0 0 0 2.5 3.7v5.6a1.2 1.2 0 0 0 1.2 1.2h1.8"/></svg>`;
-export const TICK_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg>`;
 
 export class Connections {
   private root: HTMLElement;
@@ -193,83 +191,19 @@ export class Connections {
     }
   }
 
+  /** The one card, drawn for this screen: what is in use, what is being checked, what went wrong here. */
   private card(p: ProviderView): string {
-    const busy = this.busy.has(p.id);
-    const isActive = this.data.active === p.id;
-    const st = p.status;
-    const cls = [
-      "provider",
-      st.state === "ready" ? "ready" : "",
-      st.state === "error" ? "bad" : "",
-      isActive ? "active" : "",
-    ].filter(Boolean).join(" ");
+    return providerCard(p, {
+      active: this.data.active === p.id,
+      busy: this.busy.has(p.id),
+      error: this.errors.get(p.id) ?? null,
+      hint: this.hintOf(p.id),
+      inGuide: false,
+    });
+  }
 
-    const head =
-      `<div class="provider-head">` +
-      `<span class="dot"></span><span class="nm">${esc(p.name)}</span>` +
-      (p.free ? `<span class="badge">Free tier</span>` : "") +
-      `<span class="spacer"></span>` +
-      (isActive
-        ? `<span class="src on">In use</span>`
-        : st.state === "ready"
-          ? `<button class="btn sm" data-act="use" data-id="${p.id}">Use</button>`
-          : "") +
-      `</div>`;
-
-    if (st.state === "checking") {
-      return `<div class="${cls}">${head}<p class="blurb">Checking the key…</p></div>`;
-    }
-
-    if (st.state === "unconfigured" || st.state === "error") {
-      const err =
-        this.errors.get(p.id) ?? (st.state === "error" ? st.message : null);
-      return (
-        `<div class="${cls}">` +
-        head +
-        `<p class="blurb">${esc(p.blurb)}</p>` +
-        (err ? `<p class="err">${esc(err)}</p>` : "") +
-        `<div class="row">` +
-        `<input class="field grow" type="password" data-key="${p.id}" placeholder="${esc(p.keyPrefix)}…" autocomplete="off" spellcheck="false" aria-label="${esc(p.name)} API key">` +
-        `<button class="btn primary" data-act="save" data-id="${p.id}"${busy ? " disabled" : ""}>${busy ? "Checking" : "Connect"}</button>` +
-        `</div>` +
-        // the how and the cost, a line away rather than on the page
-        `<details class="disclose"><summary>How to get a key</summary><div class="body">` +
-        `<ol class="steps">` +
-        `<li>Open <a href="${p.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${p.free ? " and sign in with a Google account" : ""}.</li>` +
-        `<li>Create a key and copy it. ${esc(p.keyHint)}.</li>` +
-        `<li>Paste it above and press Connect.</li>` +
-        `</ol>` +
-        `<p class="cost">${esc(p.cost)}</p>` +
-        `</div></details>` +
-        (st.state === "error"
-          ? `<div class="row" style="margin-top:8px"><button class="btn sm danger" data-act="remove" data-id="${p.id}">Forget key</button></div>`
-          : "") +
-        `</div>`
-      );
-    }
-
-    const models = st.models
-      .map((m) => `<option value="${esc(m)}"${m === st.model ? " selected" : ""}>${esc(m)}</option>`)
-      .join("");
-
-    return (
-      `<div class="${cls}">` +
-      head +
-      `<div class="keyline">` +
-      `<span class="mask">${esc(st.maskedKey)}</span>` +
-      // the key can be copied back out only where it is kept in this browser
-      (api.keyOf(p.id) !== null ? `<button class="copy" type="button" data-act="copy" data-id="${p.id}" title="Copy the key" aria-label="Copy the key">${COPY_ICON}</button>` : "") +
-      `<span class="src"${st.source === "environment" ? ` title="Disconnect makes J.A.R.V.I.S. stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${p.envVar}` : ""}</span>` +
-      `</div>` +
-      (st.problem ? `<p class="err">${esc(st.problem)}</p>` : "") +
-      `<p class="hint">${esc(this.hintOf(p.id) ?? "")}</p>` +
-      `<div class="ctl"><span class="ctl-k"><span>Model</span><span class="n">${st.models.length} available</span></span>` +
-      `<select class="sel" data-model="${p.id}" aria-label="${esc(p.name)} model">${models}</select></div>` +
-      `<div class="row">` +
-      `<button class="btn" data-act="recheck" data-id="${p.id}"${busy ? " disabled" : ""}>${busy ? "Checking" : "Re-check"}</button>` +
-      `<button class="btn danger" data-act="remove" data-id="${p.id}">Disconnect</button>` +
-      `</div>` +
-      `</div>`
-    );
+  /** A service as its card shows it, for the guide. */
+  viewOf(id: ProviderId): ProviderView | undefined {
+    return this.data.providers.find((p) => p.id === id);
   }
 }

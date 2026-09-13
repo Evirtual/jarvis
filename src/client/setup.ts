@@ -12,13 +12,14 @@ import type { ProviderId } from "../shared/types.js";
 import { PROVIDER_IDS } from "../shared/types.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
-import { $, esc } from "./dom.js";
+import { $ } from "./dom.js";
 import { KEY, recall, store } from "./storage.js";
 import { setDrawer } from "./drawer.js";
 import { locate } from "./sensors.js";
 import { SERVERLESS } from "./server.js";
 import { conn, voice } from "./state.js";
-import { COPY_ICON, TICK_ICON } from "./connections.js";
+import { COPY_ICON, TICK_ICON } from "./icons.js";
+import { providerCard as card } from "./provider-card.js";
 
 const STEPS = ["Where you are", "Connect a service", "What J.A.R.V.I.S. needs", "Say hello"] as const;
 const NEEDS_STEP = 2;
@@ -94,51 +95,10 @@ function whereYouAre(): string {
        <p>A key is saved in <b>config.json</b> beside the server and never sent to the browser. The server reads this machine's sensors and, when asked, sweeps your network.</p></div></details>`;
 }
 
+/** The same card as on Connections (provider-card.ts), for this guide: a connected service says so, a spare offers Use. */
 function providerCard(id: ProviderId): string {
-  const meta = PROVIDERS[id];
-  const ready = conn.readyIds().includes(id);
-  const busy = checking === id;
-  const err = errors.get(id);
-  const head =
-    `<div class="provider-head"><span class="dot"></span><span class="nm">${esc(meta.name)}</span>` +
-    (meta.free ? `<span class="badge">Free tier</span>` : "") +
-    (ready ? `<span class="spacer"></span><span class="ok">Connected</span>` : "") +
-    `</div>`;
-  if (ready) {
-    const active = conn.active === id;
-    const m = conn.modelsOf(id);
-    const models = m
-      ? `<div class="ctl"><span class="ctl-k"><span>Model</span><span class="n">${m.models.length} available</span></span>` +
-        `<select class="sel" data-setup-model="${id}" aria-label="${esc(meta.name)} model">` +
-        m.models.map((x) => `<option value="${esc(x)}"${x === m.model ? " selected" : ""}>${esc(x)}</option>`).join("") +
-        `</select></div>`
-      : "";
-    // the key line as on Connections: masked, with the copy icon where the key is kept in this browser
-    const masked = conn.maskedKeyOf(id);
-    const keyline = masked
-      ? `<div class="keyline"><span class="mask">${esc(masked)}</span>` +
-        (api.keyOf(id) !== null ? `<button class="copy" type="button" data-setup-copy="${id}" title="Copy the key" aria-label="Copy the key">${COPY_ICON}</button>` : "") +
-        `</div>`
-      : "";
-    // the same sentence under the same faded line as on Connections
-    const hint = `<p class="hint">${esc(conn.hintOf(id) ?? "")}</p>`;
-    const use = active
-      ? ""
-      : `<div class="row" style="align-items:center;margin-bottom:10px"><p class="blurb grow" style="margin:0">Connected, as a spare.</p><button class="btn sm" type="button" data-setup-use="${id}">Use ${esc(meta.name)}</button></div>`;
-    return `<div class="provider ready${active ? " active" : ""}">${head}${keyline}${hint}${use}${models}</div>`;
-  }
-  return (
-    `<div class="provider${err ? " bad" : ""}">${head}` +
-    `<p class="blurb">${esc(meta.blurb)}</p>` +
-    (err ? `<p class="err">${esc(err)}</p>` : "") +
-    `<div class="row"><input class="field grow" type="password" data-setup-key="${id}" placeholder="${esc(meta.keyPrefix)}…" autocomplete="off" spellcheck="false" aria-label="${esc(meta.name)} API key">` +
-    `<button class="btn primary" type="button" data-setup-connect="${id}"${busy ? " disabled" : ""}>${busy ? "Checking" : "Connect"}</button></div>` +
-    `<details class="disclose"><summary>How to get a key</summary><div class="body">` +
-    `<ol class="steps"><li>Open <a href="${meta.keyUrl}" target="_blank" rel="noreferrer noopener">the key page</a>${meta.free ? " and sign in with a Google account" : ""}.</li>` +
-    `<li>Create a key and copy it. It starts with <b>${esc(meta.keyPrefix)}</b>.</li><li>Paste it above and press Connect.</li></ol>` +
-    `<p class="cost">${esc(meta.cost)}</p></div></details>` +
-    `</div>`
-  );
+  const view = conn.viewOf(id) ?? { ...PROVIDERS[id], status: { state: "unconfigured" as const } };
+  return card(view, { active: conn.active === id, busy: checking === id, error: errors.get(id) ?? null, hint: conn.hintOf(id), inGuide: true });
 }
 
 function connect(): string {
@@ -275,7 +235,7 @@ function render(): void {
 /* ---------------- what the steps do ---------------- */
 
 async function saveKey(id: ProviderId): Promise<void> {
-  const field = body.querySelector<HTMLInputElement>(`input[data-setup-key="${id}"]`);
+  const field = body.querySelector<HTMLInputElement>(`input[data-key="${id}"]`);
   const key = field?.value.trim();
   if (!key) return;
   checking = id;
@@ -300,30 +260,30 @@ export function wireSetup(): void {
 
   body.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
-    const connectBtn = target.closest<HTMLElement>("[data-setup-connect]");
-    if (connectBtn) { void saveKey(connectBtn.dataset.setupConnect as ProviderId); return; }
-    const copyBtn = target.closest<HTMLElement>("[data-setup-copy]");
+    const connectBtn = target.closest<HTMLElement>('[data-act="save"]');
+    if (connectBtn) { void saveKey(connectBtn.dataset.id as ProviderId); return; }
+    const copyBtn = target.closest<HTMLElement>('[data-act="copy"]');
     if (copyBtn) {
-      const key = api.keyOf(copyBtn.dataset.setupCopy as ProviderId);
+      const key = api.keyOf(copyBtn.dataset.id as ProviderId);
       if (key) {
         void navigator.clipboard.writeText(key).then(() => { copyBtn.innerHTML = TICK_ICON; copyBtn.classList.add("done"); }).catch(() => undefined)
           .then(() => window.setTimeout(() => { copyBtn.innerHTML = COPY_ICON; copyBtn.classList.remove("done"); }, 1500));
       }
       return;
     }
-    const useBtn = target.closest<HTMLElement>("[data-setup-use]");
-    if (useBtn) { void api.setActive(useBtn.dataset.setupUse as ProviderId).then(() => conn.refresh()).then(render); return; }
+    const useBtn = target.closest<HTMLElement>('[data-act="use"]');
+    if (useBtn) { void api.setActive(useBtn.dataset.id as ProviderId).then(() => conn.refresh()).then(render); return; }
   });
   body.addEventListener("keydown", (e) => {
-    const field = (e.target as HTMLElement).closest<HTMLInputElement>("input[data-setup-key]");
+    const field = (e.target as HTMLElement).closest<HTMLInputElement>("input[data-key]");
     if (!field || e.key !== "Enter") return;
     e.preventDefault();
-    void saveKey(field.dataset.setupKey as ProviderId);
+    void saveKey(field.dataset.key as ProviderId);
   });
   body.addEventListener("change", (e) => {
     needsChange(e.target as HTMLElement, body);
-    const model = (e.target as HTMLElement).closest<HTMLSelectElement>("select[data-setup-model]");
-    if (model) void api.selectModel(model.dataset.setupModel as ProviderId, model.value).then(() => conn.refresh());
+    const model = (e.target as HTMLElement).closest<HTMLSelectElement>("select[data-model]");
+    if (model) void api.selectModel(model.dataset.model as ProviderId, model.value).then(() => conn.refresh());
   });
 
   back.addEventListener("click", () => { step = Math.max(0, step - 1); render(); });

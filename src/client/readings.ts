@@ -1,210 +1,144 @@
 /**
- * The instruments: painting the live readings, and receiving them.
+ * The instruments: the live readings painted, and received.
+ *
+ * The deck's chips are always painted; a panel's body only while it is open,
+ * and from rows (panel-rows.ts), so the PC's readings and what a browser can
+ * measure are the same panels with their own words — no element serves two
+ * meanings.
  */
 
 import type { ScanResponse, TelemetryResponse, WorldResponse } from "../shared/types.js";
 import { api } from "./api.js";
-import { $, esc, fmtRate, gib, gib0, hhmm, setMeter, setPill } from "./dom.js";
+import { $, esc, fmtRate, gib, gib0, hhmm, setPill } from "./dom.js";
 import { radar, panels } from "./state.js";
 import { notice, paintCoreState } from "./say.js";
 import { fitDockIfChanged } from "./deck.js";
 import { SERVERLESS } from "./server.js";
 import { locate, startSensors, sweepServices } from "./sensors.js";
+import { levelOf, paintRows, type Row } from "./panel-rows.js";
 
 /* ===================================================================== *
- * Painting the HUD
+ * The latest readings, owned here and read everywhere
  * ===================================================================== */
 
-/** The latest readings, owned here and read everywhere. */
 export let T: TelemetryResponse | null = null;
 export let W: WorldResponse = { uplink: null, weather: null, error: null, at: 0 };
 export let S: ScanResponse = { running: false, at: 0, durationMs: 0, subnet: null, self: null, gateway: null, hosts: [] };
 
-let coreCells: { box: HTMLElement; fill: HTMLElement }[] = [];
-/** The last reading the round-trip trace took a point from, so a repeated one isn't drawn twice. */
-let lastRttAt = 0;
-
-/** A meter's class for how full it is: nothing until three quarters, then warn, then crit. */
-const levelClass = (pct: number): string => (pct >= 90 ? " crit" : pct >= 75 ? " warn" : "");
-
-/** A panel's body is painted only while it is open. */
-const openPanels = () => ({ compute: panels.isOpen("compute"), graphics: panels.isOpen("graphics"), storage: panels.isOpen("storage"), uplink: panels.isOpen("uplink") });
-
-function buildCores(n: number): void {
-  const wrap = $("cores");
-  wrap.replaceChildren();
-  coreCells = [];
-  wrap.style.gridTemplateColumns = `repeat(${Math.min(8, Math.max(4, Math.ceil(n / 2)))}, 1fr)`;
-  for (let i = 0; i < n; i++) {
-    const c = document.createElement("div");
-    c.className = "core";
-    const f = document.createElement("i");
-    c.append(f);
-    c.title = `Core ${i}`;
-    wrap.append(c);
-    coreCells.push({ box: c, fill: f });
-  }
-}
-
+/** The last minute of throughput (the PC) or round trips (the web), newest last. */
 const sparkRx: number[] = [];
 const sparkTx: number[] = [];
 const SPARK_N = 60;
-
-function drawSpark(): void {
-  if (sparkRx.length < 2) return;
-  const max = Math.max(...sparkRx, ...sparkTx, 1);
-  // Newest reading at the right edge, older ones scrolling off to the left, so
-  // the graph reads as a live trace from the first second rather than filling
-  // in from the left over a minute.
-  const xAt = (i: number, n: number): number => 260 - ((n - 1 - i) / (SPARK_N - 1)) * 260;
-  const path = (arr: number[]): string =>
-    arr
-      .map((v, i) => {
-        const y = 33 - (v / max) * 31;
-        return `${i ? "L" : "M"}${xAt(i, arr.length).toFixed(1)} ${y.toFixed(1)}`;
-      })
-      .join(" ");
-  const firstX = xAt(0, sparkRx.length).toFixed(1);
-  $("spark").innerHTML =
-    `<path d="${path(sparkRx)} L260 34 L${firstX} 34 Z" fill="rgba(111,240,255,.13)"/>` +
-    `<path d="${path(sparkRx)}" fill="none" stroke="#6ff0ff" stroke-width="1.2"/>` +
-    `<path d="${path(sparkTx)}" fill="none" stroke="#ffb648" stroke-width="1" stroke-dasharray="3 2" opacity=".8"/>`;
-}
-
-export function paintTelemetry(): void {
-  if (!T) return;
-  if (T.web) { paintWeb(T); fitDockIfChanged(); return; }
-  // The readings in the deck are always painted; a panel's body only while
-  // it is open (and again the moment it opens — see deck.ts).
-  const open = openPanels();
-
-  if (T.cpu) {
-    $("pCpu").textContent = `${T.cpu.avg}%`;
-    setPill($("pillCpu"), T.cpu.avg >= 75, T.cpu.avg >= 92);
-  }
-  if (T.cpu && open.compute) {
-    $("cpuModel").textContent = T.cpu.model;
-    $("cpuModel").title = T.cpu.model;
-    $("cpuCount").textContent =
-      `${T.cpu.cores.length} cores${T.cpu.speedMhz ? ` · ${(T.cpu.speedMhz / 1000).toFixed(1)} GHz` : ""}`;
-    if (coreCells.length !== T.cpu.cores.length) buildCores(T.cpu.cores.length);
-    T.cpu.cores.forEach((v, i) => {
-      const c = coreCells[i];
-      if (!c) return;
-      c.fill.style.height = `${v}%`;
-      c.box.classList.toggle("hot", v >= 60 && v < 88);
-      c.box.classList.toggle("max", v >= 88);
-      c.box.title = `Core ${i}: ${v}%`;
-    });
-    $("cpuAvgN").innerHTML = `${T.cpu.avg}<span class="u">%</span>`;
-    setMeter($("cpuAvg"), T.cpu.avg);
-  }
-
-  if (T.mem && open.compute) {
-    $("memN").innerHTML = `${gib(T.mem.usedBytes)} / ${gib(T.mem.totalBytes)}<span class="u">GB</span>`;
-    setMeter($("memBar"), T.mem.pct);
-  }
-
-  if (T.gpu) {
-    $("pGpu").textContent = `${T.gpu.utilPct ?? 0}% · ${T.gpu.tempC != null ? `${T.gpu.tempC}°` : "—"}`;
-    setPill($("pillGpu"), (T.gpu.tempC ?? 0) >= 78, (T.gpu.tempC ?? 0) >= 88);
-  }
-  if (T.gpu && open.graphics) {
-    $("gpuName").textContent = T.gpu.name;
-    $("gpuName").title = T.gpu.name;
-    $("gpuTemp").textContent = T.gpu.tempC != null ? `${T.gpu.tempC}°C` : "";
-    $("gpuUtilN").innerHTML = `${T.gpu.utilPct ?? 0}<span class="u">%</span>`;
-    setMeter($("gpuUtil"), T.gpu.utilPct);
-    if (T.gpu.vramTotalMb && T.gpu.vramUsedMb != null) {
-      $("gpuVramN").innerHTML =
-        `${(T.gpu.vramUsedMb / 1024).toFixed(1)} / ${(T.gpu.vramTotalMb / 1024).toFixed(1)}<span class="u">GB</span>`;
-      setMeter($("gpuVram"), (T.gpu.vramUsedMb / T.gpu.vramTotalMb) * 100);
-    }
-    $("gpuPwr").textContent = T.gpu.powerW != null ? `${T.gpu.powerW.toFixed(1)} W` : "—";
-    $("gpuClock").textContent = T.gpu.clockMhz != null ? `${T.gpu.clockMhz} MHz` : "—";
-    $("gpuFan").textContent = T.gpu.fanPct != null ? `${T.gpu.fanPct} %` : "passive";
-  } else if (!T.gpu && open.graphics) {
-    $("gpuName").textContent = "No NVIDIA adapter detected";
-  }
-
-  if (T.disks.length) {
-    const d0 = T.disks[0]!;
-    const dp = d0.totalBytes ? Math.round((d0.usedBytes / d0.totalBytes) * 100) : 0;
-    $("pDisk").textContent = `${dp}%`;
-    setPill($("pillDisk"), dp >= 85, dp >= 95);
-    if (open.storage) $("disks").innerHTML = T.disks
-      .map((d) => {
-        const pct = d.totalBytes ? (d.usedBytes / d.totalBytes) * 100 : 0;
-        const cls = levelClass(pct);
-        return (
-          `<div class="meter"><div class="row"><span class="nm">${esc(d.id)}</span>` +
-          `<span class="nu">${gib0(d.usedBytes)} / ${gib0(d.totalBytes)}<span class="u">GB</span></span></div>` +
-          `<div class="track"><div class="fill${cls}" style="width:${pct.toFixed(1)}%"></div></div></div>`
-        );
-      })
-      .join("");
-  }
-
-  if (T.net) {
-    $("pNet").textContent = fmtRate(T.net.rxBps);
-    if (T.net.rxBps != null) {
-      sparkRx.push(T.net.rxBps);
-      sparkTx.push(T.net.txBps ?? 0);
-      while (sparkRx.length > SPARK_N) { sparkRx.shift(); sparkTx.shift(); }
-    }
-  }
-  if (T.net && open.uplink) {
-    if (T.net.wifi) {
-      $("ssid").textContent = T.net.wifi.ssid || "—";
-      $("ssid").title = `Link rate: ${T.net.wifi.rxMbps} / ${T.net.wifi.txMbps} Mbps`;
-      $("radio").textContent = [T.net.wifi.radio, T.net.wifi.channel ? `ch ${T.net.wifi.channel}` : null]
-        .filter(Boolean).join(" · ") || "—";
-      $("wifiSig").textContent = `${T.net.wifi.signal}%`;
-    } else {
-      $("ssid").textContent = "Wired / unknown";
-      $("radio").textContent = "—";
-    }
-    $("rate").textContent = `${fmtRate(T.net.rxBps)}  ↓ / ↑  ${fmtRate(T.net.txBps)}`;
-    $("gw").textContent = T.net.gateway ?? "—";
-    $("dns").textContent = T.net.dns.slice(0, 2).join(", ") || "—";
-    $("dns").title = T.net.dns.join(", ");
-    drawSpark();
-  }
-
-  if (T.anchors.length && open.uplink) {
-    $("anchors").textContent = T.anchors
-      .map((a) => `${a.label.split(" ")[0]} ${a.ms == null ? "—" : `${a.ms}ms`}`)
-      .join(" · ");
-  }
-  fitDockIfChanged();
-}
+/** The last reading the round-trip trace took a point from, so a repeated one isn't drawn twice. */
+let lastRttAt = 0;
 
 const fmtBytes = (b: number | null | undefined): string =>
   b == null ? "—" : b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : b >= 1e3 ? `${Math.round(b / 1e3)} KB` : `${b} B`;
 
-/** The same instruments, from what the browser measures (see sensors.ts). */
+const kv = (key: string, label: string, value: string, more: { gold?: boolean; title?: string } = {}): Row => ({ kind: "kv", key, label, value, ...more });
+const meter = (key: string, label: string, value: string, unit: string, pct: number | null, level?: "" | "warn" | "crit"): Row =>
+  ({ kind: "meter", key, label, value, unit, pct, ...(level !== undefined ? { level } : {}) });
+
+/** Whatever is on the uplink, from the world: the public address and the carrier. */
+function worldRows(): Row[] {
+  return [
+    kv("ip", "Public IP", W.uplink?.ip ?? "—"),
+    kv("isp", "Carrier", W.uplink ? `${W.uplink.isp}${W.uplink.asn ? ` · ${W.uplink.asn}` : ""}` : "—", { title: W.uplink?.isp ?? "" }),
+  ];
+}
+
+/* ---------------- the PC: the machine's own readings ---------------- */
+
+function paintPc(t: TelemetryResponse): void {
+  if (t.cpu) {
+    $("pCpu").textContent = `${t.cpu.avg}%`;
+    setPill($("pillCpu"), t.cpu.avg >= 75, t.cpu.avg >= 92);
+    $("cpuCount").textContent = `${t.cpu.cores.length} cores${t.cpu.speedMhz ? ` · ${(t.cpu.speedMhz / 1000).toFixed(1)} GHz` : ""}`;
+  }
+  if (panels.isOpen("compute")) {
+    paintRows($("computeBody"), [
+      kv("cpu", "Processor", t.cpu?.model ?? "—", { title: t.cpu?.model ?? "" }),
+      ...(t.cpu ? [{ kind: "cores", key: "cores", cores: t.cpu.cores } as Row] : []),
+      meter("load", "Aggregate load", t.cpu ? String(t.cpu.avg) : "—", "%", t.cpu?.avg ?? null),
+      meter("mem", "Memory", t.mem ? `${gib(t.mem.usedBytes)} / ${gib(t.mem.totalBytes)}` : "—", "GB", t.mem?.pct ?? null),
+    ]);
+  }
+
+  if (t.gpu) {
+    $("pGpu").textContent = `${t.gpu.utilPct ?? 0}% · ${t.gpu.tempC != null ? `${t.gpu.tempC}°` : "—"}`;
+    setPill($("pillGpu"), (t.gpu.tempC ?? 0) >= 78, (t.gpu.tempC ?? 0) >= 88);
+    $("gpuTemp").textContent = t.gpu.tempC != null ? `${t.gpu.tempC}°C` : "";
+  }
+  if (panels.isOpen("graphics")) {
+    const g = t.gpu;
+    paintRows($("graphicsBody"), g ? [
+      kv("name", "Adapter", g.name, { title: g.name }),
+      meter("util", "Utilisation", String(g.utilPct ?? 0), "%", g.utilPct),
+      meter("vram", "VRAM", g.vramTotalMb && g.vramUsedMb != null ? `${(g.vramUsedMb / 1024).toFixed(1)} / ${(g.vramTotalMb / 1024).toFixed(1)}` : "—", "GB",
+        g.vramTotalMb && g.vramUsedMb != null ? (g.vramUsedMb / g.vramTotalMb) * 100 : null),
+      kv("power", "Power draw", g.powerW != null ? `${g.powerW.toFixed(1)} W` : "—", { gold: true }),
+      kv("clock", "Core clock", g.clockMhz != null ? `${g.clockMhz} MHz` : "—"),
+      kv("fan", "Fan", g.fanPct != null ? `${g.fanPct} %` : "passive"),
+    ] : [kv("name", "Adapter", "No NVIDIA adapter detected")]);
+  }
+
+  if (t.disks.length) {
+    const d0 = t.disks[0]!;
+    const dp = d0.totalBytes ? Math.round((d0.usedBytes / d0.totalBytes) * 100) : 0;
+    $("pDisk").textContent = `${dp}%`;
+    setPill($("pillDisk"), dp >= 85, dp >= 95);
+  }
+  if (panels.isOpen("storage")) {
+    paintRows($("storageBody"), t.disks.map((d) => {
+      const pct = d.totalBytes ? (d.usedBytes / d.totalBytes) * 100 : 0;
+      return meter(d.id, d.id, `${gib0(d.usedBytes)} / ${gib0(d.totalBytes)}`, "GB", pct);
+    }));
+  }
+
+  if (t.net) {
+    $("pNet").textContent = fmtRate(t.net.rxBps);
+    if (t.net.rxBps != null) {
+      sparkRx.push(t.net.rxBps);
+      sparkTx.push(t.net.txBps ?? 0);
+      while (sparkRx.length > SPARK_N) { sparkRx.shift(); sparkTx.shift(); }
+    }
+    if (t.net.wifi) $("wifiSig").textContent = `${t.net.wifi.signal}%`;
+  }
+  if (panels.isOpen("uplink")) {
+    const n = t.net;
+    const wifi = n?.wifi;
+    paintRows($("uplinkBody"), [
+      kv("net", "Network", wifi ? wifi.ssid || "—" : "Wired / unknown", { title: wifi ? `Link rate: ${wifi.rxMbps} / ${wifi.txMbps} Mbps` : "" }),
+      kv("radio", "Radio", wifi ? [wifi.radio, wifi.channel ? `ch ${wifi.channel}` : null].filter(Boolean).join(" · ") || "—" : "—"),
+      { kind: "spark", key: "spark", label: "Network throughput, last 60 seconds", rx: sparkRx, tx: sparkTx },
+      kv("rate", "Down / Up", n ? `${fmtRate(n.rxBps)}  ↓ / ↑  ${fmtRate(n.txBps)}` : "—"),
+      kv("gw", "Gateway", n?.gateway ?? "—"),
+      kv("dns", "Resolvers", n?.dns.slice(0, 2).join(", ") || "—", { title: n?.dns.join(", ") ?? "" }),
+      ...worldRows(),
+      kv("latency", "Latency", t.anchors.length ? t.anchors.map((a) => `${a.label.split(" ")[0]} ${a.ms == null ? "—" : `${a.ms}ms`}`).join(" · ") : "—"),
+    ]);
+  }
+}
+
+/* ---------------- the web: what a browser can measure (sensors.ts) ---------------- */
+
 function paintWeb(t: TelemetryResponse): void {
   const w = t.web!;
-  const open = openPanels();
 
   // compute
   if (w.load != null) {
     $("pCpu").textContent = `${w.load}%`;
     setPill($("pillCpu"), w.load >= 75, w.load >= 92);
   }
-  if (open.compute) {
-    $("cpuModel").textContent = w.platform;
-    $("cpuModel").title = w.platform;
-    $("cpuCount").textContent = [w.cores ? `${w.cores} cores` : null, w.pressure].filter(Boolean).join(" · ") || "—";
-    $("cpuAvgN").innerHTML = w.load != null ? `${w.load}<span class="u">%</span>` : "—";
-    setMeter($("cpuAvg"), w.load);
-    if (w.heapUsed != null && w.heapLimit) {
-      $("memN").innerHTML = `${Math.round(w.heapUsed / 1e6)} / ${Math.round(w.heapLimit / 1e6)}<span class="u">MB</span>` +
-        (w.deviceMemGb ? ` <span class="u">· device ${w.deviceMemGb} GB</span>` : "");
-      setMeter($("memBar"), (w.heapUsed / w.heapLimit) * 100);
-    } else {
-      $("memN").innerHTML = w.deviceMemGb ? `device ${w.deviceMemGb}<span class="u">GB</span>` : "—";
-    }
+  $("cpuCount").textContent = [w.cores ? `${w.cores} cores` : null, w.pressure].filter(Boolean).join(" · ") || "—";
+  if (panels.isOpen("compute")) {
+    paintRows($("computeBody"), [
+      kv("device", "Device", w.platform, { title: w.platform }),
+      meter("load", "Load, estimated", w.load != null ? String(w.load) : "—", "%", w.load),
+      w.heapUsed != null && w.heapLimit
+        ? meter("mem", "App memory", `${Math.round(w.heapUsed / 1e6)} / ${Math.round(w.heapLimit / 1e6)}`, "MB", (w.heapUsed / w.heapLimit) * 100)
+        : kv("mem", "Device memory", w.deviceMemGb ? `${w.deviceMemGb} GB` : "—"),
+    ]);
   }
 
   // graphics: frames held, against what the display can show
@@ -213,19 +147,17 @@ function paintWeb(t: TelemetryResponse): void {
     const ratio = w.refreshHz ? w.fps / w.refreshHz : 1;
     setPill($("pillGpu"), ratio < 0.75, ratio < 0.4);
   }
-  if (open.graphics) {
-    $("gpuName").textContent = w.renderer ?? "Not named by this browser";
-    $("gpuName").title = w.renderer ?? "";
-    $("gpuTemp").textContent = w.refreshHz ? `${w.refreshHz} Hz` : "—";
-    $("gpuUtilN").innerHTML = w.fps != null ? `${w.fps}<span class="u">fps</span>` : "—";
-    const fill = $("gpuUtil");
+  $("gpuTemp").textContent = w.refreshHz ? `${w.refreshHz} Hz` : "—";
+  if (panels.isOpen("graphics")) {
     const pct = w.fps != null && w.refreshHz ? Math.min(100, (w.fps / w.refreshHz) * 100) : 0;
-    fill.style.width = `${pct}%`;
-    fill.classList.toggle("warn", pct < 75 && pct >= 40);
-    fill.classList.toggle("crit", pct < 40);
-    $("gpuPwr").textContent = w.screen;
-    $("gpuClock").textContent = `${w.hdr ? "HDR" : "SDR"} · ${w.gamut}`;
-    $("gpuFan").textContent = w.graphicsApi ?? "—";
+    paintRows($("graphicsBody"), [
+      kv("name", "Adapter", w.renderer ?? "Not named by this browser", { title: w.renderer ?? "" }),
+      // a low frame rate is the worry here, so the colours run the other way
+      meter("fps", "Frame rate", w.fps != null ? String(w.fps) : "—", "fps", pct, pct < 40 ? "crit" : pct < 75 ? "warn" : ""),
+      kv("screen", "Screen", w.screen),
+      kv("colour", "Colour", `${w.hdr ? "HDR" : "SDR"} · ${w.gamut}`),
+      kv("api", "Renders with", w.graphicsApi ?? "—"),
+    ]);
   }
 
   // storage: what this app keeps on the device
@@ -235,20 +167,17 @@ function paintWeb(t: TelemetryResponse): void {
     const full = w.storageQuota ? ((w.storageUsed ?? 0) / w.storageQuota) * 100 : 0;
     setPill($("pillDisk"), full >= 75, full >= 90);
   }
-  if (open.storage) {
+  if (panels.isOpen("storage")) {
     const LOCAL_LIMIT = 5 * 1024 * 1024; // what browsers allow a site's local storage
-    const rows: [string, number | null, number | null][] = [
-      ["Files and caches", w.storageUsed, w.storageQuota],
-      ["Board, threads and settings", w.boardBytes, LOCAL_LIMIT],
-    ];
-    $("disks").innerHTML = rows.map(([name, used, total]) => {
+    const row = (key: string, name: string, used: number | null, total: number | null): Row => {
       const pct = used != null && total ? (used / total) * 100 : 0;
-      const cls = levelClass(pct);
-      return `<div class="meter"><div class="row"><span class="nm">${esc(name)}</span>` +
-        `<span class="nu">${fmtBytes(used)} / ${fmtBytes(total)}</span></div>` +
-        `<div class="track"><div class="fill${cls}" style="width:${Math.max(pct, used ? 0.5 : 0).toFixed(1)}%"></div></div></div>`;
-    }).join("") +
-      `<div class="kv"><span class="k">Kept when space is short</span><span class="v">${w.persisted == null ? "—" : w.persisted ? "yes" : "no — the browser may clear it"}</span></div>`;
+      return meter(key, name, `${fmtBytes(used)} / ${fmtBytes(total)}`, "", Math.max(pct, used ? 0.5 : 0), levelOf(pct));
+    };
+    paintRows($("storageBody"), [
+      row("files", "Files and caches", w.storageUsed, w.storageQuota),
+      row("board", "Board, threads and settings", w.boardBytes, LOCAL_LIMIT),
+      kv("kept", "Kept when space is short", w.persisted == null ? "—" : w.persisted ? "yes" : "no — the browser may clear it"),
+    ]);
   }
 
   // uplink: the connection as the browser sees it, and the measured round trip
@@ -260,22 +189,21 @@ function paintWeb(t: TelemetryResponse): void {
     sparkTx.push(0);
     while (sparkRx.length > SPARK_N) { sparkRx.shift(); sparkTx.shift(); }
   }
-  if (open.uplink) {
+  $("wifiSig").textContent = w.rttMs != null ? `${w.rttMs} ms` : "—";
+  if (panels.isOpen("uplink")) {
     const c = w.connection;
     const kind = c?.type && c.type !== "unknown" ? c.type.replace("wifi", "Wi-Fi").replace("cellular", "mobile data") : null;
-    $("ssid").textContent = !w.online ? "Offline" : kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : "Online";
-    // the browser's own speed estimate: a class ("4G" means fast, on any connection) and a rounded downlink
-    $("radio").textContent = c
-      ? [c.downlinkMbps != null ? `~${c.downlinkMbps} Mbps` : null, c.effective ? `${c.effective.toUpperCase()} class` : null].filter(Boolean).join(" · ") || "—"
-      : "not offered by this browser";
-    $("wifiSig").textContent = w.rttMs != null ? `${w.rttMs} ms` : "—";
-    $("rate").textContent = w.rttMs != null ? `${w.rttMs} ms` : "—";
-    $("gw").textContent = w.online ? "online" : "offline";
-    $("dns").textContent = c ? (c.saveData ? "on" : "off") : "—";
-    drawSpark();
-    if (t.anchors.length) {
-      $("anchors").textContent = t.anchors.map((a) => `${a.label === "This page's host" ? "Host" : a.label} ${a.ms == null ? "—" : `${a.ms}ms`}`).join(" · ");
-    }
+    paintRows($("uplinkBody"), [
+      kv("conn", "Connection", !w.online ? "Offline" : kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : "Online"),
+      // the browser's own speed estimate: a class ("4G" means fast, on any connection) and a rounded downlink
+      kv("estimate", "Estimate", c ? [c.downlinkMbps != null ? `~${c.downlinkMbps} Mbps` : null, c.effective ? `${c.effective.toUpperCase()} class` : null].filter(Boolean).join(" · ") || "—" : "not offered by this browser"),
+      { kind: "spark", key: "spark", label: "Round trip to the internet, last minute", rx: sparkRx, tx: sparkTx },
+      kv("rtt", "Round trip", w.rttMs != null ? `${w.rttMs} ms` : "—"),
+      kv("status", "Status", w.online ? "online" : "offline"),
+      kv("saver", "Data saver", c ? (c.saveData ? "on" : "off") : "—"),
+      ...worldRows(),
+      kv("latency", "Latency", t.anchors.length ? t.anchors.map((a) => `${a.label === "This page's host" ? "Host" : a.label} ${a.ms == null ? "—" : `${a.ms}ms`}`).join(" · ") : "—"),
+    ]);
   }
 
   // environment: how it knows where you are
@@ -288,13 +216,15 @@ function paintWeb(t: TelemetryResponse): void {
   ($("locateBtn") as HTMLButtonElement).hidden = !!loc || w.locationState === "asking";
 }
 
+export function paintTelemetry(): void {
+  if (!T) return;
+  if (T.web) paintWeb(T);
+  else paintPc(T);
+  fitDockIfChanged();
+}
+
 function paintWorld(): void {
-  if (W.uplink) {
-    $("pubip").textContent = W.uplink.ip;
-    $("isp").textContent = `${W.uplink.isp}${W.uplink.asn ? ` · ${W.uplink.asn}` : ""}`;
-    $("isp").title = W.uplink.isp;
-    $("wxPlace").textContent = [W.uplink.city, W.uplink.country].filter(Boolean).join(", ");
-  }
+  if (W.uplink) $("wxPlace").textContent = [W.uplink.city, W.uplink.country].filter(Boolean).join(", ");
   if (W.weather) {
     const w = W.weather;
     $("wxIcon").textContent = w.icon;
@@ -310,6 +240,7 @@ function paintWorld(): void {
   } else if (W.error) {
     $("wxText").textContent = "no uplink data";
   }
+  paintTelemetry(); // the uplink panel carries the public address and the carrier
 }
 
 export function paintHosts(): void {
@@ -427,6 +358,7 @@ export function sweep(): void {
   sweepPending = true;
   void pollScan(true);
 }
+
 /** The radar's hover lights the host in the list; the Sweep button sweeps. */
 export function wireReadings(): void {
   radar.onHover = paintHosts;
