@@ -22,6 +22,7 @@
     "test": "node --import tsx --test \"tests/**/*.test.ts\""
   },
   "dependencies": {
+    "marked": "^15.0.12",
     "openai": "^7.2.0"
   },
   "devDependencies": {

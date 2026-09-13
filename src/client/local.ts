@@ -21,28 +21,30 @@ export const partOfDay = (): string => {
 const HELP = [
   ...(SERVERLESS
     ? [
-        "status — this device: load, memory, frame rate, storage, right now",
-        "power — battery and charging, where the browser shares them",
-        "scan — measure the round trip to every service I rely on",
-        "devices — what the last sweep found",
-        "uplink — connection, public IP, provider, latency",
-        "weather — real conditions where you are (Environment → Use GPS for more precision)",
+        "- **status** — this device: load, memory, frame rate, storage, right now",
+        "- **power** — battery and charging, where the browser shares them",
+        "- **scan** — measure the round trip to every service I rely on",
+        "- **devices** — what the last sweep found",
+        "- **uplink** — connection, public IP, provider, latency",
+        "- **weather** — real conditions where you are (Environment → Use GPS for more precision)",
       ]
     : [
-        "status — CPU, memory, GPU, thermals, right now",
-        "power — battery, mains, GPU draw",
-        "scan — sweep the local network (only when you ask)",
-        "devices — what the last sweep found",
-        "uplink — Wi-Fi, gateway, public IP, carrier, latency",
-        "weather — real conditions where this machine is",
+        "- **status** — CPU, memory, GPU, thermals, right now",
+        "- **power** — battery, mains, GPU draw",
+        "- **scan** — sweep the local network (only when you ask)",
+        "- **devices** — what the last sweep found",
+        "- **uplink** — Wi-Fi, gateway, public IP, carrier, latency",
+        "- **weather** — real conditions where this machine is",
       ]),
-  "time · date — the obvious",
+  "- **time** · **date** — the obvious",
+  "", // a blank line, or the next line would be read as the item above continuing
   "Operate the console in plain words, alone or mid-sentence:",
-  "  new thread … · branch off … (a subthread) · close this chat (put away) · restore … · go back to …",
-  "  connect A with B (puts them in one bubble) · move A into Travel · new group called … · collapse Research",
-  "  show the radar · open the weather · show the threads · close all panels",
-  "  switch to Gemini / ChatGPT · use the Charon voice · speak faster · mute / unmute",
-  "  paste an API key here and I'll connect it — it never reaches a model",
+  "- new thread … · branch off … (a subthread) · close this chat (put away) · restore … · go back to …",
+  "- connect A with B (puts them in one bubble) · move A into Travel · new group called … · collapse Research",
+  "- show the radar · open the weather · show the threads · close all panels",
+  "- switch to Gemini / ChatGPT · use the Charon voice · speak faster · mute / unmute",
+  "- paste an API key here and I'll connect it — it never reaches a model",
+  "",
   "Anything else goes to the connected service, with live readings and web search.",
 ].join("\n");
 

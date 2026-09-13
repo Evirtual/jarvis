@@ -110,12 +110,15 @@ function appSnapshot(): string {
 function cleanReply(s: string): string {
   let cleaned = s
     .replace(/\(\s*\[([^\]]+)\]\([^)]*\)\s*\)/g, "")   // ([apnews.com](https://…))
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1: $2")
+    // an http page can't be a link on the stage, so its address is written out; https ones stay for the stage to link
+    .replace(/\[([^\]]+)\]\((http:\/\/[^\s)]+)\)/g, "$1: $2")
     // Wikimedia's File pages are stable research sources. Turn those page
     // links into its documented direct-file endpoint for an inline preview.
-    .replace(/https:\/\/commons\.wikimedia\.org\/wiki\/File(?:%3A|:)([^\s;\])]+)/gi, "[[media:image https://commons.wikimedia.org/wiki/Special:FilePath/$1]]")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/[ \t]{2,}/g, " ")
+    // Only picture files, and never inside a media marker the service already wrote —
+    // a marker inside a marker showed as brackets, and a .webm is no picture.
+    .replace(/(?<!\[\[media:(?:image|video)\s)https:\/\/commons\.wikimedia\.org\/wiki\/File(?:%3A|:)([^\s;\])]+\.(?:jpe?g|png|gif|webp|avif))(?=[\s;\])]|$)/gi, "[[media:image https://commons.wikimedia.org/wiki/Special:FilePath/$1]]")
+    // runs of spaces inside a line, but not the indent that nests a list (Markdown itself is drawn by the stage)
+    .replace(/(\S)[ \t]{2,}/g, "$1 ")
     .replace(/\s+([.,;:!?])/g, "$1");
 
   // Image and video cards are clickable source objects. Drop duplicate
@@ -137,7 +140,8 @@ async function askCore(thread: Thread): Promise<void> {
   const body = addMsg("jarvis", "Thinking…", thread.id);
   graph.attachLive(thread.id, body);
   const setBody = (text: string): void => {
-    body.textContent = text;
+    // Drawn as the finished reply will be, so a list doesn't jump into shape at the end.
+    body.replaceChildren(...line("jarvis", text).childNodes);
     const b = graph.bodyOf(thread.id);
     if (b) b.scrollTop = b.scrollHeight;
   };

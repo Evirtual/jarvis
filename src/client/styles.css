@@ -711,10 +711,13 @@ body.m-compact .setup-sheet {
 }
 .cw-link { color: var(--ice); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ice) 48%, transparent); text-underline-offset: 2px; }
 .cw-link:hover, .cw-link:focus-visible { color: #dffbff; text-decoration-color: currentColor; }
-.cw-media { display: block; width: 100%; margin: 10px 0 4px; padding: 0; border: 1px solid var(--line); background: rgba(4,12,18,.66); }
+/* A picture or player is the full width of the thread; its height follows (a player keeps 16:9). */
+.cw-media { display: block; width: 100%; margin: 10px 0; padding: 0; border: 1px solid var(--line); background: rgba(4,12,18,.66); }
+/* Cards in a row sit the same distance apart as the thread's edge padding (margins collapse to the larger). */
+.cw-media + .cw-media { margin-top: 12px; }
 .cw-media img, .cw-media iframe { display: block; width: 100%; max-width: none; border: 0; }
 .cw-media > a { display: block; width: 100%; max-width: none; }
-.cw-media img { max-height: 320px; object-fit: contain; background: #050b11; }
+.cw-media img { height: auto; background: #050b11; }
 .cw-media iframe { aspect-ratio: 16 / 9; }
 .cw-media > a:not(:has(img)) { margin-top: 4px; font: 10px var(--f-hud); letter-spacing: .1em; text-transform: uppercase; }
 .cw-ref { color: var(--ice-dim); font: 9px var(--f-mono); letter-spacing: .04em; white-space: nowrap; }
@@ -739,7 +742,41 @@ body.m-compact .setup-sheet {
   display: flex; flex-direction: column; gap: 8px;
   font-size: 12px; line-height: 1.5;
 }
-.cw-msg { white-space: pre-wrap; overflow-wrap: anywhere; }
+.cw-msg { overflow-wrap: anywhere; }
+/* A reply's Markdown, drawn token by token (message.ts): blocks stack with a small gap. */
+.cw-msg > * + *, .cw-msg li > * + *, .cw-quote > * + * { margin-top: 6px; }
+.cw-msg .cw-p { margin: 0; }
+.cw-msg .cw-h { margin: 0; font-weight: 600; color: var(--ice); }
+.cw-msg .cw-h[data-level="1"], .cw-msg .cw-h[data-level="2"] { font-size: 1.1em; letter-spacing: .01em; }
+.cw-msg .cw-h[data-level="1"] { font-family: var(--f-hud); text-transform: uppercase; letter-spacing: .12em; font-size: .95em; }
+.cw-msg ul.cw-list, .cw-msg ol.cw-list { margin: 0; padding-left: 1.5em; }
+.cw-msg li + li { margin-top: 2px; }
+.cw-msg li::marker { color: var(--ice-dim); font-variant-numeric: tabular-nums; }
+.cw-msg .cw-task { margin-right: 5px; color: var(--ice-dim); }
+.cw-msg li:has(> .cw-task) { list-style: none; margin-left: -1.5em; }
+.cw-msg b { font-weight: 600; color: var(--ice); }
+.cw-msg s { opacity: .7; }
+.cw-msg code {
+  font-family: var(--f-mono); font-size: .92em; padding: 0 4px; border-radius: 3px;
+  background: rgba(111,240,255,.08); color: var(--text-hi);
+}
+.cw-msg pre.cw-code {
+  margin: 0; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere;
+  border: 1px solid var(--line); background: rgba(4,12,18,.66); position: relative;
+}
+.cw-msg pre.cw-code code { padding: 0; border-radius: 0; background: none; font-size: .92em; }
+.cw-msg pre.cw-code[data-lang]::before {
+  content: attr(data-lang); position: absolute; top: 4px; right: 8px;
+  font: 8.5px var(--f-hud); letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim);
+}
+.cw-msg .cw-quote { margin: 0; padding: 0 0 0 10px; border-left: 2px solid var(--ice-dim); color: var(--ice-dim); }
+.cw-msg .cw-table-wrap { overflow-x: auto; }
+.cw-msg .cw-table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.cw-msg .cw-table th, .cw-msg .cw-table td { padding: 3px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.cw-msg .cw-table th { color: var(--ice); font-weight: 600; }
+.cw-msg .cw-table tbody tr:last-child td { border-bottom: 0; }
+.cw-msg hr.cw-hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.cw-msg.user { white-space: pre-wrap; }
 .cw-msg.user { color: var(--gold); padding-left: 9px; border-left: 2px solid rgba(255,182,72,.45); }
 .cw-msg.jarvis { color: var(--text-hi); }
 .cw-msg.sys { color: var(--ice-dim); font-size: 10.5px; }

@@ -123,8 +123,11 @@ use it, but it is deliberately unfriendly to anything else:
   on another site cannot set without a preflight that is never granted.
 - Keys never reach the browser or a model; a key pasted into the chat is
   intercepted locally and stored server-side.
-- Replies are always rendered as text. Only `https` links become clickable, and
-  videos are embedded only from YouTube and Vimeo, by validated video ID.
+- Replies are always built from text, never from markup. Their Markdown is
+  read into tokens (by `marked`, used as a parser only) and each token is drawn
+  with `createElement` and text nodes, so an HTML tag in a reply appears as the
+  characters it is. Only `https` links become clickable, and videos are
+  embedded only from YouTube and Vimeo, by validated video ID.
 
 ## Subscriptions
 
