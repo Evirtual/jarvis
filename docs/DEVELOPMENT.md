@@ -67,7 +67,8 @@ the web version answers the same API calls in the browser
 | `src/client/browser-core.ts` | The console core with its keys in the browser's storage — the same calls the server answers |
 | `src/client/sensors.ts` | The web version's instruments: what a browser can genuinely measure of its device |
 | `src/client/workspace.ts` | Threads, groups, colours and their lifecycle, as pure data (plus migrations) |
-| `src/client/stage.ts` | The board: JARVIS, windows, bubbles, the bin — measured and moved by pointer; the pure parts are beside it |
+| `src/client/stage.ts` | The board drawn from the workspace and placed: windows, bubbles, the web; a press handed to the part that follows it |
+| `src/client/board-store.ts`, `core-canvas.ts`, `stage-pointer.ts`, `stage-phone.ts` | The stage's parts: the workspace loaded and saved; JARVIS drawn and where he is; carrying, sizing and dropping on the desktop (what a drop means); the list a phone shows instead, its order and the grip |
 | `src/client/surface.ts` | What every box on the board shares — window, bubble, panel: one pointer gesture at a time (tap or drag), sizing from corners and edges within one set of limits, carry past the edge and put down inside the board. The stage and `panels.ts` build on it; the pure parts are tested |
 | `src/client/board-geometry.ts`, `tidy.ts` | Pure and tested: keeping a window inside the board and clear of JARVIS, a free seat, bubbles nudged apart; the Tidy-up plan |
 | `src/client/message.ts` | One line in a window: links, and pictures and players for image and video results |

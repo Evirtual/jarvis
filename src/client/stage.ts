@@ -1,60 +1,47 @@
 /**
- * The stage: JARVIS in the middle, everything he is working on drifting around
- * him.
+ * The stage: JARVIS in the middle, everything he is working on around him.
  *
- *   core ──flowing spoke──> bubble (a group)
- *                             ├─ thread
- *                             └─ thread
+ *   core ──> bubble (a group)
+ *              ├─ thread
+ *              └─ thread
  *
- * Nothing here is a grid. Bubbles are soft fields that hang off the core on
- * curved, moving spokes; they drift a little at rest and glide when they move.
- * The light behind the core is fixed where he is (styles.css), so it never
- * slides when the window resizes. Windows and bubbles can be resized from any
- * edge or corner, dragged between bubbles, or dropped on the bin that rises
- * when you pick one up.
+ * Nothing here is a grid. Bubbles are soft fields that glide when they move;
+ * loose windows are placed on their own. Windows are real DOM — selectable,
+ * scrollable text — over a canvas that draws the core. This draws the board
+ * from the workspace and places what is on it; the parts it is made of are
+ * beside it:
  *
- * Threads are shown flat inside their bubble — no nesting, no wires strung
- * across the board. What connects them is shown on demand instead: open a
- * thread's web (⌗, or double-click it) and everything that shares its context
- * blooms out around it, near and bright for a strong connection, far and faint
- * for a passing one.
- *
- * Windows are real DOM — selectable, scrollable text — over a canvas that draws
- * the core and the spokes. On a phone the bubbles become a list
- * under the core.
+ *   board-store.ts    the workspace, loaded and saved
+ *   core-canvas.ts    JARVIS drawn, and where he is
+ *   stage-pointer.ts  carrying, sizing and dropping on the desktop
+ *   stage-phone.ts    the list a phone shows instead
+ *   web.ts            what else is about a thread, on demand
  */
 
 import { seat, separate, shown, type Rect, type Room } from "./board-geometry.js";
-import { KEY, recall, store } from "./storage.js";
-import { reduceMotion } from "./motion.js";
-import { CORE_R, DESIGN_R, drawCore, type Activity } from "./core-draw.js";
+import { BoardStore } from "./board-store.js";
+import { CoreCanvas, DECK_H, HEADER_H } from "./core-canvas.js";
+import { type Activity } from "./core-draw.js";
 import { ICON } from "./icons.js";
 import { line } from "./message.js";
-import { ContextWeb } from "./web.js";
+import { reduceMotion } from "./motion.js";
 import { forget, raise, stackKey, track } from "./stack.js";
+import { PhoneList } from "./stage-phone.js";
+import { BoardPointer } from "./stage-pointer.js";
+import { gestures } from "./surface.js";
 import { planTidy, type TidyItem } from "./tidy.js";
-import { averageHues, GENERAL_ID, Workspace, migrate, THREAD_HUES, threadRef, type Group, type Thread, isHexColour } from "./workspace.js";
-import { clamp } from "./num.js";
+import { ContextWeb, type Related } from "./web.js";
+import { averageHues, GENERAL_ID, THREAD_HUES, threadRef, type Group, type Thread, type Workspace, isHexColour } from "./workspace.js";
 
 export type { Thread, Group } from "./workspace.js";
 export type { Activity } from "./core-draw.js";
-
-/** How big JARVIS is on screen, and the size the core was drawn at. */
-const CORE_BOTTOM_GAP = 20;
-/** The deck at the bottom: readings, JARVIS, controls. */
-const DECK_H = 96;
-/** The title row across the top (threads, the JARVIS title, configuration): the board starts below it. Matches --header-h. */
-const HEADER_H = 56;
-/** Half the width of the column kept clear above JARVIS (his ring, status line and notices). */
-const CORE_ZONE = 150;
-/** Room above his ring for the status line and a notice. */
-const CORE_STATUS_ROOM = 44;
-
-import type { Related } from "./web.js";
-import { gestures, resized, sidesOf, sizeLimits } from "./surface.js";
 export type { Related } from "./web.js";
 
-interface Card {
+/** Half the width of the column kept clear above JARVIS (his ring, status line and notices). */
+const CORE_ZONE = 150;
+
+/** A thread's window on the board. */
+export interface Card {
   el: HTMLElement;
   body: HTMLElement;
   title: HTMLElement;
@@ -64,41 +51,34 @@ interface Card {
   sig: string;
 }
 
-/** Phone: a thread being dragged up or down the list by its title bar. */
-interface PhoneDrag {
-  id: string; sy: number; scroll0: number; started: boolean; wasActive: boolean;
-  list: HTMLElement; index: number; target: number; h: number;
-}
-
-interface Bubble {
+/** A group's bubble on the board. */
+export interface Bubble {
   el: HTMLElement;
   title: HTMLElement;
   count: HTMLElement;
   list: HTMLElement;
   node: HTMLElement;
-  /** Where it is drifting to, and its own phase so no two move alike. */
-  phase: number;
 }
 
 export class Stage {
-  private root: HTMLElement;
-  private canvas: HTMLCanvasElement;
-  private layer: HTMLElement;
-  private ctx: CanvasRenderingContext2D;
-  private w = 0;
-  private h = 0;
-  private dpr = Math.min(window.devicePixelRatio || 1, 2);
-  private cards = new Map<string, Card>();
-  private bubbles = new Map<string, Bubble>();
+  private readonly root: HTMLElement;
+  private readonly layer: HTMLElement;
+  private readonly store: BoardStore;
+  private readonly canvas: CoreCanvas;
+  private readonly pointer: BoardPointer;
+  private readonly phone: PhoneList;
+  private readonly web: ContextWeb;
+  private readonly cards = new Map<string, Card>();
+  private readonly bubbles = new Map<string, Bubble>();
   /** Where each bubble is actually drawn, in stage pixels. */
-  private boxes = new Map<string, Rect>();
+  private readonly boxes = new Map<string, Rect>();
   /** Lines that belong to a thread's window but not (yet) to its history. */
-  private liveEls = new Map<string, HTMLElement[]>();
+  private readonly liveEls = new Map<string, HTMLElement[]>();
 
-  ws: Workspace;
+  readonly ws: Workspace;
   amplitude = 0;
   activity: Activity = "idle";
-  /** The thread receiving an answer right now — its spoke carries a pulse. */
+  /** The thread receiving an answer right now. */
   streamingId: string | null = null;
   cpuLoad = 0;
   gpuLoad = 0;
@@ -110,8 +90,6 @@ export class Stage {
   bodyPainter: ((t: Thread, body: HTMLElement) => void) | null = null;
   onChange: (() => void) | null = null;
   onCoreTap: (() => void) | null = null;
-  /** After every save of the board: whether the browser kept it, and its size in characters (memory.ts). */
-  onSaved: ((kept: boolean, size: number) => void) | null = null;
   onArchive: ((id: string) => void) | null = null;
   onBranch: ((id: string) => void) | null = null;
   onNewThread: ((groupId: string) => void) | null = null;
@@ -119,84 +97,72 @@ export class Stage {
   onDropDelete: ((kind: "thread" | "group", id: string) => void) | null = null;
   /** What shares context with a thread — the web asks this when it opens. */
   relatedFor: ((id: string) => Related[]) | null = null;
+  /** After every save of the board: whether the browser kept it, and its size in characters (memory.ts). */
+  set onSaved(f: ((kept: boolean, size: number) => void) | null) { this.store.onSaved = f; }
 
-  private bin: HTMLElement;
-  private web: ContextWeb;
   private pulse = 0;
   private placeQueued = false;
-  /** The window being carried right now, for the drop targets worked out each frame. */
-  private carrying: string | null = null;
-  private sizer = new ResizeObserver(() => this.queuePlace());
-  private stick = new ResizeObserver((entries) => {
+  private readonly sizer = new ResizeObserver(() => this.queuePlace());
+  private readonly stick = new ResizeObserver((entries) => {
     for (const { target } of entries) {
       const b = target as HTMLElement;
       if (b.dataset.pinned !== "0") b.scrollTop = b.scrollHeight;
     }
   });
-  /**
-   * Phone: the order you've dragged the list into (thread ids). Anything newer
-   * than that order goes on top, newest first.
-   */
-  private phoneOrder: string[] = (() => {
-    try {
-      const v = JSON.parse(recall(KEY.phoneOrder) ?? "[]") as unknown;
-      return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
-    } catch { return []; }
-  })();
   /** The thread last brought to the top for being the active one. */
   private raisedFor = "";
   /** Threads already on the board, so a new one can be scrolled to on a phone. */
   private known: Set<string> | null = null;
-  /** While a window is carried: where the pointer is, and what it would drop on. */
-  private hitAt: { x: number; y: number; id: string } | null = null;
-  private hitQueued = false;
-  private dropCard: string | null = null;
-  private dropGroup: string | null = null;
 
   constructor(root: HTMLElement, canvas: HTMLCanvasElement, layer: HTMLElement) {
     this.root = root;
-    this.canvas = canvas;
     this.layer = layer;
-    const c = canvas.getContext("2d");
-    if (!c) throw new Error("no 2d context");
-    this.ctx = c;
+    this.store = new BoardStore();
+    this.ws = this.store.ws;
+    this.canvas = new CoreCanvas(root, canvas);
 
-    this.bin = document.createElement("div");
-    this.bin.className = "bin";
-    this.bin.hidden = true;
-    this.bin.innerHTML =
-      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true">` +
-      `<path d="M4 7h16M9.5 7V4.8h5V7M6.5 7l1 12.2h9l1-12.2M10 10.5v6M14 10.5v6"/></svg><span>Drop to delete</span>`;
-    root.append(this.bin);
-
+    this.pointer = new BoardPointer({
+      root, ws: this.ws,
+      card: (id) => this.cards.get(id), cards: () => this.cards.entries(),
+      bubble: (gid) => this.bubbles.get(gid), bubbles: () => this.bubbles.entries(),
+      boxOf: (gid) => this.boxes.get(gid),
+      room: () => this.room, shown: (r) => this.shown(r), onCore: (x, y) => this.canvas.onCore(x, y),
+      focus: (id) => this.focus(id), commit: () => this.commit(), save: () => this.save(),
+      place: () => this.place(), renderAll: () => this.renderAll(), setFolded: (gid, f) => this.setFolded(gid, f),
+      applySize: (id) => this.applySize(id), applyGroupSize: (gid) => this.applyGroupSize(gid),
+      dropDelete: (kind, id) => this.onDropDelete?.(kind, id),
+    });
+    this.phone = new PhoneList({
+      root, layer, ws: this.ws, compact: () => this.compact,
+      card: (id) => this.cards.get(id), cards: () => this.cards.entries(), bubbles: () => this.bubbles.values(),
+      coreFloor: () => this.canvas.coreFloor,
+      focus: (id) => this.focus(id), commit: () => this.commit(), save: () => this.save(),
+    });
     this.web = new ContextWeb({
       root,
       thread: (id) => this.ws.thread(id),
       hueOf: (t) => { const c = t.color ?? this.hueOf(this.ws.groupOf(t)); return isHexColour(c) ? c : THREAD_HUES[0]; },
       related: (id) => this.relatedFor?.(id) ?? [],
-      board: () => ({ top: HEADER_H + this.inset.top + 8, bottom: this.floor - DECK_H - 24 }),
+      board: () => ({ top: HEADER_H + this.canvas.inset.top + 8, bottom: this.canvas.floor - DECK_H - 24 }),
       pick: (id) => { this.focus(id); this.reveal(id); },
     });
 
-    this.ws = new Workspace(this.load());
-    this.resize();
-    this.anchorToCorner();
+    this.canvas.resize();
+    this.store.anchorToCorner(this.canvas.w || root.clientWidth, this.canvas.h || root.clientHeight);
     this.save();
-    new ResizeObserver(() => { this.resize(); this.place(); }).observe(root);
-    // A phone's list shares its height by what each thread holds (fitList):
+    new ResizeObserver(() => { this.canvas.resize(); this.place(); }).observe(root);
+    // A phone's list shares its height by what each thread holds (stage-phone.ts):
     // measured again whenever anything in the list changes or finishes loading.
-    new MutationObserver(() => this.scheduleFit()).observe(layer, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "hidden"] });
-    layer.addEventListener("load", () => this.scheduleFit(), true);
+    new MutationObserver(() => this.phone.scheduleFit()).observe(layer, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "hidden"] });
+    layer.addEventListener("load", () => this.phone.scheduleFit(), true);
 
-    // Every press begins a gesture (surface.ts follows it to its end); the
-    // cursor over JARVIS is the one thing watched between gestures.
+    // Every press begins a gesture (surface.ts follows it to its end).
     root.addEventListener("pointerdown", (e) => this.onDown(e));
-    window.addEventListener("pointermove", (e) => this.cursorAt(e));
     root.addEventListener("dblclick", (e) => {
       const card = (e.target as HTMLElement).closest<HTMLElement>(".chatwin");
       if (card) { this.openWeb(card.dataset.id!); return; }
       if (this.compact || (e.target as HTMLElement).closest(".bubble, .cmd, .panel, .deck, .topbar")) return;
-      if (this.onCore(e.clientX, e.clientY)) return;
+      if (this.canvas.onCore(e.clientX, e.clientY)) return;
       this.onNewThread?.(GENERAL_ID);
     });
 
@@ -207,51 +173,18 @@ export class Stage {
     const frame = (t: number): void => {
       const resting = this.activity === "idle" && this.pulse <= 0 && !gestures.busy;
       skip = resting && !skip;
-      if (!skip) this.draw(t);
+      if (!skip) {
+        this.canvas.draw(t, { activity: this.activity, amplitude: this.amplitude, cpuLoad: this.cpuLoad, gpuLoad: this.gpuLoad, pulse: this.pulse });
+        if (this.pulse > 0) this.pulse -= 0.02;
+      }
       requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
   }
 
-  /* ---------------- persistence ---------------- */
+  /* ---------------- the board as data ---------------- */
 
-  /**
-   * The saved workspace, or the older flat list of threads brought forward.
-   * The old key is left untouched, so nothing is ever lost to a migration.
-   */
-  private load() {
-    try {
-      const raw = recall(KEY.workspace);
-      if (raw) return migrate(JSON.parse(raw));
-    } catch { /* corrupt — fall through to the older save */ }
-    try {
-      const legacy = localStorage.getItem("jarvis.threads");
-      if (legacy) return migrate(JSON.parse(legacy), localStorage.getItem("jarvis.activeThread"));
-    } catch { /* nothing usable */ }
-    return migrate(null);
-  }
-
-  save(): void {
-    const json = JSON.stringify(this.ws.data);
-    this.onSaved?.(store(KEY.workspace, json), json.length);
-  }
-
-  /**
-   * Older saves measured positions from the stage centre, so every window
-   * slid about whenever the screen changed width. Measure from the top-left
-   * corner instead — as the instrument panels do — converting once, where
-   * things are on this screen now.
-   */
-  private anchorToCorner(): void {
-    const d = this.ws.data;
-    if (d.anchor === "corner") return;
-    const dx = Math.round((this.w || this.root.clientWidth) / 2), dy = Math.round((this.h || this.root.clientHeight) / 2);
-    for (const p of [...d.groups, ...d.threads]) {
-      if (p.x !== undefined) p.x += dx;
-      if (p.y !== undefined) p.y += dy;
-    }
-    d.anchor = "corner";
-  }
+  save(): void { this.store.save(); }
 
   /** Save, redraw and tell the console the board changed. */
   commit(): void {
@@ -286,6 +219,9 @@ export class Stage {
     this.renderAll();
     this.onFocus?.(id);
   }
+
+  /** On a phone, bring the window in front into view in the list. */
+  reveal(id = this.ws.activeId): void { this.phone.reveal(id); }
 
   /**
    * Tidy the board: every thread is folded to its title bar, then everything
@@ -372,9 +308,9 @@ export class Stage {
 
   /**
    * Draw a thread's conversation afresh from its history on the next commit —
-   * after messages were taken out of it (cleared, or moved to a thread of
-   * their own). A window otherwise redraws only when its history grows or
-   * shrinks from what it last drew, which a removal can happen to match.
+   * after messages were taken out of it (cleared). A window otherwise redraws
+   * only when its history grows or shrinks from what it last drew, which a
+   * removal can happen to match.
    */
   redraw(id: string): void {
     const c = this.cards.get(id);
@@ -411,15 +347,8 @@ export class Stage {
     el.querySelector(".cw-del")!.addEventListener("click", (e) => { e.stopPropagation(); this.onDropDelete?.("thread", t.id); });
     el.querySelector(".cw-b")!.addEventListener("click", (e) => { e.stopPropagation(); this.onBranch?.(t.id); });
     el.querySelector(".cw-w")!.addEventListener("click", (e) => { e.stopPropagation(); this.openWeb(t.id); });
-    // Every corner resets on a double-click, as each one's tooltip promises.
-    el.querySelector(".cw-grip-m")?.addEventListener("dblclick", (e) => {
-      e.stopPropagation();
-      const th = this.ws.thread(t.id);
-      if (!th?.mh) return;
-      delete th.mh;
-      this.save();
-      this.scheduleFit();
-    });
+    // Every grip resets on a double-click, as each one's tooltip promises.
+    el.querySelector(".cw-grip-m")?.addEventListener("dblclick", (e) => { e.stopPropagation(); this.phone.releaseHeight(t.id); });
     for (const grip of el.querySelectorAll(".cw-grip")) grip.addEventListener("dblclick", (e) => {
       e.stopPropagation();
       const th = this.ws.thread(t.id);
@@ -528,7 +457,6 @@ export class Stage {
       count: el.querySelector(".bb-count")!,
       list: el.querySelector(".bb-list")!,
       node: el.querySelector(".bb-node")!,
-      phase: Math.random() * Math.PI * 2,
     };
     el.querySelector(".bb-add")!.addEventListener("click", (e) => { e.stopPropagation(); this.onNewThread?.(g.id); });
     el.querySelector(".bb-fold")!.addEventListener("click", (e) => { e.stopPropagation(); this.setFolded(g.id, true); });
@@ -573,7 +501,7 @@ export class Stage {
     for (const g of visible) {
       const b = this.bubble(g);
       seen.add(g.id);
-      const members = this.phoneSorted(this.ws.treeOrder(g.id));
+      const members = this.phone.sorted(this.ws.treeOrder(g.id));
       // Threads that belong to no group aren't a group: no name, no shell —
       // each just hangs off the core on its own.
       const loose = g.id === GENERAL_ID;
@@ -638,76 +566,6 @@ export class Stage {
     }
   }
 
-  /** On a phone: the order you dragged threads into, with anything newer on top, newest first. */
-  private phoneSorted(list: Thread[]): Thread[] {
-    if (!this.compact) return list;
-    const rank = new Map(this.phoneOrder.map((id, i) => [id, i] as const));
-    return [...list].sort((a, b) => {
-      const ra = rank.get(a.id), rb = rank.get(b.id);
-      if (ra === undefined && rb === undefined) return b.createdAt - a.createdAt;
-      if (ra === undefined) return -1;
-      if (rb === undefined) return 1;
-      return ra - rb;
-    });
-  }
-
-  /** Phone: follow a thread being dragged up or down its list; the others make way. */
-  private movePhoneDrag(d: PhoneDrag, e: PointerEvent): void {
-    const c = this.cards.get(d.id);
-    if (!c) return;
-    if (!d.started) {
-      d.started = true;
-      const all = this.phoneCards(d.list);
-      d.index = d.target = all.indexOf(c.el);
-      d.h = c.el.offsetHeight + (parseFloat(getComputedStyle(d.list).rowGap) || 8);
-      c.el.classList.add("reordering");
-      d.list.classList.add("reorder");
-      this.root.classList.add("carrying");
-    }
-    // Near the top or bottom of the list, it scrolls along.
-    const box = this.layer.getBoundingClientRect();
-    if (e.clientY < box.top + 48) this.layer.scrollTop -= 12;
-    else if (e.clientY > this.coreFloor - 24) this.layer.scrollTop += 12;
-    const dy = e.clientY - d.sy + (this.layer.scrollTop - d.scroll0);
-    c.el.style.transform = `translateY(${Math.round(dy)}px)`;
-    // Where it would land: past the middle of each neighbour it has crossed.
-    const all = this.phoneCards(d.list);
-    const mid = c.el.offsetTop + c.el.offsetHeight / 2 + dy;
-    d.target = all.filter((el) => el !== c.el && el.offsetTop + el.offsetHeight / 2 < mid).length;
-    all.forEach((el, j) => {
-      if (el === c.el) return;
-      const shift = j > d.index && j <= d.target ? -d.h : j < d.index && j >= d.target ? d.h : 0;
-      el.style.transform = shift ? `translateY(${shift}px)` : "";
-    });
-  }
-
-  private phoneCards(list: HTMLElement): HTMLElement[] {
-    return ([...list.children] as HTMLElement[]).filter((el) => el.classList.contains("chatwin"));
-  }
-
-  /** Phone: let go of a thread — a tap folds or focuses it, a drag puts it where it was heading. */
-  private endPhoneDrag(d: PhoneDrag, moved: boolean): void {
-    const t = this.ws.thread(d.id);
-    if (!t) return;
-    if (!moved) {
-      if (!d.wasActive) this.focus(t.id);
-      else { this.ws.setOpen(t.id, !this.ws.isOpen(t)); this.commit(); }
-      return;
-    }
-    const all = this.phoneCards(d.list);
-    const ids = all.map((el) => el.dataset.id ?? "").filter((id) => id && id !== d.id);
-    ids.splice(d.target, 0, d.id);
-    // no easing back: the list is simply redrawn in its new order
-    d.list.classList.remove("reorder");
-    for (const el of all) el.style.transform = "";
-    this.cards.get(d.id)?.el.classList.remove("reordering");
-    this.root.classList.remove("carrying");
-    this.phoneOrder = [...ids, ...this.phoneOrder.filter((id) => !ids.includes(id))];
-    store(KEY.phoneOrder, JSON.stringify(this.phoneOrder));
-    if (!d.wasActive) this.ws.focus(t.id);
-    this.commit();
-  }
-
   private paintCard(t: Thread): void {
     const c = this.card(t);
     const on = t.id === this.ws.activeId;
@@ -745,7 +603,7 @@ export class Stage {
     c.body.scrollTop = c.body.scrollHeight;
   }
 
-  /* ---------------- placing bubbles ---------------- */
+  /* ---------------- placing ---------------- */
 
   private queuePlace(): void {
     if (this.placeQueued) return;
@@ -753,35 +611,15 @@ export class Stage {
     requestAnimationFrame(() => { this.placeQueued = false; this.place(); });
   }
 
-  /**
-   * Where the core is drawn: the middle of the deck at the bottom, always. He
-   * is the console's one fixed point — the board arranges itself around him
-   * instead of him getting out of its way.
-   */
-  private core(): { cx: number; cy: number } {
-    // Sitting in the deck, rising a little above it.
-    return { cx: this.w / 2, cy: this.floor - CORE_R - CORE_BOTTOM_GAP };
-  }
-
   /** Stage bounds the board must stay inside: the whole stage above the deck. */
-  private get bounds(): { top: number; bottom: number; left: number; right: number } {
+  private get bounds(): Room["bounds"] {
     // the same 16px edge margin as the title row, the deck and the panels (--edge)
-    return { top: HEADER_H + this.inset.top + 4, bottom: this.floor - DECK_H - 8, left: 16, right: this.w - 16 };
-  }
-
-  /**
-   * The top of the space kept clear above JARVIS: his ring rises above the
-   * deck, and his status line and notices sit just over it. Anything in his
-   * column stops here, so nothing on the board ever covers him.
-   */
-  private get coreFloor(): number {
-    const { cy } = this.core();
-    return cy - (CORE_R * (DESIGN_R + 8)) / DESIGN_R - CORE_STATUS_ROOM;
+    return { top: HEADER_H + this.canvas.inset.top + 4, bottom: this.canvas.floor - DECK_H - 8, left: 16, right: this.canvas.w - 16 };
   }
 
   /** The board as it is right now: its edges, and the column kept clear above JARVIS. Panels sit by it too. */
   get room(): Room {
-    return { bounds: this.bounds, cx: this.core().cx, coreZone: CORE_ZONE, coreFloor: this.coreFloor };
+    return { bounds: this.bounds, cx: this.canvas.core().cx, coreZone: CORE_ZONE, coreFloor: this.canvas.coreFloor };
   }
 
   /** Where a window or bubble is actually shown: inside the board, clear of the deck and of JARVIS. */
@@ -799,14 +637,14 @@ export class Stage {
   }
 
   private place(): void {
-    this.placeLabel();
+    this.canvas.publish();
     if (this.compact) {
       for (const b of this.bubbles.values()) { b.el.style.transform = ""; b.el.classList.remove("unplaced"); }
       this.boxes.clear();
-      this.scheduleFit();
+      this.phone.scheduleFit();
       return;
     }
-    if (this.fitted) this.fitList(); // back on a wide screen: the phone's limits come off
+    this.phone.fit(); // back on a wide screen: the phone's limits come off
     const placed: { id: string; b: Bubble; r: Rect; here: boolean }[] = [];
     const unseated: Group[] = [];
     for (const g of this.ws.visibleGroups) {
@@ -828,7 +666,7 @@ export class Stage {
       const b = this.bubbles.get(g.id)!;
       const w = b.el.offsetWidth, h = b.el.offsetHeight;
       if (!w || !h) continue; // not laid out yet; try again next frame
-      const r = this.seat(w, h, [...placed.map((p) => p.r), ...loose, ...this.panelObstacles()]);
+      const r = seat(w, h, [...placed.map((p) => p.r), ...loose, ...this.panelObstacles()], this.room);
       g.x = Math.round(r.x);
       g.y = Math.round(r.y);
       placed.push({ id: g.id, b, r, here: b.el.classList.contains("here") });
@@ -836,7 +674,7 @@ export class Stage {
     }
     // Reflow only newly seated groups. A manual resize must never shove other
     // conversations down the board; their saved positions remain their own.
-    if (seated) this.separate(placed);
+    if (seated) separate(placed, this.room);
     for (const p of placed) {
       p.b.el.style.transform = `translate3d(${p.r.x}px, ${p.r.y}px, 0)`;
       if (p.b.el.classList.contains("unplaced")) {
@@ -876,7 +714,7 @@ export class Stage {
       if (!w || !h) continue;
       let r: Rect;
       if (t.x === undefined || t.y === undefined) {
-        r = this.seat(w, h, [...taken, ...this.panelObstacles()]);
+        r = seat(w, h, [...taken, ...this.panelObstacles()], this.room);
         t.x = Math.round(r.x);
         t.y = Math.round(r.y);
         changed = true;
@@ -888,137 +726,13 @@ export class Stage {
     if (changed) this.save();
   }
 
-  /** Nudge overlapping bubbles apart for display; the one you're working in stays still. */
-  private separate(placed: { r: Rect; here: boolean }[]): void {
-    separate(placed, this.room);
-  }
-
-  /** A free seat begins in the board's centre, then works outward. */
-  private seat(w: number, h: number, taken: Rect[]): Rect {
-    return seat(w, h, taken, this.room);
-  }
-
-  /**
-   * Publish where the core is, so the glow and the layout can follow it:
-   *   --status-y   the one line just above JARVIS where everything he says in
-   *                passing appears — his status word, a notice, the bin;
-   *   --core-clear how far up from the bottom anything opening over the deck
-   *                must stop so it never covers him.
-   */
-  private placeLabel(): void {
-    const { cx, cy } = this.core();
-    const s = this.root.style;
-    // His outermost ring.
-    const coreTop = cy - (CORE_R * (DESIGN_R + 8)) / DESIGN_R;
-    s.setProperty("--core-x", `${cx}px`);
-    s.setProperty("--deck-h", `${DECK_H + this.inset.bottom}px`); // the deck grows by the inset, so its buttons keep their place beside the core
-    s.setProperty("--status-y", `${Math.round(coreTop - 10)}px`);
-    s.setProperty("--core-clear", `${Math.round(this.h - coreTop + 8)}px`);
-  }
-
-  private onCore(clientX: number, clientY: number): boolean {
-    const r = this.root.getBoundingClientRect();
-    const { cx, cy } = this.core();
-    return Math.hypot(clientX - r.left - cx, clientY - r.top - cy) <= CORE_R + 14;
-  }
-
   /* ---------------- the web: what else is about this ---------------- */
 
   openWeb(id: string): void { this.web.open(id); }
   closeWeb(): boolean { return this.web.close(); }
   get webOpen(): boolean { return this.web.isOpen; }
 
-
-  /* ---------------- phone: threads share the list's height ---------------- */
-
-  /** A thread with anything in it keeps at least this much of the list (its title bar and a few lines). */
-  private static readonly PHONE_MIN = 150;
-  private fitPending = 0;
-  private fitted = false;
-
-  private scheduleFit(): void {
-    if (this.fitPending) return;
-    const run = (): void => { this.fitPending = 0; this.fitList(); };
-    // Animation frames stop while the page is hidden (another app in front on a phone); a timer doesn't.
-    this.fitPending = document.hidden ? window.setTimeout(run, 0) : requestAnimationFrame(run);
-  }
-
-  /**
-   * On a phone every thread is a flex item that starts from nothing and grows
-   * equally with the others (styles.css, .m-compact .chatwin) — up to a limit,
-   * which is its own natural height, measured here: a short exchange keeps its
-   * size and the room it doesn't need goes to the long ones; two long ones
-   * split the space; one alone may take all of it, if it has that much to
-   * show. The limits are set in pixels because a browser sizes a nested flex
-   * column from its items' minimums, not from what they hold. Past the
-   * minimums the list scrolls.
-   */
-  private fitList(): void {
-    if (!this.compact) {
-      if (!this.fitted) return;
-      for (const c of this.cards.values()) { c.el.style.maxHeight = ""; c.el.style.minHeight = ""; }
-      for (const b of this.bubbles.values()) { b.el.style.maxHeight = ""; b.el.style.minHeight = ""; }
-      this.fitted = false;
-      return;
-    }
-    this.fitted = true;
-    // Everything is measured first and set after, so the layout is read once.
-    const px = (v: string): number => Number.parseFloat(v) || 0;
-    /** What a window's body holds, however the body is stretched or squeezed right now: its lines, their margins, the gaps, its own padding. */
-    const held = (body: HTMLElement): number => {
-      const cs = getComputedStyle(body);
-      let h = px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
-      let n = 0;
-      for (const k of body.children) {
-        if (!(k instanceof HTMLElement) || k.hidden) continue;
-        const ks = getComputedStyle(k);
-        h += k.getBoundingClientRect().height + px(ks.marginTop) + px(ks.marginBottom);
-        n += 1;
-      }
-      return h + Math.max(0, n - 1) * px(cs.rowGap);
-    };
-    const cards = new Map<HTMLElement, { max: number; min: number }>();
-    for (const [id, c] of this.cards) {
-      if (c.el.offsetHeight === 0) continue; // not shown
-      const t = this.ws.thread(id);
-      if (t?.mh && this.ws.isOpen(t)) { cards.set(c.el, { max: t.mh, min: t.mh }); continue; } // a height of the reader's own
-      const chrome = c.el.offsetHeight - c.body.offsetHeight; // title bar, borders, padding
-      const max = Math.ceil(chrome + held(c.body));
-      cards.set(c.el, { max, min: Math.min(Stage.PHONE_MIN, max) });
-    }
-    const groups = new Map<HTMLElement, { max: number; min: number } | null>();
-    for (const b of this.bubbles.values()) {
-      if (b.el.offsetHeight === 0 || b.el.classList.contains("collapsed") || b.list.offsetHeight === 0) { groups.set(b.el, null); continue; }
-      const kids = [...b.list.children].filter((k): k is HTMLElement => k instanceof HTMLElement && k.offsetHeight > 0);
-      const bs = getComputedStyle(b.el), ls = getComputedStyle(b.list);
-      const gaps = Math.max(0, kids.length - 1) * px(ls.rowGap);
-      // The group's name and frame, from their own measures — never from the
-      // bubble's current height, which may be stretched (see held()).
-      const head = b.el.querySelector<HTMLElement>(".bb-head");
-      const chrome = px(bs.paddingTop) + px(bs.paddingBottom) + px(bs.borderTopWidth) + px(bs.borderBottomWidth)
-        + px(ls.paddingTop) + px(ls.paddingBottom) + px(ls.borderTopWidth) + px(ls.borderBottomWidth)
-        + (head && head.offsetHeight > 0 ? head.offsetHeight + px(getComputedStyle(head).marginTop) + px(getComputedStyle(head).marginBottom) : 0);
-      let max = chrome + gaps, min = chrome + gaps;
-      for (const k of kids) { const n = cards.get(k); max += n?.max ?? k.offsetHeight; min += n?.min ?? k.offsetHeight; }
-      groups.set(b.el, { max: Math.ceil(max), min: Math.ceil(min) });
-    }
-    for (const [el, n] of cards) { el.style.maxHeight = `${n.max}px`; el.style.minHeight = `${n.min}px`; }
-    for (const [el, n] of groups) { el.style.maxHeight = n ? `${n.max}px` : ""; el.style.minHeight = n ? `${n.min}px` : ""; }
-  }
-
-  /** On a phone, bring the window in front into view in the list. */
-  reveal(id = this.ws.activeId): void {
-    if (!this.compact) return;
-    this.cards.get(id)?.el.scrollIntoView({ block: "nearest" });
-  }
-
-  /* ---------------- pointer ---------------- *
-   * Every box here — a window, a bubble — is carried, sized and folded the
-   * way every box on the board is (surface.ts): the press decides what was
-   * pressed, and hands the gesture its handlers. What is particular to the
-   * stage is what a drop means: on another window, a group; on a bubble,
-   * membership; on the bin, deletion; on JARVIS, out of its group.
-   * ------------------------------------------------------------------- */
+  /* ---------------- a press: what was pressed, and who follows it ---------------- */
 
   private onDown(e: PointerEvent): void {
     const target = e.target as HTMLElement;
@@ -1026,7 +740,7 @@ export class Stage {
     const overUi = target.closest(".bubble, .cmd, .panel, .deck, .topbar");
 
     // JARVIS himself: the one control that is always in the same place.
-    if (!overUi && this.onCore(e.clientX, e.clientY)) { e.preventDefault(); this.onCoreTap?.(); return; }
+    if (!overUi && this.canvas.onCore(e.clientX, e.clientY)) { e.preventDefault(); this.onCoreTap?.(); return; }
 
     // Whatever you touch comes to the top — above other threads and panels.
     const surface = target.closest<HTMLElement>(".chatwin, .bubble:not(.loose)");
@@ -1037,19 +751,19 @@ export class Stage {
 
     // A corner or an edge: size the window, or the bubble.
     const grip = target.closest<HTMLElement>(".cw-grip, .bb-grip");
-    if (grip) { this.beginSize(e, grip); return; }
+    if (grip) { this.pointer.size(e, grip); return; }
 
     // A bubble, by its name bar or — folded — by the orb itself.
     const bubEl = target.closest<HTMLElement>(".bubble");
     const onHead = target.closest(".bb-head") && !target.closest("button");
     const onNode = target.closest(".bb-node");
-    if (bubEl && (onHead || onNode)) { this.beginCarryGroup(e, bubEl, !!onNode); return; }
+    if (bubEl && (onHead || onNode)) { this.pointer.carryGroup(e, bubEl, !!onNode); return; }
 
     // A thread window: click to bring it forward, its title bar to fold it,
     // and drag that bar to move or group it.
     const card = target.closest<HTMLElement>(".chatwin");
     if (!card || target.closest(".cw-x, .cw-del, .cw-b, .cw-w")) return;
-    this.beginCarryCard(e, card, !!target.closest(".cw-head"));
+    this.pointer.carryCard(e, card, !!target.closest(".cw-head"));
   }
 
   /**
@@ -1065,8 +779,8 @@ export class Stage {
     if (card) {
       const t = this.ws.thread(card.dataset.id);
       if (!t) return;
-      if (target.closest(".cw-head") && card.parentElement) { this.beginPhoneDrag(e, t, card.parentElement); return; }
-      if (target.closest(".cw-grip-m")) { this.beginPhoneSize(e, t, card); return; }
+      if (target.closest(".cw-head") && card.parentElement) { this.phone.beginDrag(e, t, card.parentElement); return; }
+      if (target.closest(".cw-grip-m")) { this.phone.beginSize(e, t, card); return; }
       if (t.id !== this.ws.activeId) this.focus(t.id);
       return;
     }
@@ -1074,338 +788,4 @@ export class Stage {
     const g = bub ? this.ws.group(bub.dataset.gid) : undefined;
     if (g && g.id !== GENERAL_ID && target.closest(".bb-head, .bb-node")) this.setFolded(g.id, !g.collapsed);
   }
-
-  /** A window or a bubble sized from a corner or an edge, within the board's limits, the opposite side staying put. */
-  private beginSize(e: PointerEvent, grip: HTMLElement): void {
-    const sides = sidesOf(grip.dataset.corner ?? "se");
-    const isGroup = grip.classList.contains("bb-grip");
-    const el = grip.closest<HTMLElement>(isGroup ? ".bubble" : ".chatwin")!;
-    const id = isGroup ? el.dataset.gid! : el.dataset.id!;
-    const t = isGroup ? undefined : this.ws.thread(id);
-    const c = isGroup ? undefined : this.cards.get(id);
-    // Only a loose window is sized by hand; one inside a group takes the
-    // group's width, and it is the group that is resized.
-    if (!isGroup && (!t || !c || t.groupId !== GENERAL_ID)) return;
-    const box = isGroup ? this.boxes.get(id) : undefined;
-    // What the drag sets: a bubble's own height; a window's body, with its
-    // title bar on top of that.
-    const start = isGroup
-      ? { x: box?.x ?? 0, y: box?.y ?? 0, w: el.offsetWidth, h: el.offsetHeight }
-      : { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: c!.body.offsetHeight };
-    const lim = sizeLimits(this.room);
-    if (!isGroup) lim.maxH = Math.max(lim.minH, lim.maxH - 50);
-    el.classList.add("sizing");
-    e.preventDefault();
-    gestures.begin(e, {
-      travel: 0,
-      move: (_ev, dx, dy) => {
-        const r = resized(start, sides, dx, dy, lim);
-        if (isGroup) {
-          const g = this.ws.group(id);
-          if (!g) return;
-          g.size = { w: r.w, h: r.h };
-          delete g.fit;
-          if (box) { g.x = Math.round(r.x); g.y = Math.round(r.y); }
-          this.applyGroupSize(id);
-        } else {
-          t!.size = { w: r.w, h: r.h };
-          delete t!.fit;
-          t!.x = Math.round(r.x);
-          t!.y = Math.round(r.y);
-          this.applySize(id);
-        }
-        if (sides.ex < 0 || sides.ey < 0) this.place();
-      },
-      end: () => { el.classList.remove("sizing"); this.commit(); },
-    });
-  }
-
-  /**
-   * A bubble carried by its name bar — wherever the pointer takes it, over
-   * the edge included, as a window is — and put down inside the board
-   * (place → shown). A tap on the name bar folds it; a tap on the folded
-   * orb opens it — as a thread's title bar folds and opens it.
-   */
-  private beginCarryGroup(e: PointerEvent, bubEl: HTMLElement, onNode: boolean): void {
-    const g = this.ws.group(bubEl.dataset.gid);
-    if (!g) return;
-    const box = bubEl.getBoundingClientRect();
-    const dx0 = box.left - e.clientX, dy0 = box.top - e.clientY;
-    e.preventDefault();
-    let lifted = false;
-    gestures.begin(e, {
-      travel: 5,
-      move: (ev) => {
-        if (!lifted) { lifted = true; this.showBin(true); bubEl.classList.add("dragging"); }
-        const r = this.root.getBoundingClientRect();
-        g.x = Math.round(ev.clientX + dx0 - r.left);
-        g.y = Math.round(ev.clientY + dy0 - r.top);
-        bubEl.style.transform = `translate3d(${g.x}px, ${g.y}px, 0)`;
-        this.overBin(ev.clientX, ev.clientY);
-      },
-      end: (ev, moved) => {
-        bubEl.classList.remove("dragging");
-        const binned = moved && this.overBin(ev.clientX, ev.clientY);
-        this.showBin(false);
-        if (binned) { this.onDropDelete?.("group", g.id); return; }
-        if (!moved) { this.setFolded(g.id, !onNode); return; }
-        this.place();
-        this.save();
-      },
-    });
-  }
-
-  /**
-   * A window: the first click on an inactive one only brings it forward;
-   * the title bar of the one you're in folds it. Carried past a few pixels
-   * it lifts, and where it is let go decides what happens (dropCard).
-   */
-  private beginCarryCard(e: PointerEvent, card: HTMLElement, onHead: boolean): void {
-    const id = card.dataset.id!;
-    const wasActive = id === this.ws.activeId;
-    if (!wasActive) this.focus(id);
-    const box = card.getBoundingClientRect();
-    const ox = e.clientX - box.left, oy = e.clientY - box.top;
-    if (onHead) e.preventDefault();
-    gestures.begin(e, {
-      travel: 7,
-      move: (ev, dx, dy) => {
-        const c = this.cards.get(id);
-        if (!c) return;
-        if (this.carrying !== id) {
-          this.carrying = id;
-          c.el.classList.add("lifted");
-          // Carried where it is, by a transform. Moving the window to another
-          // parent would reload anything in it — a video would stop and restart.
-          c.el.closest(".bubble")?.classList.add("carrying");
-          this.root.classList.add("carrying");
-          this.showBin(true);
-        }
-        c.el.style.transform = `translate(${Math.round(dx)}px, ${Math.round(dy)}px)`;
-        // What it would land on — another thread (making a group), a bubble, the
-        // bin — is worked out once a frame, not on every pointer event: measuring
-        // every window that often makes a heavy one (a playing video) stutter.
-        this.hitAt = { x: ev.clientX, y: ev.clientY, id };
-        if (!this.hitQueued) {
-          this.hitQueued = true;
-          requestAnimationFrame(() => {
-            this.hitQueued = false;
-            const h = this.hitAt;
-            if (!h || this.carrying !== h.id) return;
-            const ontoCard = this.cardAt(h.x, h.y, h.id);
-            const over = ontoCard ? null : this.bubbleAt(h.x, h.y);
-            const dropGroup = over && over !== this.ws.thread(h.id)?.groupId ? over : null;
-            if (ontoCard !== this.dropCard) {
-              if (this.dropCard) this.cards.get(this.dropCard)?.el.classList.remove("drop");
-              if (ontoCard) this.cards.get(ontoCard)?.el.classList.add("drop");
-              this.dropCard = ontoCard;
-            }
-            if (dropGroup !== this.dropGroup) {
-              if (this.dropGroup) this.bubbles.get(this.dropGroup)?.el.classList.remove("drop");
-              if (dropGroup) this.bubbles.get(dropGroup)?.el.classList.add("drop");
-              this.dropGroup = dropGroup;
-            }
-            this.overBin(h.x, h.y);
-          });
-        }
-      },
-      end: (ev, moved) => this.putDownCard(ev, id, moved, onHead, wasActive, ox, oy),
-    });
-  }
-
-  /** What letting go of a window means: a fold, a new group, a new home, the bin, or a new seat. */
-  private putDownCard(e: PointerEvent, id: string, moved: boolean, onHead: boolean, wasActive: boolean, ox: number, oy: number): void {
-    this.carrying = null;
-    const c = this.cards.get(id);
-    for (const b of this.bubbles.values()) b.el.classList.remove("drop");
-    for (const x of this.cards.values()) x.el.classList.remove("drop");
-    this.hitAt = null; this.dropCard = null; this.dropGroup = null;
-    if (!c) { this.showBin(false); return; }
-
-    // The first click on an inactive card only focuses it. Folding is a
-    // separate, deliberate second click on the active title bar.
-    if (!moved) {
-      this.showBin(false);
-      if (!onHead || !wasActive) return;
-      const t = this.ws.thread(id);
-      if (!t) return;
-      this.ws.setOpen(t.id, !this.ws.isOpen(t));
-      this.commit();
-      return;
-    }
-
-    // Let go: its carry (transform) and its place (left/top, set below) ease
-    // back together over the same time, so from where it was dropped it glides
-    // to where it is put down — as a bubble and a panel do.
-    c.el.classList.remove("lifted");
-    c.el.style.transform = "";
-    c.el.closest(".bubble")?.classList.remove("carrying");
-    this.root.classList.remove("carrying");
-    const binned = this.overBin(e.clientX, e.clientY);
-    this.showBin(false);
-    const t = this.ws.thread(id);
-    if (!t) { this.renderAll(); return; }
-    if (binned) { this.renderAll(); this.onDropDelete?.("thread", t.id); return; }
-
-    const ontoCard = this.cardAt(e.clientX, e.clientY, id);
-    const over = this.bubbleAt(e.clientX, e.clientY);
-    const dropAt = (): void => {
-      const r = this.root.getBoundingClientRect();
-      const seat = this.shown({
-        x: e.clientX - r.left - ox,
-        y: e.clientY - r.top - oy,
-        w: c.el.offsetWidth,
-        h: c.el.offsetHeight,
-      });
-      t.x = Math.round(seat.x);
-      t.y = Math.round(seat.y);
-    };
-    if (this.onCore(e.clientX, e.clientY)) {
-      // Dropped on JARVIS himself: out of its group, loose on the board.
-      this.ws.moveThread(t.id, GENERAL_ID);
-      delete t.x; delete t.y;
-    } else if (ontoCard) {
-      // Dropped on another thread: the two of them become a group.
-      const g = this.ws.groupThreads(t.id, ontoCard);
-      if (g && (g.x === undefined || g.y === undefined)) {
-        const box = this.cards.get(ontoCard)?.el.getBoundingClientRect();
-        const r = this.root.getBoundingClientRect();
-        if (box) { g.x = Math.round(box.left - r.left - 12); g.y = Math.round(Math.max(this.bounds.top, box.top - r.top - 46)); }
-      }
-    } else if (over && over !== t.groupId) {
-      this.ws.moveThread(t.id, over);
-    } else if (!over) {
-      // Open space: it becomes (or stays) an independently placed window.
-      this.ws.moveThread(t.id, GENERAL_ID);
-      dropAt();
-    }
-    this.commit();
-  }
-
-  /** Phone: the title bar dragged moves the thread up or down the list; a tap folds or focuses it (endPhoneDrag). */
-  private beginPhoneDrag(e: PointerEvent, t: Thread, list: HTMLElement): void {
-    const d: PhoneDrag = {
-      id: t.id, sy: e.clientY, scroll0: this.layer.scrollTop, started: false,
-      wasActive: t.id === this.ws.activeId, list, index: 0, target: 0, h: 0,
-    };
-    gestures.begin(e, {
-      travel: 8,
-      move: (ev) => this.movePhoneDrag(d, ev),
-      end: (_ev, moved) => this.endPhoneDrag(d, moved),
-    });
-  }
-
-  /** Phone: the grip at the bottom of the thread in front, dragged for a height of its own (kept: Thread.mh). */
-  private beginPhoneSize(e: PointerEvent, t: Thread, card: HTMLElement): void {
-    const h0 = card.offsetHeight;
-    card.classList.add("sizing");
-    e.preventDefault();
-    gestures.begin(e, {
-      travel: 0,
-      move: (_ev, _dx, dy) => {
-        const c = this.cards.get(t.id);
-        if (!c) return;
-        // no smaller than its title bar and a line or two, no taller than the list itself
-        const room = this.layer.clientHeight - Stage.PHONE_MIN;
-        t.mh = Math.round(clamp(h0 + dy, 110, room));
-        c.el.style.minHeight = c.el.style.maxHeight = `${t.mh}px`;
-      },
-      end: () => { card.classList.remove("sizing"); this.save(); this.scheduleFit(); },
-    });
-  }
-
-  /** JARVIS is a button, and says so under the pointer. */
-  private cursorAt(e: PointerEvent): void {
-    if (gestures.busy) return;
-    const t = e.target as HTMLElement | null;
-    if (t instanceof Element && this.root.contains(t) && !t.closest(".bubble, .cmd, .panel, .web, .deck, .topbar")) {
-      this.root.style.cursor = this.onCore(e.clientX, e.clientY) ? "pointer" : "";
-    }
-  }
-
-  /** The bin rises while something is being carried. */
-  private showBin(on: boolean): void {
-    this.bin.hidden = !on;
-    this.bin.classList.toggle("in", on);
-    if (!on) this.bin.classList.remove("hot");
-  }
-
-  private overBin(x: number, y: number): boolean {
-    if (this.bin.hidden) return false;
-    const r = this.bin.getBoundingClientRect();
-    const over = x >= r.left - 30 && x <= r.right + 30 && y >= r.top - 30 && y <= r.bottom + 30;
-    this.bin.classList.toggle("hot", over);
-    return over;
-  }
-
-  /** The thread window under a point, ignoring the one being carried. */
-  private cardAt(x: number, y: number, except: string): string | null {
-    // The browser's own hit test: one call, and it answers with the window
-    // actually on top there, not whichever happens to be listed first.
-    for (const el of document.elementsFromPoint(x, y)) {
-      const card = (el as HTMLElement).closest<HTMLElement>(".chatwin");
-      if (!card || card.classList.contains("lifted")) continue;
-      const id = card.dataset.id ?? "";
-      return id && id !== except && this.cards.has(id) ? id : null;
-    }
-    return null;
-  }
-
-  /** The bubble under a point, if any. */
-  private bubbleAt(x: number, y: number): string | null {
-    for (const [gid, b] of this.bubbles) {
-      if (gid === GENERAL_ID) continue;
-      const r = b.el.getBoundingClientRect();
-      if (x >= r.left - 6 && x <= r.right + 6 && y >= r.top - 6 && y <= r.bottom + 6) return gid;
-    }
-    return null;
-  }
-
-  /* ---------------- canvas ---------------- */
-
-  /**
-   * The phone's own bars over the page's edges — the clock and the gesture
-   * bar — where the page is drawn under them (viewport-fit=cover). Two empty
-   * elements the size of each inset are measured, since the canvas can't
-   * read env() itself.
-   */
-  private inset = { top: 0, bottom: 0 };
-  /** Where the usable stage ends at the bottom: above the gesture bar, when there is one. */
-  private get floor(): number { return this.h - this.inset.bottom; }
-
-  private resize(): void {
-    const r = this.root.getBoundingClientRect();
-    this.w = Math.max(280, r.width);
-    this.h = Math.max(240, r.height);
-    const probe = (edge: string): number => this.root.querySelector<HTMLElement>(`.safe-probe[data-edge="${edge}"]`)?.offsetHeight ?? 0;
-    this.inset = { top: probe("top"), bottom: probe("bottom") };
-    this.canvas.width = this.w * this.dpr;
-    this.canvas.height = this.h * this.dpr;
-    this.canvas.style.width = `${this.w}px`;
-    this.canvas.style.height = `${this.h}px`;
-    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-  }
-
-  private draw(t: number): void {
-    const ctx = this.ctx;
-    ctx.clearRect(0, 0, this.w, this.h);
-    const { cx, cy } = this.core();
-
-    const amp = clamp(this.amplitude, 0, 1);
-    const idle = this.activity === "idle";
-    const spin = reduceMotion ? 0 : idle ? 0.12 : this.activity === "thinking" ? 1 : 0.55 + amp * 1.6;
-
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.scale(CORE_R / DESIGN_R, CORE_R / DESIGN_R);
-    drawCore(ctx, t * spin, t, amp, idle, {
-      activity: this.activity, cpuLoad: this.cpuLoad, gpuLoad: this.gpuLoad, pulse: this.pulse,
-    });
-    ctx.restore();
-    if (this.pulse > 0) this.pulse -= 0.02;
-  }
-
-
 }
-
-

@@ -1048,3 +1048,8 @@ Found and fixed on the way:
      I'm answering through …" notice and the spare's own line. The notice is
      taken back and one line carries both reasons; a notice and the line
      under the core are drawn as the same box.
+114. A window dropped on another had made no group since the boxes began
+     to glide back to their seats (fcbb0b1): the drop was judged after the
+     carried window had been let go, and the hit test found the window
+     itself still under the pointer. The drop is judged while the window is
+     still lifted, and the hit test passes over it.
