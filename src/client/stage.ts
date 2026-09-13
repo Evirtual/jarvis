@@ -1315,7 +1315,9 @@ export class Stage {
       const binned = d.moved && this.overBin(e.clientX, e.clientY);
       this.showBin(false);
       if (binned) { this.onDropDelete?.("group", d.id); return; }
-      if (!d.moved && d.node) { this.setFolded(d.id, false); return; }
+      // A tap on the name bar folds the group, a tap on the folded orb opens
+      // it — as a thread's title bar folds and opens it.
+      if (!d.moved) { this.setFolded(d.id, !d.node); return; }
       this.save();
       return;
     }
