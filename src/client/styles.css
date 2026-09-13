@@ -889,7 +889,8 @@ body.m-compact .setup-sheet {
 
 /* ---------- settings switch ---------- */
 /* A setting: its name and switch on one line, the explanation beneath at full width. */
-.switch-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; margin-bottom: 12px; cursor: pointer; }
+/* Each setting is a card, as a service is on Connections. */
+.switch-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; cursor: pointer; border: 1px solid var(--line); background: rgba(7,17,25,.7); padding: 11px 12px; margin-bottom: 9px; }
 .switch-row > span { display: contents; }
 .switch-row b { grid-column: 1; grid-row: 1; color: var(--text-hi); font-weight: 600; font-size: 12px; }
 .switch-row .switch { grid-column: 2; grid-row: 1; }
