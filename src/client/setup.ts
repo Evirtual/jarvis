@@ -1,9 +1,11 @@
 /**
- * The first-run guide: three short steps for someone who has never seen the
+ * The first-run guide: four short steps for someone who has never seen the
  * console. Where it is running and what that means for their keys; connecting
- * a service, or not yet; and saying hello. Shown once, on a first visit with
- * nothing connected. Brought back from Configuration → Connections, or by
- * asking ("run setup", "show me the guide").
+ * a service and choosing its model, or not yet; what the browser will ask
+ * for — the microphone, a location, sound on opening — each with its state
+ * and the way to allow it; and saying hello. Shown once, on a first visit
+ * with nothing connected. Brought back from Configuration → Connections, or
+ * by asking ("run setup", "show me the guide").
  */
 
 import type { ProviderId } from "../shared/types.js";
@@ -14,12 +16,33 @@ import { getAddress } from "./address.js";
 import { $, esc, recall, store } from "./dom.js";
 import { setDrawer } from "./drawer.js";
 import { partOfDay } from "./local.js";
+import { locate } from "./sensors.js";
 import { SERVERLESS } from "./server.js";
 import { conn, voice } from "./state.js";
 import { applyAddress } from "./voice-ui.js";
 
 const DONE = "jarvis.setupDone";
-const STEPS = ["Where you are", "Connect a service", "Say hello"] as const;
+const STEPS = ["Where you are", "Connect a service", "What he needs", "Say hello"] as const;
+const NEEDS_STEP = 2;
+
+/* ---------------- installing ----------------
+ * The browser offers to install the console once, early, with an event the
+ * page must keep to show its own button; installed, it opens like an app —
+ * and an app may play sound the moment it opens.
+ */
+type InstallPrompt = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> };
+let installPrompt: InstallPrompt | null = null;
+let installed = false;
+export function offerInstall(e: Event): void {
+  installPrompt = e as InstallPrompt;
+  if (setupOpen() && step === NEEDS_STEP) render();
+}
+export function noteInstalled(): void {
+  installed = true;
+  installPrompt = null;
+  if (setupOpen() && step === NEEDS_STEP) render();
+}
+const isApp = (): boolean => installed || matchMedia("(display-mode: standalone)").matches;
 
 const root = $("setup");
 const sheet = $("setupSheet");
@@ -76,7 +99,18 @@ function providerCard(id: ProviderId): string {
     (ready ? `<span class="spacer" style="flex:1"></span><span class="ok">Connected</span>` : "") +
     `</div>`;
   if (ready) {
-    return `<div class="provider ready${conn.active === id ? " active" : ""}">${head}<p class="blurb">JARVIS answers, hears and speaks through ${esc(meta.name)}.</p></div>`;
+    const active = conn.active === id;
+    const m = conn.modelsOf(id);
+    const models = m
+      ? `<div class="ctl"><span class="ctl-k"><span>Model</span><span class="n">${m.models.length} available</span></span>` +
+        `<select class="sel" data-setup-model="${id}" aria-label="${esc(meta.name)} model">` +
+        m.models.map((x) => `<option value="${esc(x)}"${x === m.model ? " selected" : ""}>${esc(x)}</option>`).join("") +
+        `</select></div>`
+      : "";
+    const use = active
+      ? `<p class="blurb">JARVIS answers, hears and speaks through ${esc(meta.name)}.</p>`
+      : `<div class="row"><p class="blurb grow">Connected, as a spare.</p><button class="btn" type="button" data-setup-use="${id}">Use ${esc(meta.name)}</button></div>`;
+    return `<div class="provider ready${active ? " active" : ""}">${head}${use}${models}</div>`;
   }
   return (
     `<div class="provider${err ? " bad" : ""}">${head}` +
@@ -99,6 +133,84 @@ function connect(): string {
   );
 }
 
+/* ---------------- what he needs ---------------- */
+
+type Need = "mic" | "geo";
+const NEED_NAMES: Record<Need, PermissionName> = { mic: "microphone" as PermissionName, geo: "geolocation" as PermissionName };
+
+/** The browser's word on a permission, where it will say; "unknown" where it won't (Firefox, for the microphone). */
+async function permissionState(need: Need): Promise<PermissionState | "unknown"> {
+  try {
+    const p = await navigator.permissions.query({ name: NEED_NAMES[need] });
+    // when the user answers the browser's own prompt, the row follows
+    p.onchange = () => { if (setupOpen() && step === NEEDS_STEP) void paintNeeds(); };
+    return p.state;
+  } catch {
+    return "unknown";
+  }
+}
+
+function needRow(need: Need, name: string, how: string): string {
+  return (
+    `<div class="need" data-need="${need}"><div class="k"><b>${name}</b><p class="how">${how}</p><p class="err" hidden></p></div>` +
+    `<span class="st">…</span><button class="btn" type="button" data-setup-perm="${need}">Allow</button></div>`
+  );
+}
+
+function needs(): string {
+  const sound = isApp() || voice.soundOnOpen === "yes";
+  const soundHow = isApp()
+    ? "Installed: he greets you aloud the moment the console opens."
+    : sound
+      ? "Sound is allowed here: he greets you aloud the moment the console opens."
+      : "A browser plays nothing before your first tap, so on opening he greets you in writing. To hear it: install the console, or allow sound for this site — the lock icon by the address, Site settings, Sound — and reload.";
+  const install = !isApp() && installPrompt ? `<button class="btn primary" type="button" id="setupInstall">Install the console</button>` : "";
+  return (
+    `<p class="lead">Three things the browser asks about. Each is yours to allow, and none is needed to type to him.</p>` +
+    needRow("mic", "Microphone", "To talk to him. Tapping JARVIS asks for it too, the first time.") +
+    needRow("geo", "Location", "For the weather where you stand, to a few streets. Without it he uses your connection's city.") +
+    `<div class="need"><div class="k"><b>Sound when the console opens</b><p class="how">${soundHow}</p></div>` +
+    `<span class="st${sound ? " ok" : ""}">${sound ? "Allowed" : "Blocked"}</span>${install}</div>`
+  );
+}
+
+/** Fills in each permission's state from the browser, and hides the button once it is granted. */
+async function paintNeeds(): Promise<void> {
+  for (const need of ["mic", "geo"] as Need[]) {
+    const row = body.querySelector<HTMLElement>(`.need[data-need="${need}"]`);
+    if (!row) return;
+    const state = await permissionState(need);
+    const st = row.querySelector<HTMLElement>(".st")!;
+    const btn = row.querySelector<HTMLButtonElement>("button")!;
+    st.className = `st${state === "granted" ? " ok" : state === "denied" ? " bad" : ""}`;
+    st.textContent = state === "granted" ? "Allowed" : state === "denied" ? "Blocked" : state === "prompt" ? "Not yet" : "";
+    btn.hidden = state === "granted";
+    const err = row.querySelector<HTMLElement>(".err")!;
+    err.hidden = state !== "denied";
+    if (state === "denied") err.textContent = "Blocked in the browser. Allow it from the lock icon by the address, then try again.";
+  }
+}
+
+/** Asks the browser for one permission — its own prompt appears — and the row follows the answer. */
+async function allow(need: Need): Promise<void> {
+  const row = body.querySelector<HTMLElement>(`.need[data-need="${need}"]`);
+  const err = row?.querySelector<HTMLElement>(".err");
+  try {
+    if (need === "mic") {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      for (const t of stream.getTracks()) t.stop(); // asked only to be allowed; listening is a tap on JARVIS
+    } else {
+      locate(); // the browser asks, and the weather follows once it answers
+    }
+  } catch (e) {
+    if (err) {
+      err.hidden = false;
+      err.textContent = e instanceof Error && e.name === "NotFoundError" ? "No microphone was found on this device." : "Blocked in the browser. Allow it from the lock icon by the address, then try again.";
+    }
+  }
+  void paintNeeds();
+}
+
 function sayHello(): string {
   const address = getAddress();
   return (
@@ -113,7 +225,8 @@ function sayHello(): string {
 function render(): void {
   title.textContent = STEPS[step] ?? "";
   dots.innerHTML = STEPS.map((_, i) => `<i${i === step ? ' class="on"' : ""}></i>`).join("");
-  body.innerHTML = step === 0 ? whereYouAre() : step === 1 ? connect() : sayHello();
+  body.innerHTML = step === 0 ? whereYouAre() : step === 1 ? connect() : step === NEEDS_STEP ? needs() : sayHello();
+  if (step === NEEDS_STEP) void paintNeeds();
   back.hidden = step === 0;
   const last = step === STEPS.length - 1;
   skip.hidden = last;
@@ -145,6 +258,16 @@ body.addEventListener("click", (e) => {
   const target = e.target as HTMLElement;
   const connectBtn = target.closest<HTMLElement>("[data-setup-connect]");
   if (connectBtn) { void saveKey(connectBtn.dataset.setupConnect as ProviderId); return; }
+  const useBtn = target.closest<HTMLElement>("[data-setup-use]");
+  if (useBtn) { void api.setActive(useBtn.dataset.setupUse as ProviderId).then(() => conn.refresh()).then(render); return; }
+  const permBtn = target.closest<HTMLElement>("[data-setup-perm]");
+  if (permBtn) { void allow(permBtn.dataset.setupPerm as Need); return; }
+  if (target.closest("#setupInstall") && installPrompt) {
+    const p = installPrompt;
+    installPrompt = null;
+    void p.prompt().then(() => p.userChoice).then((c) => { if (c.outcome !== "accepted") installPrompt = p; render(); });
+    return;
+  }
   if (target.closest("#setupVoice")) {
     voice.markUserActed();
     voice.stop();
@@ -160,6 +283,8 @@ body.addEventListener("keydown", (e) => {
 body.addEventListener("change", (e) => {
   const sel = (e.target as HTMLElement).closest<HTMLSelectElement>("#setupAddress");
   if (sel) applyAddress(sel.value === "madam" ? "madam" : "sir");
+  const model = (e.target as HTMLElement).closest<HTMLSelectElement>("select[data-setup-model]");
+  if (model) void api.selectModel(model.dataset.setupModel as ProviderId, model.value).then(() => conn.refresh());
 });
 
 back.addEventListener("click", () => { step = Math.max(0, step - 1); render(); });

@@ -70,6 +70,12 @@ export class Connections {
     return this.data.providers.find((p) => p.id === id)?.name ?? id;
   }
 
+  /** A connected service's models and the one chosen, for the setup guide's picker. */
+  modelsOf(id: ProviderId): { models: string[]; model: string } | null {
+    const p = this.data.providers.find((x) => x.id === id);
+    return p?.status.state === "ready" ? { models: p.status.models, model: p.status.model } : null;
+  }
+
   async refresh(revalidate = false): Promise<void> {
     this.data = await api.connections(revalidate);
     this.render();

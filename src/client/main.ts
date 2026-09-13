@@ -29,7 +29,7 @@ import "./confirm.js";
 import "./actions.js";
 import "./ask.js";
 import "./drawer.js";
-import { markSetupDone, openSetup, setupDone } from "./setup.js";
+import { markSetupDone, noteInstalled, offerInstall, openSetup, setupDone } from "./setup.js";
 import { SERVERLESS } from "./server.js";
 
 /* ===================================================================== *
@@ -48,6 +48,12 @@ if (SERVERLESS) {
   for (const el of document.querySelectorAll<HTMLElement>("[data-web]")) el.textContent = el.dataset.web!;
   for (const el of document.querySelectorAll<HTMLElement>("[data-web-label]")) el.setAttribute("aria-label", el.dataset.webLabel!);
 }
+
+// Asked before anything is clicked, while the answer can still be had.
+void voice.probeSoundOnOpen();
+// The browser's own offer to install the console is kept for the setup guide's button.
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); offerInstall(e); });
+window.addEventListener("appinstalled", noteInstalled);
 
 applyMode();
 paintThread();

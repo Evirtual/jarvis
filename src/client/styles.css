@@ -677,6 +677,17 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .setup-body .ok { font-family: var(--f-hud); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--green); }
 .setup-body .ctl { margin: 12px 0; }
 .setup-body .btn.wide { margin-bottom: 12px; }
+/* What he needs: one row a permission — its name and why, its state, and the button that asks. */
+.setup-body .need { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.setup-body .need:last-child { border-bottom: 0; }
+.setup-body .need .k { flex: 1; min-width: 0; }
+.setup-body .need .how { margin: 3px 0 0; font-size: 11px; color: var(--ice-dim); }
+.setup-body .need .err { margin: 3px 0 0; font-size: 11px; color: var(--red); }
+.setup-body .need .st { flex: none; font-family: var(--f-hud); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ice-dim); }
+.setup-body .need .st.ok { color: var(--green); }
+.setup-body .need .st.bad { color: var(--red); }
+.setup-body .need .btn { flex: none; }
+.setup-body .provider .row .blurb.grow { flex: 1; margin: 0; }
 .setup-actions { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
 .setup-actions .spacer { flex: 1; }
 body.m-compact .setup { padding: 0; align-items: flex-end; }

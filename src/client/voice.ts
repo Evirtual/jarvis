@@ -125,20 +125,34 @@ export class Voice {
   markUserActed(): void { this.userActed = true; }
 
   /**
-   * Whether a line may be said right now, before any click or tap. "yes" in
-   * an installed app, or on a site the browser allows to play sound;
-   * "blocked" in a fresh browser tab, where sound waits for the first
-   * gesture; "no-voice" when there is no service's voice to say it with, or
-   * spoken replies are off — the device's own voice never starts unasked.
+   * Whether this browser lets sound start before any click or tap: "yes" in
+   * an installed app, or on a site allowed to play; "blocked" in a fresh
+   * tab, where sound waits for the first gesture. Found once, at opening —
+   * after a gesture the question can no longer be asked — and shown in the
+   * setup guide.
+   */
+  soundOnOpen: "yes" | "blocked" | "unknown" = "unknown";
+
+  /** Asks the browser, at opening, whether sound may start unasked. */
+  async probeSoundOnOpen(): Promise<void> {
+    const g = this.graph();
+    if (!g) return;
+    if (g.ac.state === "running") { this.soundOnOpen = "yes"; return; }
+    // resume() stays pending for as long as the browser withholds sound
+    await Promise.race([g.ac.resume().catch(() => undefined), new Promise((r) => window.setTimeout(r, 400))]);
+    this.soundOnOpen = (g.ac.state as AudioContextState) === "running" ? "yes" : "blocked"; // resume() may have changed it
+  }
+
+  /**
+   * Whether a line may be said right now, before any click or tap: the
+   * browser's answer above, or "no-voice" when there is no service's voice
+   * to say it with, or spoken replies are off — the device's own voice never
+   * starts unasked.
    */
   async canSoundNow(): Promise<"yes" | "blocked" | "no-voice"> {
     if (!this.enabled || this.neuralNow() === null) return "no-voice";
-    const g = this.graph();
-    if (!g) return "no-voice";
-    if (g.ac.state === "running") return "yes";
-    // resume() stays pending for as long as the browser withholds sound
-    await Promise.race([g.ac.resume().catch(() => undefined), new Promise((r) => window.setTimeout(r, 400))]);
-    return (g.ac.state as AudioContextState) === "running" ? "yes" : "blocked"; // resume() may have changed it
+    if (this.soundOnOpen === "unknown") await this.probeSoundOnOpen();
+    return this.soundOnOpen === "yes" ? "yes" : "blocked";
   }
 
   /** Turn on recorded-and-heard input when a connected service can hear. */
