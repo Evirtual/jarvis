@@ -893,7 +893,9 @@ body.m-compact .setup-sheet {
 .switch-row > span { display: contents; }
 .switch-row b { grid-column: 1; grid-row: 1; color: var(--text-hi); font-weight: 600; font-size: 12px; }
 .switch-row .switch { grid-column: 2; grid-row: 1; }
-.switch-row small { grid-column: 1 / -1; display: block; color: var(--ice-dim); font-size: 10px; margin-top: 3px; line-height: 1.5; }
+.switch-row small { grid-column: 1 / -1; display: block; color: var(--ice-dim); font-size: 10px; line-height: 1.5; }
+/* a faint line sets the explanation off from the name and switch above it */
+.switch-row > span > small:first-of-type { margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--line); }
 .switch {
   appearance: none; -webkit-appearance: none; flex: none; cursor: pointer;
   width: 40px; height: 22px; border-radius: 11px; position: relative;
