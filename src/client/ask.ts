@@ -78,6 +78,7 @@ function appSnapshot(): string {
     const members = ws.treeOrder(g.id);
     out.push(`Group “${g.title}”${g.collapsed ? " (folded)" : ""} — ${members.length} thread${members.length === 1 ? "" : "s"}:`);
     for (const t of members) {
+      if (t.kind) continue; // the readiness card is the console's, not a conversation
       const indent = "  ".repeat(1 + ws.depth(t));
       const here = t.id !== ws.activeId ? ""
         : t.provisional ? " (the one we're in — its title is only a stand-in)" : " (the one we're in)";
@@ -153,7 +154,7 @@ type Target = { kind: "core" } | { kind: "thread"; thread: Thread; body: HTMLEle
 async function askCore(question: string): Promise<void> {
   setBusy(true, "Thinking");
   voice.beginStream();
-  const front = graph.active && !graph.active.archivedAt ? graph.active : null;
+  const front = graph.active && !graph.active.archivedAt && !graph.active.kind ? graph.active : null;
   let target: Target | null = null;
   const current = (): Target | null => target;
   let streamed = "";

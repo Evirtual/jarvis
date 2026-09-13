@@ -30,6 +30,7 @@ import "./actions.js";
 import "./ask.js";
 import "./drawer.js";
 import "./radar-split.js";
+import "./readiness.js";
 import { markSetupDone, openSetup, setupDone } from "./setup.js";
 import { SERVERLESS } from "./server.js";
 

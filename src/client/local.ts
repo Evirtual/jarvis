@@ -6,6 +6,7 @@ import { gib, hhmm } from "./dom.js";
 import { panels, voice } from "./state.js";
 import { jarvis } from "./say.js";
 import { coreChat } from "./core-chat.js";
+import { readiness } from "./readiness.js";
 import { S, T, W } from "./readings.js";
 import { SERVERLESS } from "./server.js";
 
@@ -165,5 +166,11 @@ export function localCommand(raw: string): boolean {
     return true;
   }
   if (words <= 4 && /\b(?:thank|thanks|cheers)\b/.test(q)) { jarvis("Always a pleasure, sir."); return true; }
+  if (/\b(?:what(?:'s| is) missing|what do you need|what(?:'s| is) (?:not |un)set|readiness|what do i (?:still )?need to set)\b/.test(q)) {
+    const missing = readiness.missing();
+    readiness.show();
+    jarvis(missing.length ? `Still missing, sir: ${missing.join(" and ")}. The card on the board has the way in.` : "Nothing that stops me, sir. The card shows what's optional.");
+    return true;
+  }
   return false;
 }

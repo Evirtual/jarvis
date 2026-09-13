@@ -60,6 +60,8 @@ export interface Thread {
   size?: { w: number; h: number };
   /** On a phone: a height the reader dragged the window to, instead of its share of the list (stage.ts fitList). */
   mh?: number;
+  /** Not a conversation: the readiness card (readiness.ts) — drawn as a window, left out of everything else. */
+  kind?: "setup";
   /**
    * What Tidy up shrank it to so the board fits on the screen: a width and a
    * cap on the conversation's height (0: no cap). Tidy up clears it before it
@@ -257,10 +259,12 @@ function repair(d: WorkspaceData): WorkspaceData {
     .filter((t) => t && typeof t.id === "string")
     .map((t, index) => {
       // Previous releases could create special-purpose threads. Keep their
-      // history, but return them to ordinary conversations.
-      const { kind: _kind, codeSession: _codeSession, ...plain } = t as Thread & { kind?: string; codeSession?: string };
+      // history, but return them to ordinary conversations — except the
+      // readiness card, which is a kind of its own and stays one.
+      const { kind: _kind, codeSession: _codeSession, ...plain } = t as Omit<Thread, "kind"> & { kind?: string; codeSession?: string };
       return {
       ...plain,
+      ...(_kind === "setup" ? { kind: "setup" as const } : {}),
       title: _kind === "code" && plain.title === "Claude Code" ? "Previous conversation" : plain.title,
       turns: asTurns(t.turns),
       groupId: gids.has(t.groupId) ? t.groupId : GENERAL_ID,

@@ -100,6 +100,8 @@ export class Stage {
   compact = false;
 
   onFocus: ((id: string) => void) | null = null;
+  /** Draws the body of a window that holds no conversation (a thread of a kind: the readiness card). */
+  bodyPainter: ((t: Thread, body: HTMLElement) => void) | null = null;
   onChange: (() => void) | null = null;
   onCoreTap: (() => void) | null = null;
   /** After every save of the board: whether the browser kept it, and its size in characters (memory.ts). */
@@ -766,6 +768,16 @@ export class Stage {
     c.el.classList.toggle("shut", !open);
     this.paintHead(t);
 
+    c.el.dataset.kind = t.kind ?? "";
+    if (t.kind) {
+      // no conversation in it: its body is drawn by whoever owns the kind, whenever it is (re)opened or redrawn
+      const sig = `${open ? 1 : 0}|${t.kind}`;
+      if (sig === c.sig) return;
+      c.sig = sig;
+      c.body.replaceChildren();
+      if (open) this.bodyPainter?.(t, c.body);
+      return;
+    }
     const live = this.liveEls.get(t.id) ?? [];
     const last = t.turns[t.turns.length - 1];
     const sig = `${open ? 1 : 0}|${t.turns.length}|${last?.content.length ?? 0}|${live.length}`;

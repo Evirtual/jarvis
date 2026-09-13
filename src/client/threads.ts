@@ -28,7 +28,7 @@ export function paintThreadName(): void {
   line.textContent = "";
   // The deck reports retained work, not only what happens to be open. A
   // thread put away is still there until the person explicitly deletes it.
-  $("pThreads").textContent = String(ws.all.length);
+  $("pThreads").textContent = String(ws.all.filter((t) => !t.kind).length);
   $("prompt").textContent = addressed("SIR ›");
 }
 
@@ -215,7 +215,7 @@ export function paintThreadList(): void {
     // next reading panels their normal clearance instead of letting the list grow over them.
     panels.clearLaneOverlaps();
   }
-  $("threadsAux").textContent = `${ws.all.length} total`;
+  $("threadsAux").textContent = `${ws.all.filter((t) => !t.kind).length} total`;
 }
 
 $("threadList").addEventListener("click", (e) => {

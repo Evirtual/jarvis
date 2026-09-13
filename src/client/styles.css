@@ -966,6 +966,14 @@ body.m-compact .setup-sheet {
   min-height: var(--ctl-h);
 }
 .btn.sm { min-height: 30px; padding: 4px 10px; }
+.btn.ghost { background: transparent; border-color: var(--line); color: var(--ice-dim); }
+.btn.ghost:hover { color: var(--ice); border-color: rgba(111,240,255,.4); }
+/* the readiness card's rows (readiness.ts): the same switch rows as Access, with a way in beside each */
+.ready { margin-top: 4px; }
+.ready .switch-row { margin-bottom: 8px; }
+.ready .switch-row .btn.sm { margin-top: 8px; justify-self: start; }
+.ready .switch-row.skipped .switch { opacity: .35; }
+.ready .switch-row .btn.sm[data-ready="connect"] { margin-top: 0; }
 .btn:hover:not(:disabled) { color: var(--ice); border-color: var(--ice); background: rgba(111,240,255,.07); }
 .btn:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
 .btn:disabled { opacity: .32; cursor: not-allowed; }

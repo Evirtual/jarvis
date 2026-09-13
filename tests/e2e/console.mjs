@@ -54,7 +54,7 @@ const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers
 
 const browser = await puppeteer.launch({ executablePath, headless: process.env.JARVIS_HEADED ? false : 'new', args: ['--hide-scrollbars', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'], defaultViewport: { width: 1200, height: 800 } });
 const context = browser.defaultBrowserContext();
-await context.overridePermissions(base.replace(/\/$/, ''), ['microphone', 'geolocation', 'clipboard-read', 'clipboard-write']);
+await context.overridePermissions(base.replace(/\/$/, ''), ['microphone', 'clipboard-read', 'clipboard-write']); // location is left unanswered, so the readiness card has something to show
 const page = await browser.newPage();
 const pageErrors = []; const consoleErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
@@ -124,9 +124,19 @@ await check('guide: connect a key from the card, model picker, spare/use, permis
   await wait(1200);
   const mic = await page.evaluate(() => { const s = document.querySelector('#setupBody input[data-setup-perm="mic"]'); return { checked: s.checked, disabled: s.disabled }; });
   await page.evaluate(() => document.getElementById('setupNext').click()); await wait(300);
-  await page.evaluate(() => document.getElementById('setupNext').click()); await wait(300);
+  await page.evaluate(() => document.getElementById('setupNext').click()); await wait(600);
   const b = await board(); assert(!b.guideOpen, 'guide still open'); assert(b.title.includes('ChatGPT'), 'title: ' + b.title);
-  return { chosen, masked, mic, done: await page.evaluate(() => localStorage.getItem('jarvis.setupDone')) };
+  // Location and sound were left undone: the readiness card stays on the board, drawn like a thread,
+  // counted as no thread; marking the two not needed sends it away by itself.
+  assert(b.windows.length === 1 && /what jarvis needs/i.test(b.windows[0].title), 'no readiness card: ' + JSON.stringify(b.windows));
+  const count = await page.evaluate(() => document.getElementById('pThreads').textContent);
+  assert(count === '0', 'the card counted as a thread: ' + count);
+  const cardRows = await page.$$eval('.chatwin[data-kind="setup"] .switch-row b', (r) => r.map((x) => x.textContent));
+  assert(cardRows.join() === 'A service,Microphone,Location,Sound', 'card rows: ' + cardRows.join());
+  for (let i = 0; i < 2; i++) { await page.evaluate(() => document.querySelector('.chatwin[data-kind="setup"] [data-ready="skip"]')?.click()); await wait(700); }
+  const after = await board();
+  assert(after.windows.length === 0, 'the card stayed after everything was set: ' + JSON.stringify(after.windows));
+  return { chosen, masked, mic, done: await page.evaluate(() => localStorage.getItem('jarvis.setupDone')), cardRows };
 });
 
 await check('local commands: help, time, date, hi, status answer at the core, without a model or a thread', async () => {

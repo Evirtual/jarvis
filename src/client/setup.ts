@@ -57,7 +57,15 @@ export function closeSetup(): void {
   root.classList.remove("in");
   root.hidden = true;
   placeVoiceControls(false);
+  onClosed?.();
 }
+
+/** What happens when the guide is closed: the readiness card takes over what is left (readiness.ts). */
+let onClosed: (() => void) | null = null;
+export function setSetupClosed(f: () => void): void { onClosed = f; }
+
+/** Called whenever the browser's word on a permission changes, wherever the rows are drawn. */
+export const permissionWatchers: (() => void)[] = [];
 
 /**
  * The voice settings are one set of controls (#voiceControls, Configuration →
@@ -156,6 +164,7 @@ async function permissionState(need: Need): Promise<PermissionState | "unknown">
     p.onchange = () => {
       if (setupOpen() && step === NEEDS_STEP) void paintNeeds(body);
       if (access.childElementCount) void paintNeeds(access);
+      for (const f of permissionWatchers) f();
     };
     return p.state;
   } catch {
@@ -171,7 +180,7 @@ function needRow(need: Need, name: string, how: string): string {
   );
 }
 
-function needs(): string {
+export function needs(): string {
   // Sound is the browser's to give, not the page's to ask for. The switch
   // shows whether it is on right now: from the moment the console opened, or
   // since the first click or key — the browser's rule for a tab — or not yet.
@@ -192,7 +201,7 @@ function needs(): string {
 }
 
 /** Sets each switch from the browser: on and fixed once granted, off until then, with the way past a block. */
-async function paintNeeds(root: ParentNode): Promise<void> {
+export async function paintNeeds(root: ParentNode): Promise<void> {
   for (const need of ["mic", "geo"] as Need[]) {
     const row = root.querySelector<HTMLElement>(`.need[data-need="${need}"]`);
     if (!row) return;
@@ -227,7 +236,7 @@ async function allow(need: Need, root: ParentNode): Promise<void> {
 }
 
 /** A switch in a set of rows was flipped on. */
-function needsChange(target: HTMLElement, root: HTMLElement): void {
+export function needsChange(target: HTMLElement, root: HTMLElement): void {
   const sw = target.closest<HTMLInputElement>("input[data-setup-perm]");
   if (!sw) return;
   if (sw.checked) void allow(sw.dataset.setupPerm as Need, root);

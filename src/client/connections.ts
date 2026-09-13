@@ -25,6 +25,8 @@ export class Connections {
   private errors = new Map<ProviderId, string>();
 
   onChange: ((c: ConnectionsResponse) => void) | null = null;
+  /** Anyone else who follows the connections (the readiness card). */
+  onConnectionsChanged: (() => void)[] = [];
 
   constructor() {
     this.root = $("providers");
@@ -98,12 +100,14 @@ export class Connections {
     this.data = await api.connections(revalidate);
     this.render();
     this.onChange?.(this.data);
+    for (const f of this.onConnectionsChanged) f();
   }
 
   private apply(next: ConnectionsResponse): void {
     this.data = next;
     this.render();
     this.onChange?.(next);
+    for (const f of this.onConnectionsChanged) f();
   }
 
   private async onClick(e: Event): Promise<void> {

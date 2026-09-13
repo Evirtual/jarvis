@@ -13,6 +13,15 @@ the same voice settings as **Config → Voice**, address, voice, listening and
 all. **Not now** closes it; it doesn't come back on its own. Bring it back any time from Configuration → Connections → *Open the
 setup guide*, or by saying "run setup" or "show me the guide".
 
+**What JARVIS needs.** Close the guide with something left undone and a card
+stays on the board, drawn like a thread: a service, the microphone, location,
+sound — each with what it costs you while it is missing, a switch that shows
+the real state, and the way in (Connect opens Connections; a switch asks the
+browser). The optional ones can be marked *Not needed*. When everything is set
+the card goes by itself; it comes back only if the service goes missing, or
+when you ask "what's missing". It is not a thread: the model never sees it and
+it counts as none.
+
 ## The deck
 
 **JARVIS sits at the bottom of the screen and does not move.** He is the
