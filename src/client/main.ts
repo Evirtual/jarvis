@@ -60,9 +60,12 @@ paintThread();
 // A greeting, but never a thread the user didn't ask for: on a clean screen it
 // is simply said under the core.
 const opening = `Good ${partOfDay()}, sir. Bringing the sensors up now.`;
+const NO_SERVICE = "No service connected — open Config and connect Gemini: it's free, and gives me my voice and hearing.";
+/** Whether the greeting is on the screen — then it, not a separate notice, says what to do next. */
+const greeting = !graph.active?.turns.length;
 /** Says the greeting aloud, once the connections are known and a voice with them. */
 let greetAloud = (): void => undefined;
-if (!graph.active?.turns.length) {
+if (greeting) {
   toast(opening);
   // Said aloud the moment the console opens, where the browser allows sound
   // unasked (an installed app does). A fresh browser tab lets nothing be said
@@ -70,7 +73,8 @@ if (!graph.active?.turns.length) {
   // — unless the gesture is a tap on the core to talk, which is the user's
   // turn, not his; and if the guide is open, once the guide is closed.
   greetAloud = (): void => {
-    const say = (): void => { voice.markUserActed(); voice.speak(opening); };
+    // With nothing connected, the greeting carries the one thing worth knowing next, in the same breath.
+    const say = (): void => { voice.markUserActed(); voice.speak(conn.anyReady ? opening : `${opening} ${NO_SERVICE}`); };
     void voice.canSoundNow().then((now) => {
       if (now === "muted") return;
       if (now === "yes") { say(); return; }
@@ -122,5 +126,6 @@ void conn.refresh().then(() => {
   // connected has no need of it, and someone who closed it isn't nagged.
   if (conn.anyReady) markSetupDone();
   else if (!setupDone()) openSetup();
-  else sys("No service connected — open Config and connect Gemini: it's free, and gives me my voice and hearing.");
+  else if (greeting) toast(NO_SERVICE); // spoken as part of the greeting, when the voice is free to
+  else sys(NO_SERVICE);
 });
