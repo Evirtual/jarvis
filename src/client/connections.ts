@@ -74,6 +74,14 @@ export class Connections {
     return this.data.providers.find((p) => p.id === id)?.name ?? id;
   }
 
+  /** The line under a connected service's key — what it does through it — the same in the guide and here. */
+  hintOf(id: ProviderId): string | null {
+    const p = this.data.providers.find((x) => x.id === id);
+    if (p?.status.state !== "ready") return null;
+    const st = p.status;
+    return `${st.hears ? "Answers and hears" : "Answers"} through this key${st.voices.length ? `, and offers ${st.voices.length} voices in Voice` : ""}.`;
+  }
+
   /** A connected service's key, masked, for the guide's key line. */
   maskedKeyOf(id: ProviderId): string | null {
     const p = this.data.providers.find((x) => x.id === id);
@@ -250,7 +258,7 @@ export class Connections {
       `<span class="src"${st.source === "environment" ? ` title="Disconnect makes JARVIS stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${p.envVar}` : ""}</span>` +
       `</div>` +
       (st.problem ? `<p class="err">${esc(st.problem)}</p>` : "") +
-      `<p class="hint">${st.hears ? "Answers and hears" : "Answers"} through this key${st.voices.length ? `, and offers ${st.voices.length} voices in Voice` : ""}.</p>` +
+      `<p class="hint">${esc(this.hintOf(p.id) ?? "")}</p>` +
       `<div class="ctl"><span class="ctl-k"><span>Model</span><span class="n">${st.models.length} available</span></span>` +
       `<select class="sel" data-model="${p.id}" aria-label="${esc(p.name)} model">${models}</select></div>` +
       `<div class="row">` +

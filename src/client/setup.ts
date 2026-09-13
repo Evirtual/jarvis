@@ -101,10 +101,12 @@ function providerCard(id: ProviderId): string {
         (api.keyOf(id) !== null ? `<button class="copy" type="button" data-setup-copy="${id}" title="Copy the key" aria-label="Copy the key">${COPY_ICON}</button>` : "") +
         `</div>`
       : "";
+    // the same sentence under the same faded line as on Connections
+    const hint = `<p class="hint">${esc(conn.hintOf(id) ?? "")}</p>`;
     const use = active
-      ? `<p class="blurb">JARVIS answers, hears and speaks through ${esc(meta.name)}.</p>`
-      : `<div class="row" style="align-items:center"><p class="blurb grow">Connected, as a spare.</p><button class="btn sm" type="button" data-setup-use="${id}">Use ${esc(meta.name)}</button></div>`;
-    return `<div class="provider ready${active ? " active" : ""}">${head}${keyline}${use}${models}</div>`;
+      ? ""
+      : `<div class="row" style="align-items:center;margin-bottom:10px"><p class="blurb grow" style="margin:0">Connected, as a spare.</p><button class="btn sm" type="button" data-setup-use="${id}">Use ${esc(meta.name)}</button></div>`;
+    return `<div class="provider ready${active ? " active" : ""}">${head}${keyline}${hint}${use}${models}</div>`;
   }
   return (
     `<div class="provider${err ? " bad" : ""}">${head}` +
