@@ -1,5 +1,5 @@
 /**
- * JARVIS himself, drawn: the aurora behind the board and the core — the logo,
+ * JARVIS himself, drawn: the core — the logo,
  * live — with its spectrum and its outer ring. Pure drawing — everything it
  * shows is handed in — so the stage decides what, and this decides how.
  */
@@ -22,33 +22,6 @@ export interface CoreLook {
 }
 
 /** One field of colour: a group's hue and where its bubble sits. */
-export interface AuroraField { hue: string; hx: number; hy: number }
-
-/**
- * Slow fields of colour drifting behind everything, tinted by the groups on
- * the board. They are what stops the screen feeling like a set of boxes.
- */
-export function drawAurora(ctx: CanvasRenderingContext2D, t: number, cx: number, cy: number, amp: number, fields: AuroraField[]): void {
-  const time = reduceMotion ? 0 : t / 1000;
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  fields.forEach(({ hue, hx, hy }, i) => {
-    // drift between the core and the bubble, slowly, each on its own path
-    const wob = Math.sin(time * 0.21 + i * 1.7) * 26, wob2 = Math.cos(time * 0.17 + i * 2.3) * 22;
-    const x = cx + (hx - cx) * 0.55 + wob;
-    const y = cy + (hy - cy) * 0.55 + wob2;
-    const r = 170 + Math.sin(time * 0.13 + i) * 26 + amp * 30;
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-    grad.addColorStop(0, withAlpha(hue, 0.055));
-    grad.addColorStop(0.55, withAlpha(hue, 0.02));
-    grad.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  });
-  ctx.restore();
-}
 
 /**
  * The logo (public/icon.svg) drawn live: the same rings, segments, weights,
@@ -154,8 +127,3 @@ export function drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, a
   ctx.stroke();
 }
 
-/** "#6ff0ff" at 40% → "rgba(111,240,255,.4)". */
-function withAlpha(hex: string, a: number): string {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a.toFixed(2)})`;
-}

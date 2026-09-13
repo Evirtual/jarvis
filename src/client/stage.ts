@@ -20,14 +20,14 @@
  * for a passing one.
  *
  * Windows are real DOM — selectable, scrollable text — over a canvas that draws
- * the core, the aurora and the spokes. On a phone the bubbles become a list
+ * the core and the spokes. On a phone the bubbles become a list
  * under the core.
  */
 
 import { seat, separate, shown, type Rect, type Room } from "./board-geometry.js";
 import { recall, store } from "./dom.js";
 import { reduceMotion } from "./motion.js";
-import { CORE_R, DESIGN_R, drawAurora, drawCore, type Activity } from "./core-draw.js";
+import { CORE_R, DESIGN_R, drawCore, type Activity } from "./core-draw.js";
 import { ICON } from "./icons.js";
 import { line } from "./message.js";
 import { ContextWeb } from "./web.js";
@@ -1429,11 +1429,6 @@ export class Stage {
     const idle = this.activity === "idle";
     const spin = reduceMotion ? 0 : idle ? 0.12 : this.activity === "thinking" ? 1 : 0.55 + amp * 1.6;
 
-    const fields = this.ws.visibleGroups.slice(0, 4).map((g) => {
-      const box = this.boxes.get(g.id);
-      return { hue: this.hueOf(g), hx: box ? box.x + box.w / 2 : cx, hy: box ? box.y + box.h / 2 : cy };
-    });
-    drawAurora(ctx, t, cx, cy, amp, fields);
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(CORE_R / DESIGN_R, CORE_R / DESIGN_R);
