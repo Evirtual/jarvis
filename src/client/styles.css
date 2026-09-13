@@ -152,6 +152,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 /* the gap JARVIS is drawn in, on the canvas below */
 .core-seat { width: 150px; height: 100%; pointer-events: none; }
 .ic {
+  position: relative; /* the count badge sits on its corner */
   width: 38px; height: 38px; flex: none; display: grid; place-items: center;
   border: 1px solid transparent; border-radius: 12px; background: transparent;
   color: var(--ice-dim); cursor: pointer;
@@ -920,7 +921,8 @@ body.m-compact .setup-sheet {
 /* A setting: its name and switch on one line, the explanation beneath at full width. */
 /* Each setting is a card, as a service is on Connections. */
 /* ---------- a card: the one box a setting, a service or a query sits in ---------- */
-.switch-row, .switch-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; cursor: pointer; }
+.switch-row, .provider { border: 1px solid var(--line); background: rgba(7,17,25,.7); padding: 11px 12px; margin-bottom: 9px; }
+.switch-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; cursor: pointer; }
 .switch-row > span { display: contents; }
 .switch-row b { grid-column: 1; grid-row: 1; color: var(--text-hi); font-weight: 600; font-size: 12px; }
 .switch-row .switch { grid-column: 2; grid-row: 1; }
@@ -1038,7 +1040,6 @@ body.m-compact .setup-sheet {
 #showSetup { margin-top: 14px; }
 
 /* ---------- connections ---------- */
-.provider { border: 1px solid var(--line); background: rgba(7,17,25,.7); padding: 11px 12px; margin-bottom: 9px; }
 .provider.ready { border-color: var(--line-hot); }
 .provider.active { border-color: var(--ice); background: var(--hover-bg); }
 .provider-head { display: flex; align-items: center; gap: 9px; }
