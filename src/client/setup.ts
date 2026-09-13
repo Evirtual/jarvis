@@ -143,10 +143,10 @@ async function permissionState(need: Need): Promise<PermissionState | "unknown">
 }
 
 function needRow(need: Need, name: string, how: string): string {
+  // The same row as a Voice setting: a name, a line, a switch — on once the browser has said yes.
   return (
-    `<div class="need" data-need="${need}">` +
-    `<div class="need-h"><b>${name}</b><span class="st" hidden></span><button class="btn sm primary" type="button" data-setup-perm="${need}">Allow</button></div>` +
-    `<p class="how">${how}</p><p class="err" hidden></p></div>`
+    `<label class="switch-row need" data-need="${need}"><span><b>${name}</b><small>${how}</small><small class="err" hidden></small></span>` +
+    `<input type="checkbox" class="switch" data-setup-perm="${need}" aria-label="${name}"></label>`
   );
 }
 
@@ -154,37 +154,32 @@ function needs(): string {
   const app = matchMedia("(display-mode: standalone)").matches;
   const sound = app || voice.soundOnOpen === "yes";
   return (
-    `<p class="lead">Three things the browser decides. None is needed to type.</p>` +
     needRow("mic", "Microphone", "To talk to JARVIS.") +
     needRow("geo", "Location", "For the weather where you are.") +
-    // No page can ask for this one: the switch is in the browser's own settings.
-    `<div class="need"><div class="need-h"><b>Voice on opening</b><span class="st${sound ? " ok" : ""}">${sound ? "On opening" : "After first click"}</span></div>` +
-    `<p class="how">${sound
+    // No page can ask for this one: the switch shows the browser's answer, and the line says where the real one is.
+    `<label class="switch-row need"><span><b>Voice on opening</b><small>${sound
       ? "JARVIS greets you aloud the moment the console opens."
-      : "To hear the greeting as the console opens: in the browser's site settings for this site, set Sound to Allow, then reload. Installed as an app, it is allowed already."}</p></div>`
+      : "To hear the greeting as the console opens: in the browser's site settings for this site, set Sound to Allow, then reload. Installed as an app, it is allowed already."}</small></span>` +
+    `<input type="checkbox" class="switch" disabled${sound ? " checked" : ""} aria-label="Voice on opening"></label>`
   );
 }
 
-/** Fills in each permission's state from the browser, and hides the button once it is granted. */
+/** Sets each switch from the browser: on and fixed once granted, off until then, with the way past a block. */
 async function paintNeeds(root: ParentNode): Promise<void> {
   for (const need of ["mic", "geo"] as Need[]) {
     const row = root.querySelector<HTMLElement>(`.need[data-need="${need}"]`);
     if (!row) return;
     const state = await permissionState(need);
-    const st = row.querySelector<HTMLElement>(".st")!;
-    const btn = row.querySelector<HTMLButtonElement>("button")!;
-    // Granted, the word says so and the button goes; otherwise the button is the state.
-    st.className = "st ok";
-    st.textContent = "Allowed";
-    st.hidden = state !== "granted";
-    btn.hidden = state === "granted";
+    const sw = row.querySelector<HTMLInputElement>("input")!;
+    sw.checked = state === "granted";
+    sw.disabled = state === "granted"; // a page cannot give a permission back; the browser's own settings can
     const err = row.querySelector<HTMLElement>(".err")!;
     err.hidden = state !== "denied";
-    if (state === "denied") err.textContent = "Allow it from the lock icon by the address.";
+    if (state === "denied") err.textContent = "Blocked in the browser: allow it from the lock icon by the address.";
   }
 }
 
-/** Asks the browser for one permission — its own prompt appears — and the row follows the answer. */
+/** Switched on: the browser asks with its own prompt, and the row follows the answer. */
 async function allow(need: Need, root: ParentNode): Promise<void> {
   const row = root.querySelector<HTMLElement>(`.need[data-need="${need}"]`);
   const err = row?.querySelector<HTMLElement>(".err");
@@ -198,17 +193,18 @@ async function allow(need: Need, root: ParentNode): Promise<void> {
   } catch (e) {
     if (err) {
       err.hidden = false;
-      err.textContent = e instanceof Error && e.name === "NotFoundError" ? "No microphone was found on this device." : "Allow it from the lock icon by the address.";
+      err.textContent = e instanceof Error && e.name === "NotFoundError" ? "No microphone was found on this device." : "Blocked in the browser: allow it from the lock icon by the address.";
     }
   }
   void paintNeeds(root);
 }
 
-/** A click in a set of rows: Allow asks. True when it was one of ours. */
-function needsClick(target: HTMLElement, root: HTMLElement): boolean {
-  const permBtn = target.closest<HTMLElement>("[data-setup-perm]");
-  if (permBtn) { void allow(permBtn.dataset.setupPerm as Need, root); return true; }
-  return false;
+/** A switch in a set of rows was flipped on. */
+function needsChange(target: HTMLElement, root: HTMLElement): void {
+  const sw = target.closest<HTMLInputElement>("input[data-setup-perm]");
+  if (!sw) return;
+  if (sw.checked) void allow(sw.dataset.setupPerm as Need, root);
+  else void paintNeeds(root); // it cannot be switched off from here; the row shows what the browser says
 }
 
 /** The same rows in Configuration → Access, drawn afresh each time the drawer or the tab is opened. */
@@ -217,7 +213,7 @@ function mountNeeds(root: HTMLElement): void {
   root.innerHTML = needs();
   void paintNeeds(root);
 }
-access.addEventListener("click", (e) => { needsClick(e.target as HTMLElement, access); });
+access.addEventListener("change", (e) => { needsChange(e.target as HTMLElement, access); });
 $("openDrawer").addEventListener("click", () => mountNeeds(access));
 document.querySelector<HTMLElement>('.tab[data-tab="access"]')?.addEventListener("click", () => mountNeeds(access));
 
@@ -270,7 +266,6 @@ body.addEventListener("click", (e) => {
   if (connectBtn) { void saveKey(connectBtn.dataset.setupConnect as ProviderId); return; }
   const useBtn = target.closest<HTMLElement>("[data-setup-use]");
   if (useBtn) { void api.setActive(useBtn.dataset.setupUse as ProviderId).then(() => conn.refresh()).then(render); return; }
-  if (needsClick(target, body)) return;
   if (target.closest("#setupVoice")) {
     voice.markUserActed();
     voice.stop();
@@ -284,6 +279,7 @@ body.addEventListener("keydown", (e) => {
   void saveKey(field.dataset.setupKey as ProviderId);
 });
 body.addEventListener("change", (e) => {
+  needsChange(e.target as HTMLElement, body);
   const sel = (e.target as HTMLElement).closest<HTMLSelectElement>("#setupAddress");
   if (sel) applyAddress(sel.value === "madam" ? "madam" : "sir");
   const model = (e.target as HTMLElement).closest<HTMLSelectElement>("select[data-setup-model]");
