@@ -76,6 +76,7 @@ export function closeSetup(): void {
   markSetupDone();
   root.classList.remove("in");
   root.hidden = true;
+  window.dispatchEvent(new Event("setupclosed")); // a greeting held back for the guide is said now
 }
 
 /* ---------------- the steps ---------------- */
@@ -163,17 +164,15 @@ function needRow(need: Need, name: string, how: string): string {
 
 function needs(): string {
   const sound = isApp() || voice.soundOnOpen === "yes";
-  const soundHow = isApp()
-    ? "Installed: he greets you aloud the moment the console opens."
-    : sound
-      ? "Sound is allowed here: he greets you aloud the moment the console opens."
-      : "A browser plays nothing before your first tap, so on opening he greets you in writing. To hear it: install the console, or allow sound for this site — the lock icon by the address, Site settings, Sound — and reload.";
-  const install = !isApp() && installPrompt ? `<button class="btn primary" type="button" data-setup-install>Install the console</button>` : "";
+  const soundHow = sound
+    ? "He greets you aloud the moment the console opens."
+    : "In a browser tab he greets you after your first click. Installed, he does so the moment it opens.";
+  const install = !isApp() && installPrompt ? `<button class="btn primary" type="button" data-setup-install>Install</button>` : "";
   return (
-    `<p class="lead">Three things the browser asks about. Each is yours to allow, and none is needed to type to him.</p>` +
-    needRow("mic", "Microphone", "To talk to him. Tapping JARVIS asks for it too, the first time.") +
-    needRow("geo", "Location", "For the weather where you stand, to a few streets. Without it he uses your connection's city.") +
-    `<div class="need"><div class="need-h"><b>Sound when the console opens</b><span class="st${sound ? " ok" : ""}">${sound ? "Allowed" : "Blocked"}</span>${install}</div>` +
+    `<p class="lead">Three things the browser asks about. None is needed to type to him.</p>` +
+    needRow("mic", "Microphone", "To talk to him.") +
+    needRow("geo", "Location", "For the weather where you are.") +
+    `<div class="need"><div class="need-h"><b>Voice on opening</b><span class="st${sound ? " ok" : ""}">${sound ? "On opening" : "After first click"}</span>${install}</div>` +
     `<p class="how">${soundHow}</p></div>`
   );
 }
@@ -191,7 +190,7 @@ async function paintNeeds(root: ParentNode): Promise<void> {
     btn.hidden = state === "granted";
     const err = row.querySelector<HTMLElement>(".err")!;
     err.hidden = state !== "denied";
-    if (state === "denied") err.textContent = "Blocked in the browser. Allow it from the lock icon by the address, then try again.";
+    if (state === "denied") err.textContent = "Allow it from the lock icon by the address.";
   }
 }
 
@@ -209,7 +208,7 @@ async function allow(need: Need, root: ParentNode): Promise<void> {
   } catch (e) {
     if (err) {
       err.hidden = false;
-      err.textContent = e instanceof Error && e.name === "NotFoundError" ? "No microphone was found on this device." : "Blocked in the browser. Allow it from the lock icon by the address, then try again.";
+      err.textContent = e instanceof Error && e.name === "NotFoundError" ? "No microphone was found on this device." : "Allow it from the lock icon by the address.";
     }
   }
   void paintNeeds(root);

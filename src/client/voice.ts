@@ -144,13 +144,15 @@ export class Voice {
   }
 
   /**
-   * Whether a line may be said right now, before any click or tap: the
-   * browser's answer above, or "no-voice" when there is no service's voice
-   * to say it with, or spoken replies are off — the device's own voice never
-   * starts unasked.
+   * Whether a line may be said right now, before any click or tap: "yes",
+   * the browser's answer above; "blocked" until the first gesture — which is
+   * also the answer with no service connected, since the device's own voice
+   * never starts unasked but speaks after a gesture; "muted" when spoken
+   * replies are off.
    */
-  async canSoundNow(): Promise<"yes" | "blocked" | "no-voice"> {
-    if (!this.enabled || this.neuralNow() === null) return "no-voice";
+  async canSoundNow(): Promise<"yes" | "blocked" | "muted"> {
+    if (!this.enabled) return "muted";
+    if (this.neuralNow() === null) return "blocked";
     if (this.soundOnOpen === "unknown") await this.probeSoundOnOpen();
     return this.soundOnOpen === "yes" ? "yes" : "blocked";
   }

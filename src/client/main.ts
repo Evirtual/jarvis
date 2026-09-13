@@ -29,7 +29,7 @@ import "./confirm.js";
 import "./actions.js";
 import "./ask.js";
 import "./drawer.js";
-import { markSetupDone, noteInstalled, offerInstall, openSetup, setupDone } from "./setup.js";
+import { markSetupDone, noteInstalled, offerInstall, openSetup, setupDone, setupOpen } from "./setup.js";
 import { SERVERLESS } from "./server.js";
 
 /* ===================================================================== *
@@ -66,27 +66,28 @@ if (!graph.active?.turns.length) {
   toast(opening);
   // Said aloud the moment the console opens, where the browser allows sound
   // unasked (an installed app does). A fresh browser tab lets nothing be said
-  // before the first click or key — and a click means the user is about to
-  // speak, so the greeting is not saved up for it: it stays written.
+  // before the first click or key, so there it is said at that first gesture
+  // — unless the gesture is a tap on the core to talk, which is the user's
+  // turn, not his; and if the guide is open, once the guide is closed.
   greetAloud = (): void => {
+    const say = (): void => { voice.markUserActed(); voice.speak(opening); };
     void voice.canSoundNow().then((now) => {
-      if (now === "yes") {
-        voice.markUserActed();
-        voice.speak(opening);
-        return;
-      }
-      // The way to hear him on opening, said once a day at most, after the
-      // written greeting has had its time — and counted as said only when it
-      // has actually been shown, not when a reload got there first.
-      const last = Number(localStorage.getItem("jarvis.soundHint") ?? 0);
-      if (now === "blocked" && Date.now() - last > 24 * 3600_000) {
-        window.setTimeout(() => {
-          if (!graph.active?.turns.length) {
-            localStorage.setItem("jarvis.soundHint", String(Date.now()));
-            toast("To hear me when the console opens: install it, or allow sound for this site — the lock icon by the address, Site settings, Sound.");
-          }
-        }, 6500);
-      }
+      if (now === "muted") return;
+      if (now === "yes") { say(); return; }
+      const shown = Date.now();
+      const off = (): void => {
+        window.removeEventListener("pointerdown", onGesture, true);
+        window.removeEventListener("keydown", onGesture, true);
+      };
+      const onGesture = (e: Event): void => {
+        off();
+        if (Date.now() - shown > 90_000) return; // long gone: a greeting now would be odd
+        if (e instanceof PointerEvent && graph.onCore(e.clientX, e.clientY)) return; // a tap to talk
+        if (setupOpen()) window.addEventListener("setupclosed", say, { once: true });
+        else say();
+      };
+      window.addEventListener("pointerdown", onGesture, true);
+      window.addEventListener("keydown", onGesture, true);
     });
   };
 }

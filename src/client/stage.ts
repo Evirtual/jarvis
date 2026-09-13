@@ -937,7 +937,8 @@ export class Stage {
     s.setProperty("--core-clear", `${Math.round(this.h - coreTop + 8)}px`);
   }
 
-  private onCore(clientX: number, clientY: number): boolean {
+  /** Whether a point on the screen is on the core — a tap there is a tap to talk. */
+  onCore(clientX: number, clientY: number): boolean {
     const r = this.root.getBoundingClientRect();
     const { cx, cy } = this.core();
     return Math.hypot(clientX - r.left - cx, clientY - r.top - cy) <= CORE_R + 14;
