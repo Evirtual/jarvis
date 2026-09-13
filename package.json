@@ -24,8 +24,7 @@
     "test:e2e": "node tests/e2e/console.mjs"
   },
   "dependencies": {
-    "marked": "^15.0.12",
-    "openai": "^7.2.0"
+    "marked": "^15.0.12"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

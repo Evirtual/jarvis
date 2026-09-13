@@ -12,7 +12,8 @@
  * the model never sees it, and it counts as no thread.
  */
 
-import { $, esc, recall, store } from "./dom.js";
+import { $, esc } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 import { line } from "./message.js";
 import { conn, graph, voice, ws } from "./state.js";
 import { setDrawer } from "./drawer.js";
@@ -22,11 +23,9 @@ import { paintThread } from "./threads.js";
 import { type Thread } from "./workspace.js";
 
 export const READINESS_TITLE = "What J.A.R.V.I.S. needs";
-const SKIP = "jarvis.readiness.skip";
-const SEEN_READY = "jarvis.readiness.seenReady";
 type Optional = "mic" | "geo" | "sound";
 
-const skipped = (): Set<Optional> => new Set((recall(SKIP, "jarvis.readinessSkip") ?? "").split(",").filter(Boolean) as Optional[]);
+const skipped = (): Set<Optional> => new Set((recall(KEY.readinessSkip) ?? "").split(",").filter(Boolean) as Optional[]);
 
 /** The card on the board, if there is one. */
 function card(): Thread | undefined {
@@ -165,7 +164,7 @@ layer.addEventListener("click", (e) => {
   else if (b.dataset.ready === "skip" && b.dataset.key) {
     const skip = skipped();
     skip.add(b.dataset.key as Optional);
-    store(SKIP, [...skip].join(","));
+    store(KEY.readinessSkip, [...skip].join(","));
     refresh();
   }
 });
@@ -176,7 +175,7 @@ setSetupClosed(() => { if (!conn.anyReady || card()) { ensure(); refresh(); } el
 
 // A service connected: the card follows; gone again after it was once there: the card comes back.
 conn.onConnectionsChanged.push(() => {
-  if (conn.anyReady) store(SEEN_READY, "1");
-  else if (recall(SEEN_READY, "jarvis.readinessSeenReady") === "1" && !card()) { ensure(); }
+  if (conn.anyReady) store(KEY.readinessSeenReady, "1");
+  else if (recall(KEY.readinessSeenReady) === "1" && !card()) { ensure(); }
   refresh();
 });

@@ -4,7 +4,8 @@
  */
 
 import { addressed, getAddress, setAddress, type Address } from "./address.js";
-import { $, recall, store } from "./dom.js";
+import { $ } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 import { graph, input, panels, voice } from "./state.js";
 import { announce, busy, paintCoreState } from "./say.js";
 import { answerConfirm, pendingConfirm } from "./confirm.js";
@@ -81,9 +82,7 @@ voice.onRecognised = (text, final): void => {
  * --------------------------------------------------------------------- */
 
 export let keyboardShown = false;
-/* Every voice setting under one name, jarvis.voice.*; the names before are still read. */
-const KEY = { tapSpeaks: "jarvis.voice.tapSpeaks", on: "jarvis.voice.on", pause: "jarvis.voice.listenPause", manual: "jarvis.voice.manualStop" } as const;
-export let tapSpeaks = recall(KEY.tapSpeaks, "jarvis.tapSpeaks") !== "0";
+export let tapSpeaks = recall(KEY.tapSpeaks) !== "0";
 
 export function showKeyboard(on: boolean): void {
   keyboardShown = on;
@@ -150,10 +149,10 @@ const voiceOut = $<HTMLInputElement>("voiceOut");
 export function setVoiceOut(on: boolean): void {
   voice.enabled = on;
   voiceOut.checked = on;
-  store(KEY.on, on ? "1" : "0");
+  store(KEY.voiceOn, on ? "1" : "0");
   if (!on) voice.stop();
 }
-setVoiceOut(recall(KEY.on, "jarvis.voiceOn") !== "0");
+setVoiceOut(recall(KEY.voiceOn) !== "0");
 voiceOut.addEventListener("change", () => setVoiceOut(voiceOut.checked));
 
 /* Listening: how long a pause ends it, or whether only a tap does. Both
@@ -165,13 +164,13 @@ function applyListening(): void {
   voice.setListening(pause, manualStop.checked);
   $("pauseN").textContent = `${pause.toFixed(1)} s`;
   $("pauseCtl").hidden = manualStop.checked;
-  store(KEY.pause, String(pause));
-  store(KEY.manual, manualStop.checked ? "1" : "0");
+  store(KEY.listenPause, String(pause));
+  store(KEY.manualStop, manualStop.checked ? "1" : "0");
 }
 {
-  const saved = Number.parseFloat(recall(KEY.pause, "jarvis.listenPause") ?? "");
+  const saved = Number.parseFloat(recall(KEY.listenPause) ?? "");
   if (saved >= 1 && saved <= 6) pauseSl.value = String(saved);
-  manualStop.checked = recall(KEY.manual, "jarvis.manualStop") === "1";
+  manualStop.checked = recall(KEY.manualStop) === "1";
   applyListening();
 }
 manualStop.addEventListener("change", applyListening);

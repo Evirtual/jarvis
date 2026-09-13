@@ -15,6 +15,10 @@
 
 import "./styles.css";
 
+// Before anything reads: a setting kept under an older name is moved to its current one.
+import { migrateStorage } from "./storage.js";
+migrateStorage();
+
 import { api } from "./api.js";
 import { $ } from "./dom.js";
 import { conn, graph, input, voice } from "./state.js";

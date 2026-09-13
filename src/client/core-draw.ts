@@ -21,8 +21,6 @@ export interface CoreLook {
   pulse: number;
 }
 
-/** One field of colour: a group's hue and where its bubble sits. */
-
 /**
  * The logo (public/icon.svg) drawn live: the same rings, segments, weights,
  * colours and triangle, in its proportions — its outer ring (196) is 60 here —

@@ -12,14 +12,14 @@ import type { ProviderId } from "../shared/types.js";
 import { PROVIDER_IDS } from "../shared/types.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
-import { $, esc, recall, store } from "./dom.js";
+import { $, esc } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 import { setDrawer } from "./drawer.js";
 import { locate } from "./sensors.js";
 import { SERVERLESS } from "./server.js";
 import { conn, voice } from "./state.js";
 import { COPY_ICON, TICK_ICON } from "./connections.js";
 
-const DONE = "jarvis.setupDone";
 const STEPS = ["Where you are", "Connect a service", "What J.A.R.V.I.S. needs", "Say hello"] as const;
 const NEEDS_STEP = 2;
 
@@ -39,8 +39,8 @@ let checking: ProviderId | null = null;
 const errors = new Map<ProviderId, string>();
 
 /** Seen, or dismissed: it doesn't open again unasked. */
-export function setupDone(): boolean { return recall(DONE) === "1"; }
-export function markSetupDone(): void { store(DONE, "1"); }
+export function setupDone(): boolean { return recall(KEY.setupDone) === "1"; }
+export function markSetupDone(): void { store(KEY.setupDone, "1"); }
 export function setupOpen(): boolean { return !root.hidden; }
 
 export function openSetup(): void {

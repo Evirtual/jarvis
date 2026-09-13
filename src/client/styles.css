@@ -663,7 +663,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .stage:has(.core-say.in) .toast.in { transform: translate(-50%, calc(-100% - var(--say-h, 0px) - 8px)); }
 body.m-compact :is(.core-say, .toast) { max-width: calc(100% - 24px); font-size: 11.5px; }
 body.m-compact .core-say { max-height: 38vh; }
-/* the conversation in the Threads panel */
+/* the Conversation panel's list of lines */
 .tl-core { margin-bottom: 6px; }
 .tl-chat {
   display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow-y: auto;
@@ -936,7 +936,6 @@ body.m-compact .setup-sheet {
 
 .chatwin.shut .cw-w, .chatwin.shut .cw-b, .chatwin.shut .cw-del { display: none; }
 
-/* the caret that trails a reply while it is still being written */
 
 /* ---------- command bar ---------- */
 .cmd { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line-hot); background: var(--panel); clip-path: var(--chamfer); padding: 8px 10px; }

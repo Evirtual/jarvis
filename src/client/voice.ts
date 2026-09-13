@@ -19,7 +19,7 @@ import { PROVIDERS, SPEECH_RATE } from "../shared/services/index.js";
 import { api } from "./api.js";
 import { addressed } from "./address.js";
 import { rankDeviceVoices, shortName } from "./device-voices.js";
-import { recall, store } from "./dom.js";
+import { KEY, recall, store, voiceKeyFor } from "./storage.js";
 import { Hearing } from "./hearing.js";
 import { joinFloat32, speechEnd, speechStart, toFloat32 } from "./pcm.js";
 
@@ -28,8 +28,7 @@ function parseSelection(value: string): Selection | null {
   const at = value.indexOf(":");
   if (at < 0) return null;
   const source = value.slice(0, at), id = value.slice(at + 1);
-  // "system:" is how a device voice was remembered before it was called one
-  if (source === "device" || source === "system") return { kind: "device", name: id || null };
+  if (source === "device") return { kind: "device", name: id || null };
   if (id && (PROVIDER_IDS as readonly string[]).includes(source)) return { kind: "neural", via: source as ProviderId, id };
   return null;
 }
@@ -98,8 +97,8 @@ export class Voice {
   onRecognised: ((text: string, final: boolean) => void) | null = null;
 
   constructor() {
-    const p = Number.parseFloat(recall("jarvis.voice.pitch", "jarvis.pitch") ?? "");
-    const r = Number.parseFloat(recall("jarvis.voice.rate", "jarvis.rate") ?? "");
+    const p = Number.parseFloat(recall(KEY.voicePitch) ?? "");
+    const r = Number.parseFloat(recall(KEY.voiceRate) ?? "");
     if (p >= 0.4 && p <= 1.2) this.pitch = p;
     if (r >= 0.7 && r <= 1.3) this.rate = r;
     this.hearing = new Hearing({ graph: () => this.graph(), level: () => this.amplitude });
@@ -122,8 +121,8 @@ export class Voice {
   get transcribing(): boolean { return this.hearing.transcribing; }
   get micAvailable(): boolean { return this.hearing.available; }
 
-  setPitch(v: number): void { this.pitch = v; store("jarvis.voice.pitch", String(v)); }
-  setRate(v: number): void { this.rate = v; store("jarvis.voice.rate", String(v)); }
+  setPitch(v: number): void { this.pitch = v; store(KEY.voicePitch, String(v)); }
+  setRate(v: number): void { this.rate = v; store(KEY.voiceRate, String(v)); }
   markUserActed(): void { this.userActed = true; }
   /** Whether the user has clicked, tapped or typed on this page — after which the browser lets sound start. */
   get acted(): boolean { return this.userActed; }
@@ -216,14 +215,14 @@ export class Voice {
   private choose(): void {
     const before = this.selectionValue;
     // The device voice — speaking now, or standing by for when the service can't.
-    const name = recall("jarvis.voice.device");
+    const name = recall(KEY.voiceDevice);
     this.systemVoice = (name && this.systemList.find((v) => v.name === name)) || (this.systemList[0] ?? null);
 
     const offered = this.neuralVoices();
     const via = offered[0]?.via;
-    const deviceChosen = this.synth !== null && recall("jarvis.voice.kind") === "device";
+    const deviceChosen = this.synth !== null && recall(KEY.voiceKind) === "device";
     if (via && !deviceChosen) {
-      const wanted = recall(`jarvis.voice.${via}`);
+      const wanted = recall(voiceKeyFor(via));
       const pick = offered.find((v) => v.voice.id === wanted) ?? offered[0]!;
       this.chosen = { kind: "neural", via, id: pick.voice.id };
     } else {
@@ -242,12 +241,12 @@ export class Voice {
     const s = parseSelection(value);
     if (!s || !this.available(s)) return false;
     if (s.kind === "neural") {
-      store(`jarvis.voice.${s.via}`, s.id);
-      store("jarvis.voice.kind", "neural");
+      store(voiceKeyFor(s.via), s.id);
+      store(KEY.voiceKind, "neural");
       this.resting.delete(s.via); // chosen again: worth asking again
     } else {
-      if (s.name) store("jarvis.voice.device", s.name);
-      store("jarvis.voice.kind", "device");
+      if (s.name) store(KEY.voiceDevice, s.name);
+      store(KEY.voiceKind, "device");
     }
     this.choose();
     this.onState?.();

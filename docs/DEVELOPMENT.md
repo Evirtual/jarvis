@@ -30,7 +30,7 @@ the types are broken.
 
 Vanilla TypeScript, no UI framework — the board is canvas plus DOM writes when a
 reading changes, and a re-render layer would add weight without buying anything.
-One runtime dependency: `openai`, for its streaming chat.
+One runtime dependency: `marked`, used as a Markdown parser only. Both services are reached with plain `fetch`.
 
 The two versions share one back end (`src/shared/services/console.ts`): the
 server and the browser each give it a place to read keys from and it does
@@ -58,7 +58,7 @@ the web version answers the same API calls in the browser
 | `src/client/state.ts` | The singletons every module shares (stage, workspace, panels, voice, connections) |
 | `src/client/server.ts` | Which version this is: the PC with its server, or the web page on its own |
 | `src/client/api.ts` | Typed calls to the console's API — to the server, or to `browser-core.ts` |
-| `src/client/dom.ts`, `text.ts`, `num.ts` | Small pure helpers: elements and storage (with old key names still read), escaping and formatting; clipping and edit distance; clamp |
+| `src/client/dom.ts`, `storage.ts`, `text.ts`, `num.ts` | Small pure helpers: elements, escaping and formatting; every name the console stores under, and the one-time move of older names; clipping and edit distance; clamp |
 | `src/client/palette.ts` | The stylesheet's colours for what is drawn on a canvas, read once |
 | `src/client/markdown.ts`, `message.ts` | A reply's Markdown parsed with marked and drawn into the DOM node by node (no innerHTML), media markers lifted into cards |
 | `src/client/core-chat.ts` | The conversation at the core — what is said outside any thread — kept in this browser, the last dozen lines sent with each question |
@@ -93,7 +93,7 @@ the web version answers the same API calls in the browser
 | `tests/` | Node's test runner over the pure modules |
 | `.github/workflows/` | `ci.yml` (typecheck, tests, build on every push) and `pages.yml` (publishes the web version) |
 | `docs/QA.md` | The manual test plan and a log of every run |
-| `docs/PLAN-*.md` | Design decisions: the connection as the core; code mode |
+| `docs/PLAN-*.md` | Design decisions: the connection as the core; code mode; the evaluation and plan for a simpler console (`PLAN-simplify.md`) |
 | `docs/SUPPORT.md`, `.github/FUNDING.yml` | How to support the project, the sponsor tiers, and what puts the Sponsor button on the repository |
 
 ## Tests

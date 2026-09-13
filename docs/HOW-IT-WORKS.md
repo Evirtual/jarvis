@@ -73,6 +73,10 @@ Every figure on screen is measured, not simulated.
 | Weather, sunrise, sunset | open-meteo.com |
 | Internet latency | real pings to your gateway, 1.1.1.1, 8.8.8.8 |
 
+The PowerShell probe is Windows-only. On macOS or Linux the CPU, memory, GPU
+(where `nvidia-smi` is installed), the sweep, the uplink and the weather still
+work; the Wi-Fi, throughput, disk and battery rows stay empty rather than guessed.
+
 **The network is swept once when the server starts**, so the Perimeter panel has
 something to show, and after that **only when you ask** — Sweep on the panel, or
 "scan the network". It is never polled in the background. The sweep is

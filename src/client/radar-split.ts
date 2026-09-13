@@ -4,7 +4,8 @@
  * corners still size the panel; this sizes what is inside it. Remembered.
  */
 
-import { $, recall, store } from "./dom.js";
+import { $ } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 import { clamp } from "./num.js";
 
 const split = $("radarSplit");
@@ -16,8 +17,7 @@ function apply(h: number | null): void {
   else panel.style.setProperty("--radar-h", `${Math.round(h)}px`);
 }
 
-const KEY = "jarvis.panels.radarH";
-const saved = Number.parseFloat(recall(KEY, "jarvis.radarH") ?? "");
+const saved = Number.parseFloat(recall(KEY.radarH) ?? "");
 if (saved >= 80) apply(saved);
 
 let drag: { pid: number; y0: number; h0: number } | null = null;
@@ -38,9 +38,9 @@ const end = (e: PointerEvent): void => {
   if (!drag || e.pointerId !== drag.pid) return;
   drag = null;
   split.classList.remove("on");
-  store(KEY, panel.style.getPropertyValue("--radar-h").replace("px", ""));
+  store(KEY.radarH, panel.style.getPropertyValue("--radar-h").replace("px", ""));
 };
 split.addEventListener("pointerup", end);
 split.addEventListener("pointercancel", end);
 // double-click: back to the full width
-split.addEventListener("dblclick", () => { apply(null); store(KEY, ""); });
+split.addEventListener("dblclick", () => { apply(null); store(KEY.radarH, ""); });

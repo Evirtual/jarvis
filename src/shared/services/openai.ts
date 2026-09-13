@@ -1,11 +1,11 @@
 /**
  * OpenAI: answers through the Responses API (where web search lives),
- * speech through the audio endpoints. Chat uses OpenAI's own SDK for its
- * streaming; speaking and hearing are single requests, made with fetch.
+ * speech and hearing through the audio endpoints — all with plain fetch,
+ * the answers as a server-sent-event stream, as Gemini's are.
  */
 
 import type { VoiceOption } from "../types.js";
-import { HEARING_HINT, MANNER, PERSONA, bytesOf, httpError, pace, rankModels, type Service } from "./common.js";
+import { HEARING_HINT, MANNER, PERSONA, bytesOf, eventsOf, httpError, pace, rankModels, type Service } from "./common.js";
 
 const API = "https://api.openai.com/v1";
 
@@ -43,9 +43,31 @@ function rankHearing(ids: string[]): string[] {
   return [...ranked.filter((id) => /mini/.test(id)), ...ranked.filter((id) => !/mini/.test(id))];
 }
 
-interface ResponseStreamEvent {
+/**
+ * A request asked again, twice at most, when the service is momentarily
+ * overloaded (429 and 5xx) — a moment's wait, then a little longer — never
+ * once the caller has given up.
+ */
+async function withRetry(call: () => Promise<Response>, signal: AbortSignal): Promise<Response> {
+  let r = await call();
+  for (const wait of [400, 800]) {
+    if (r.ok || signal.aborted || (r.status !== 429 && r.status < 500)) break;
+    await new Promise((done) => setTimeout(done, wait));
+    r = await call();
+  }
+  return r;
+}
+
+/** The key travels in a header, never in the address. */
+const headers = (key: string): Record<string, string> => ({ authorization: `Bearer ${key}`, "content-type": "application/json" });
+
+/** One event of a Responses stream: what it is, and the piece of text when it carries one. */
+interface ResponseEvent {
   type: string;
   delta?: string;
+  /** How the stream reports a failure part-way — `error`, or a response that `failed`. */
+  error?: { message?: string; code?: string };
+  response?: { error?: { message?: string; code?: string } };
 }
 
 export const openai: Service = {
@@ -62,10 +84,10 @@ export const openai: Service = {
   },
 
   async catalogue(key) {
-    const { default: OpenAI } = await import("openai");
-    const client = new OpenAI({ apiKey: key, dangerouslyAllowBrowser: true });
-    const ids: string[] = [];
-    for await (const m of await client.models.list()) ids.push(m.id);
+    const r = await fetch(`${API}/models`, { headers: headers(key), signal: AbortSignal.timeout(15000) });
+    if (!r.ok) throw httpError("ChatGPT", r.status, await r.text());
+    const body = (await r.json()) as { data?: { id?: string }[] };
+    const ids = (body.data ?? []).map((m) => m.id ?? "").filter(Boolean);
     return {
       chat: rankModels(ids.filter((id) => /^(gpt|o\d|chatgpt)/.test(id) && !NOT_CHAT.test(id))),
       speech: rankModels(ids.filter((id) => /tts/.test(id))),
@@ -75,38 +97,41 @@ export const openai: Service = {
   },
 
   async chat(key, model, turns, emit, signal, persona = PERSONA) {
-    const { default: OpenAI } = await import("openai");
-    const client = new OpenAI({ apiKey: key, dangerouslyAllowBrowser: true });
-
-    const run = async (withSearch: boolean): Promise<void> => {
-      const stream = (await client.responses.create(
-        {
+    const call = (withSearch: boolean): Promise<Response> =>
+      fetch(`${API}/responses`, {
+        method: "POST",
+        headers: headers(key),
+        body: JSON.stringify({
           model,
           stream: true,
           instructions: persona,
           input: turns.map((t) => ({ role: t.role, content: t.content })),
-          ...(withSearch ? { tools: [{ type: "web_search" as const }] } : {}),
-        },
-        { signal },
-      )) as AsyncIterable<ResponseStreamEvent>;
+          ...(withSearch ? { tools: [{ type: "web_search" }] } : {}),
+        }),
+        signal,
+      });
 
-      for await (const ev of stream) {
-        if (ev.type === "response.web_search_call.searching" || ev.type === "response.web_search_call.in_progress") {
-          emit({ t: "status", status: "searching" });
-        } else if (ev.type === "response.output_text.delta" && ev.delta) {
-          emit({ t: "text", delta: ev.delta });
-        }
-      }
-    };
-
-    try {
-      await run(true);
-    } catch (err) {
+    let r = await withRetry(() => call(true), signal);
+    if (!r.ok) {
       // Not every model carries the search tool; answer without it rather than fail.
-      const msg = err instanceof Error ? err.message : String(err);
-      if (signal.aborted || !/web_search|tool|unsupported|not supported/i.test(msg)) throw err;
+      const body = await r.text();
+      if (signal.aborted || !/web_search|tool|unsupported|not supported/i.test(body)) throw httpError("ChatGPT", r.status, body);
       emit({ t: "status", status: "thinking" });
-      await run(false);
+      r = await withRetry(() => call(false), signal);
+      if (!r.ok) throw httpError("ChatGPT", r.status, await r.text());
+    }
+    if (!r.body) throw httpError("ChatGPT", r.status, "no body");
+
+    for await (const ev of eventsOf<ResponseEvent>(r.body)) {
+      if (ev.type === "error" || ev.type === "response.failed") {
+        const e = ev.error ?? ev.response?.error;
+        throw httpError("ChatGPT", 500, JSON.stringify(e ?? ev));
+      }
+      if (ev.type === "response.web_search_call.searching" || ev.type === "response.web_search_call.in_progress") {
+        emit({ t: "status", status: "searching" });
+      } else if (ev.type === "response.output_text.delta" && ev.delta) {
+        emit({ t: "text", delta: ev.delta });
+      }
     }
   },
 
@@ -116,7 +141,7 @@ export const openai: Service = {
     const paced = /^tts-1/.test(model);
     const r = await fetch(`${API}/audio/speech`, {
       method: "POST",
-      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+      headers: headers(key),
       body: JSON.stringify({
         model,
         voice,

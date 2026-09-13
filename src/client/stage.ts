@@ -25,7 +25,7 @@
  */
 
 import { seat, separate, shown, type Rect, type Room } from "./board-geometry.js";
-import { recall, store } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 import { reduceMotion } from "./motion.js";
 import { CORE_R, DESIGN_R, drawCore, type Activity } from "./core-draw.js";
 import { ICON } from "./icons.js";
@@ -49,7 +49,6 @@ const HEADER_H = 56;
 const CORE_ZONE = 150;
 /** Room above his ring for the status line and a notice. */
 const CORE_STATUS_ROOM = 44;
-const STORE_KEY = "jarvis.workspace";
 
 import type { Related } from "./web.js";
 import { gestures, resized, sidesOf, sizeLimits } from "./surface.js";
@@ -140,7 +139,7 @@ export class Stage {
    */
   private phoneOrder: string[] = (() => {
     try {
-      const v = JSON.parse(recall("jarvis.phoneOrder") ?? "[]") as unknown;
+      const v = JSON.parse(recall(KEY.phoneOrder) ?? "[]") as unknown;
       return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
     } catch { return []; }
   })();
@@ -222,19 +221,19 @@ export class Stage {
    */
   private load() {
     try {
-      const raw = recall(STORE_KEY);
+      const raw = recall(KEY.workspace);
       if (raw) return migrate(JSON.parse(raw));
     } catch { /* corrupt — fall through to the older save */ }
     try {
-      const legacy = recall("jarvis.threads");
-      if (legacy) return migrate(JSON.parse(legacy), recall("jarvis.activeThread"));
+      const legacy = localStorage.getItem("jarvis.threads");
+      if (legacy) return migrate(JSON.parse(legacy), localStorage.getItem("jarvis.activeThread"));
     } catch { /* nothing usable */ }
     return migrate(null);
   }
 
   save(): void {
     const json = JSON.stringify(this.ws.data);
-    this.onSaved?.(store(STORE_KEY, json), json.length);
+    this.onSaved?.(store(KEY.workspace, json), json.length);
   }
 
   /**
@@ -286,10 +285,6 @@ export class Stage {
     this.save();
     this.renderAll();
     this.onFocus?.(id);
-  }
-
-  parentOf(t: Thread): Thread | null {
-    return this.ws.parentOf(t) ?? null;
   }
 
   /** Name a thread after the subject of its first question, not the instruction. */
@@ -737,7 +732,7 @@ export class Stage {
     this.cards.get(d.id)?.el.classList.remove("reordering");
     this.root.classList.remove("carrying");
     this.phoneOrder = [...ids, ...this.phoneOrder.filter((id) => !ids.includes(id))];
-    store("jarvis.phoneOrder", JSON.stringify(this.phoneOrder));
+    store(KEY.phoneOrder, JSON.stringify(this.phoneOrder));
     if (!d.wasActive) this.ws.focus(t.id);
     this.commit();
   }

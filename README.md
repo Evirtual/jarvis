@@ -32,7 +32,7 @@ readings.
 **On the web:** open [jarvis.edgarasneverdauskas.com](https://jarvis.edgarasneverdauskas.com/),
 then **Configuration → Connections** and paste a key.
 
-**On your PC** (Node 20.11 or later):
+**On your PC** (Node 20.11 or later; the machine's readings are fullest on Windows, see [How it works](docs/HOW-IT-WORKS.md#on-the-pc)):
 
 ```bash
 npm install

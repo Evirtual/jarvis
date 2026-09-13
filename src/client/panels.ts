@@ -12,7 +12,7 @@
  * scrolling with the threads — as many as you open.
  */
 
-import { recall, store } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 import { ICON } from "./icons.js";
 import { raise, stackKey, track } from "./stack.js";
 import { type Room } from "./board-geometry.js";
@@ -40,9 +40,6 @@ const DEFAULT_SEAT: Record<PanelName, { side: "l" | "r"; top: number }> = {
 // one carry-and-put-down every box has (surface.ts).
 
 interface Seat { x: number; y: number; w?: number; h?: number }
-
-/** What the panels keep between visits, under one name (the names before are still read). */
-const KEY = { open: "jarvis.panels.open", seats: "jarvis.panels.seats" } as const;
 
 export class Panels {
   private root: HTMLElement;
@@ -80,9 +77,9 @@ export class Panels {
     new ResizeObserver(() => this.relayout()).observe(root);
 
     try {
-      this.seats = JSON.parse(recall(KEY.seats, "jarvis.panelSeats") ?? "{}") as Partial<Record<PanelName, Seat>>;
+      this.seats = JSON.parse(recall(KEY.panelsSeats) ?? "{}") as Partial<Record<PanelName, Seat>>;
     } catch { this.seats = {}; }
-    const open = (recall(KEY.open, "jarvis.panelsOpen") ?? "").split(",").filter((n): n is PanelName => PANEL_NAMES.includes(n as PanelName));
+    const open = (recall(KEY.panelsOpen) ?? "").split(",").filter((n): n is PanelName => PANEL_NAMES.includes(n as PanelName));
     for (const n of open) this.show(n, true);
   }
 
@@ -342,7 +339,7 @@ export class Panels {
   }
 
   private persist(): void {
-    store(KEY.open, this.openNames.join(","));
-    store(KEY.seats, JSON.stringify(this.seats));
+    store(KEY.panelsOpen, this.openNames.join(","));
+    store(KEY.panelsSeats, JSON.stringify(this.seats));
   }
 }

@@ -12,7 +12,7 @@ import type { AskRequest, AskStatus, ConnectionsResponse, ProviderId, SpeakReque
 import { PROVIDER_IDS, isProviderId } from "../shared/types.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { ConsoleCore, type Validation } from "../shared/services/console.js";
-import { recall, store } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 
 /* ---------------- the keys, on this device ---------------- */
 
@@ -21,11 +21,9 @@ interface Saved {
   active: ProviderId | null;
 }
 
-const KEYS = "jarvis.cores";
-
 function load(): Saved {
   try {
-    const s = JSON.parse(recall(KEYS) ?? "") as Partial<Saved>;
+    const s = JSON.parse(recall(KEY.cores) ?? "") as Partial<Saved>;
     const providers: Saved["providers"] = {};
     for (const id of PROVIDER_IDS) {
       const p = s.providers?.[id];
@@ -39,14 +37,12 @@ function load(): Saved {
 
 let saved = load();
 /** False when the browser refused to keep them (storage full, or a private window that blocks it). */
-const persist = (): boolean => store(KEYS, JSON.stringify(saved));
+const persist = (): boolean => store(KEY.cores, JSON.stringify(saved));
 
 /* ---------------- the core, with those keys ---------------- */
 
 // What each key can reach (never the keys) is kept between visits, so the
 // Connections screen is instant.
-const CHECKED = "jarvis.coresChecked";
-
 const core = new ConsoleCore(
   {
     key: (id) => (saved.providers[id] ? { key: saved.providers[id]!.key, source: "saved" } : null),
@@ -54,8 +50,8 @@ const core = new ConsoleCore(
     active: () => saved.active,
   },
   {
-    read: () => { try { return JSON.parse(recall(CHECKED) ?? "{}") as Record<string, Validation>; } catch { return {}; } },
-    write: (all) => { store(CHECKED, JSON.stringify(all)); },
+    read: () => { try { return JSON.parse(recall(KEY.coresChecked) ?? "{}") as Record<string, Validation>; } catch { return {}; } },
+    write: (all) => { store(KEY.coresChecked, JSON.stringify(all)); },
   },
 );
 

@@ -11,15 +11,14 @@
  * that range, so no window can ever cover it.
  */
 
-import { recall, store } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 
 const BASE = 20;
 const KEEP = 80;
-const KEY = "jarvis.stack";
 
 let order: string[] = (() => {
   try {
-    const v = JSON.parse(recall(KEY) ?? "[]") as unknown;
+    const v = JSON.parse(recall(KEY.stack) ?? "[]") as unknown;
     return Array.isArray(v) ? v.filter((k): k is string => typeof k === "string").slice(-KEEP) : [];
   } catch { return []; }
 })();
@@ -57,7 +56,7 @@ export function raise(key: string): void {
   order.push(key);
   if (order.length > KEEP) order = order.slice(-KEEP);
   paint();
-  store(KEY, JSON.stringify(order));
+  store(KEY.stack, JSON.stringify(order));
 }
 
 /** Forget a surface that no longer exists. */
@@ -66,5 +65,5 @@ export function forget(key: string): void {
   if (!order.includes(key)) return;
   order = order.filter((k) => k !== key);
   paint();
-  store(KEY, JSON.stringify(order));
+  store(KEY.stack, JSON.stringify(order));
 }

@@ -9,18 +9,16 @@
  */
 
 import type { Address } from "../shared/types.js";
-import { recall, store } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 
 export type { Address } from "../shared/types.js";
 
-const KEY = "jarvis.address";
-
 export function getAddress(): Address {
-  return recall(KEY) === "madam" ? "madam" : "sir";
+  return recall(KEY.address) === "madam" ? "madam" : "sir";
 }
 
 export function setAddress(a: Address): void {
-  store(KEY, a);
+  store(KEY.address, a);
 }
 
 /** A line written with "sir", as it should be said to this user. */

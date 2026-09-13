@@ -8,7 +8,7 @@
  */
 
 import type { Turn } from "../shared/types.js";
-import { recall, store } from "./dom.js";
+import { KEY, recall, store } from "./storage.js";
 
 export interface CoreLine {
   role: "user" | "assistant" | "sys";
@@ -16,13 +16,12 @@ export interface CoreLine {
   at: number;
 }
 
-const KEY = "jarvis.conversation"; // once "jarvis.core", a letter from the keys' "jarvis.cores"
 /** How many lines are kept. Older ones fall off the top. */
 const CAP = 80;
 
 function load(): CoreLine[] {
   try {
-    const raw = JSON.parse(recall(KEY, "jarvis.core") ?? "[]") as unknown;
+    const raw = JSON.parse(recall(KEY.conversation) ?? "[]") as unknown;
     if (!Array.isArray(raw)) return [];
     return raw.filter((l): l is CoreLine =>
       !!l && typeof l === "object" && ["user", "assistant", "sys"].includes((l as CoreLine).role) && typeof (l as CoreLine).content === "string",
@@ -41,7 +40,7 @@ export const coreChat = {
   add(role: CoreLine["role"], content: string): void {
     lines.push({ role, content, at: Date.now() });
     if (lines.length > CAP) lines = lines.slice(-CAP);
-    store(KEY, JSON.stringify(lines));
+    store(KEY.conversation, JSON.stringify(lines));
     coreChat.onChange?.();
   },
 
@@ -55,13 +54,13 @@ export const coreChat = {
     const last = lines[lines.length - 1];
     if (!last || last.role !== role || last.content !== content) return;
     lines.pop();
-    store(KEY, JSON.stringify(lines));
+    store(KEY.conversation, JSON.stringify(lines));
     coreChat.onChange?.();
   },
 
   clear(): void {
     lines = [];
-    store(KEY, "[]");
+    store(KEY.conversation, "[]");
     coreChat.onChange?.();
   },
 

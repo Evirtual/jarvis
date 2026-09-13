@@ -124,3 +124,27 @@ test("the conversation keeps the last eighty lines, hands the model only talk, a
   coreChat.clear();
   assert.equal(coreChat.lines.length, 0);
 });
+
+/* ---------------- what is kept in the browser ---------------- */
+
+test("a setting kept under an older name is moved to its current one once, and never over a newer value", async () => {
+  const kept = new Map<string, string>();
+  (globalThis as { localStorage?: unknown }).localStorage = {
+    getItem: (k: string) => kept.get(k) ?? null,
+    setItem: (k: string, v: string) => { kept.set(k, v); },
+    removeItem: (k: string) => { kept.delete(k); },
+  };
+  try {
+    const { KEY, migrateStorage, recall } = await import("../src/client/storage.ts");
+    kept.set("jarvis.pitch", "0.9");
+    kept.set("jarvis.panelsOpen", "compute");
+    kept.set("jarvis.panels.open", "radar"); // already saved under the new name: the old one is dropped, not taken
+    migrateStorage();
+    assert.equal(recall(KEY.voicePitch), "0.9");
+    assert.equal(recall(KEY.panelsOpen), "radar");
+    assert.equal(kept.has("jarvis.pitch"), false);
+    assert.equal(kept.has("jarvis.panelsOpen"), false);
+  } finally {
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  }
+});
