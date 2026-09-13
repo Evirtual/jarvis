@@ -125,6 +125,8 @@ export interface AskRequest {
   context?: string;
   provider?: ProviderId;
   address?: Address;
+  /** Offer the service its web search tool whatever the wording — a thread is in front, and threads are where research lives. */
+  search?: boolean;
 }
 
 /**

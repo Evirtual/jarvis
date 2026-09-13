@@ -96,8 +96,13 @@ export const openai: Service = {
     };
   },
 
-  async chat(key, model, turns, emit, signal, persona = PERSONA) {
-    const call = (withSearch: boolean): Promise<Response> =>
+  async chat(key, model, turns, emit, signal, persona = PERSONA, search = true) {
+    // The gpt-5 and o-series models think before they answer, at a medium
+    // effort unless told otherwise — several seconds before the first word of
+    // a greeting. A talking console wants the low setting, and short replies
+    // when nothing is being looked up. Older models refuse these fields.
+    const reasons = /^(?:gpt-5|o\d)/.test(model);
+    const call = (withSearch: boolean, tuned: boolean): Promise<Response> =>
       fetch(`${API}/responses`, {
         method: "POST",
         headers: headers(key),
@@ -107,17 +112,18 @@ export const openai: Service = {
           instructions: persona,
           input: turns.map((t) => ({ role: t.role, content: t.content })),
           ...(withSearch ? { tools: [{ type: "web_search" }] } : {}),
+          ...(tuned ? { reasoning: { effort: "low" }, ...(withSearch ? {} : { text: { verbosity: "low" } }) } : {}),
         }),
         signal,
       });
 
-    let r = await withRetry(() => call(true), signal);
+    let r = await withRetry(() => call(search, reasons), signal);
     if (!r.ok) {
-      // Not every model carries the search tool; answer without it rather than fail.
+      // Not every model carries the search tool or takes the reasoning fields; answer plainly rather than fail.
       const body = await r.text();
-      if (signal.aborted || !/web_search|tool|unsupported|not supported/i.test(body)) throw httpError("ChatGPT", r.status, body);
+      if (signal.aborted || !/web_search|tool|unsupported|not supported|reasoning|verbosity/i.test(body)) throw httpError("ChatGPT", r.status, body);
       emit({ t: "status", status: "thinking" });
-      r = await withRetry(() => call(false), signal);
+      r = await withRetry(() => call(false, false), signal);
       if (!r.ok) throw httpError("ChatGPT", r.status, await r.text());
     }
     if (!r.body) throw httpError("ChatGPT", r.status, "no body");

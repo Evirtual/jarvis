@@ -122,35 +122,42 @@ export const gemini: Service = {
     };
   },
 
-  async chat(key, model, turns, emit, signal, persona = PERSONA) {
+  async chat(key, model, turns, emit, signal, persona = PERSONA, search = true) {
     const contents = turns.map((t) => ({
       role: t.role === "assistant" ? "model" : "user",
       parts: [{ text: t.content }],
     }));
 
-    const call = (withSearch: boolean): Promise<Response> =>
+    const call = (withSearch: boolean, thinking: boolean): Promise<Response> =>
       fetch(`${API}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
         method: "POST",
         headers: headers(key),
         body: JSON.stringify({
           contents,
           systemInstruction: { parts: [{ text: persona }] },
-          // Room for the model's own deliberation as well as the answer: the
-          // newest models think first, and a tight limit left nothing to say.
-          generationConfig: { maxOutputTokens: 4096 },
+          // The newest models think before they answer — seconds before the
+          // first word of a greeting. A talking console does without, where
+          // the model lets it be switched off (Pro insists on some); the
+          // limit leaves room for the answer either way.
+          generationConfig: { maxOutputTokens: 4096, ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }) },
           // Google Search grounding — Gemini's own live-information tool.
           ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
         }),
         signal,
       });
 
-    let r = await call(true);
-    if (r.status === 400 || r.status === 429) {
+    let r = await call(search, false);
+    if (r.status === 400 && /thinking/i.test(await r.clone().text())) {
+      // This model will not have its thinking switched off: let it think.
+      r = await call(search, true);
+    }
+    if (search && (r.status === 400 || r.status === 429)) {
       // Grounding isn't offered on every model (400), and has its own, smaller
       // allowance on the free tier (429): answer without it rather than fail.
       // A rejected key or a missing model would only be refused again.
       emit({ t: "status", status: "thinking" });
-      r = await call(false);
+      r = await call(false, false);
+      if (r.status === 400 && /thinking/i.test(await r.clone().text())) r = await call(false, true);
     }
     if (!r.ok || !r.body) throw httpError("Gemini", r.status, await r.text());
 

@@ -14,7 +14,7 @@ import type {
 } from "../types.js";
 import { PROVIDER_IDS, isProviderId } from "../types.js";
 import { hearWith, humanise, PROVIDERS, SERVICES, speakWith } from "./index.js";
-import { maskKey, personaFor, prepareTurns, type Service } from "./common.js";
+import { maskKey, personaFor, prepareTurns, type Service, wantsSearch } from "./common.js";
 
 /** Where the keys live: in config.json beside the server, or in the browser's storage. */
 export interface KeyStore {
@@ -55,6 +55,8 @@ export interface Prepared {
   model: string;
   turns: Turn[];
   persona: string;
+  /** Whether the service is offered its web search tool for this question (wantsSearch). */
+  search: boolean;
 }
 
 /**
@@ -203,7 +205,7 @@ export class ConsoleCore {
     // Live readings ride along with the newest question only, never the history.
     const turns = prepareTurns(body.turns, body.context);
     if (!turns) throw new CoreError("no_turns", "There's nothing to answer.");
-    return { id, key: c.key, model: c.model, turns, persona: personaFor(body.address === "madam" ? "madam" : "sir") };
+    return { id, key: c.key, model: c.model, turns, persona: personaFor(body.address === "madam" ? "madam" : "sir"), search: body.search === true || wantsSearch(turns) };
   }
 
   /**
@@ -213,7 +215,7 @@ export class ConsoleCore {
    */
   async answer(q: Prepared, emit: (ev: AskEvent) => void, signal: AbortSignal): Promise<void> {
     try {
-      await this.services[q.id].chat(q.key, q.model, q.turns, emit, signal, q.persona);
+      await this.services[q.id].chat(q.key, q.model, q.turns, emit, signal, q.persona, q.search);
       this.problems.delete(q.id);
     } catch (err) {
       if (signal.aborted) throw err;

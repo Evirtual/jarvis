@@ -273,11 +273,15 @@ context, and other threads reach him only as one-line summaries, or as
 findings through the web when two threads are connected.
 
 Short questions about this machine ("status", "my IP", "weather") are answered
-instantly from live readings, at the core; anything else goes to the service,
-which searches the web only when you ask it to find, look up or check
-something, or ask for current facts — searching costs, talking doesn't. A
-question asked while an answer is still arriving is queued, and questions are
-answered in the order asked.
+instantly from live readings, at the core; anything else goes to the service.
+The service is given its web search only when the question asks to find, look
+up or check something, or for current facts — news, prices, weather elsewhere,
+scores, pictures — and always for a follow-up in a thread, where research
+lives. Plain talk goes without it, and the model is asked to think briefly, so
+a greeting or a fact comes back in a second or two; a search takes a few
+seconds more. Searching costs, talking doesn't. A question asked while an
+answer is still arriving is queued, and questions are answered in the order
+asked.
 
 ## Installing it as an app
 

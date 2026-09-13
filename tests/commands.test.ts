@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { NEEDS_CONFIRMATION, extractDirectives, intentOf, parseRoute, parseUtterance, type ParseContext } from "../src/client/commands.ts";
 import { DIRECTIVES, directiveCatalogue } from "../src/shared/directives.ts";
-import { rankModels } from "../src/shared/services/common.ts";
+import { rankModels, wantsSearch } from "../src/shared/services/common.ts";
 
 const threads = ["General", "Lithuania", "Trip planning", "Cambodia news"];
 const groups = ["Research", "Travel"];
@@ -124,6 +124,29 @@ test("what is left after the commands is only asked if it has words in it", () =
 test("the newest model first, and a date or a 'latest' alias never outranks it", () => {
   assert.deepEqual(rankModels(["gpt-5.3-chat-latest", "gpt-6-astra", "gpt-5.5", "gpt-5-2025-08-07"]).slice(0, 2), ["gpt-6-astra", "gpt-5.5"]);
   assert.equal(rankModels(["deep-research-pro-preview-12-2025", "gemini-3.8-flash"])[0], "gemini-3.8-flash");
+});
+
+test("the small model of a generation is the default; a newer generation still outranks it; nano stays behind", () => {
+  assert.deepEqual(rankModels(["gpt-5.5", "gpt-5.5-nano", "gpt-5.5-mini"]), ["gpt-5.5-mini", "gpt-5.5", "gpt-5.5-nano"]);
+  assert.equal(rankModels(["gpt-5.5-mini", "gpt-6"])[0], "gpt-6");
+  assert.equal(rankModels(["gemini-3.5-pro", "gemini-3.5-flash", "gemini-3.5-flash-lite"])[0], "gemini-3.5-flash");
+});
+
+test("the web is offered for a question that wants it, or a follow-up in a thread that came from it — not for talk", () => {
+  const ask = (q: string, before: { role: "user" | "assistant"; content: string }[] = []) => wantsSearch([...before, { role: "user", content: q }]);
+  assert.equal(ask("hello there, how are you"), false);
+  assert.equal(ask("what is the capital of Peru"), false);
+  assert.equal(ask("explain how a transistor works"), false);
+  assert.equal(ask("find the latest news about the Baltic sea cables"), true);
+  assert.equal(ask("what's the weather in Lisbon"), true);
+  assert.equal(ask("look up the price of the Pixel 10"), true);
+  assert.equal(ask("who won the match last night"), true);
+  assert.equal(ask("show me pictures of the Eagle S"), true);
+  assert.equal(ask("hello\n\n[Live readings from this device: CPU 3%. Do not recite these unless asked.]"), false, "the readings that ride along are not the question");
+  const research = [{ role: "user" as const, content: "find the latest on the cables" }, { role: "assistant" as const, content: "According to Reuters, the Eagle S was detained." }];
+  assert.equal(ask("and what about Germany?", research), true, "a follow-up in a thread that came from the web");
+  const talk = [{ role: "user" as const, content: "tell me a joke" }, { role: "assistant" as const, content: "Why did the capacitor…" }];
+  assert.equal(ask("another one", talk), false);
 });
 
 test("services that aren't connections are not cores", () => {

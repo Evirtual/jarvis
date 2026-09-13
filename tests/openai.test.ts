@@ -40,7 +40,34 @@ test("an answer streams as text and status events, from the stream's own event t
     assert.equal(f.bodies[0]!.stream, true);
     assert.deepEqual(f.bodies[0]!.tools, [{ type: "web_search" }], "asked with the search tool first");
     assert.equal(f.bodies[0]!.instructions, "persona");
+    assert.equal(f.bodies[0]!.reasoning, undefined, "a model that does not reason is not told how hard to");
   } finally { f.restore(); }
+});
+
+test("a reasoning model is asked at low effort, briefly when nothing is looked up; the search tool only when the question wants it", async () => {
+  const f = fakeFetch([reply(200, sse([{ type: "response.output_text.delta", delta: "Hi." }])), reply(200, sse([{ type: "response.output_text.delta", delta: "Found." }]))]);
+  try {
+    const sink = (): void => {};
+    await openai.chat("k", "gpt-5-mini", turns, sink, new AbortController().signal, "p", false);
+    assert.deepEqual(f.bodies[0]!.reasoning, { effort: "low" });
+    assert.deepEqual(f.bodies[0]!.text, { verbosity: "low" });
+    assert.equal(f.bodies[0]!.tools, undefined, "no search tool for plain talk");
+    await openai.chat("k", "gpt-5-mini", turns, sink, new AbortController().signal, "p", true);
+    assert.deepEqual(f.bodies[1]!.reasoning, { effort: "low" });
+    assert.equal(f.bodies[1]!.text, undefined, "a searched answer is not cut short");
+    assert.deepEqual(f.bodies[1]!.tools, [{ type: "web_search" }]);
+  } finally { f.restore(); }
+  // a model that refuses the reasoning fields is asked again plainly
+  const g = fakeFetch([
+    reply(400, JSON.stringify({ error: { message: "Unsupported parameter: 'reasoning' is not supported with this model." } }), "application/json"),
+    reply(200, sse([{ type: "response.output_text.delta", delta: "Plain." }])),
+  ]);
+  try {
+    const events: AskEvent[] = [];
+    await openai.chat("k", "gpt-5-something-odd", turns, (ev) => events.push(ev), new AbortController().signal, "p", false);
+    assert.deepEqual(events, [{ t: "status", status: "thinking" }, { t: "text", delta: "Plain." }]);
+    assert.equal(g.bodies[1]!.reasoning, undefined);
+  } finally { g.restore(); }
 });
 
 test("a model without the search tool is asked again without it; any other refusal is the error", async () => {
@@ -79,7 +106,7 @@ test("the account's models come from the list endpoint, ranked, without the ones
   const f = fakeFetch([reply(200, JSON.stringify({ data: [{ id: "gpt-4.1-mini" }, { id: "gpt-4.1" }, { id: "gpt-4o-mini-tts" }, { id: "whisper-1" }, { id: "gpt-5-chat-latest" }] }), "application/json")]);
   try {
     const c = await openai.catalogue("k");
-    assert.deepEqual(c.chat, ["gpt-4.1", "gpt-4.1-mini"]);
+    assert.deepEqual(c.chat, ["gpt-4.1-mini", "gpt-4.1"], "the small one first");
     assert.deepEqual(c.speech, ["gpt-4o-mini-tts"]);
     assert.deepEqual(c.hearing, ["whisper-1"]);
   } finally { f.restore(); }

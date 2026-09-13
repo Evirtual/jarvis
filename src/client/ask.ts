@@ -233,7 +233,8 @@ async function stream(x: Exchange): Promise<string> {
   const recent = coreChat.recent(11);
   if (recent[recent.length - 1]?.role === "user" && recent[recent.length - 1]?.content === x.question) recent.pop();
   const turns = [...recent.slice(-10), { role: "user" as const, content: x.question }];
-  const request = { turns, ...(ctx ? { context: ctx } : {}), address: getAddress() };
+  // A thread in front is research, so the web is offered for a follow-up in it whatever the wording (wantsSearch decides for talk at the core).
+  const request = { turns, ...(ctx ? { context: ctx } : {}), address: getAddress(), ...(x.front ? { search: true } : {}) };
   const askVia = (provider?: ProviderId): Promise<string> => api.ask(
     { ...request, ...(provider ? { provider } : {}) },
     (full) => {

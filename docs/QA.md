@@ -1079,3 +1079,26 @@ Found and fixed on the way:
 115. Setting a service's voices told the voice tab twice that its state had
      changed — once from the choice, once from the list. Once now; a unit test
      for the choice on its own (voice-choice.test.ts) caught it.
+
+### 2026-09-14 — thinking and searching, faster
+
+Measured in the desktop pane against the real ChatGPT on gpt-5-mini, the same
+three lines before and after, the whole request from sending to the last word:
+
+| Line | Before | After |
+|---|---|---|
+| "hello there, how are you" | 7.8 s | 2.8 s |
+| "what is the capital of Peru" | 5.6 s | 1.8 s |
+| "find the latest news about the Baltic sea cables" | 44.7 s | 7.2 s |
+
+Typecheck clean, 118 unit tests, 21 end-to-end scenarios, build clean.
+
+116. Every line went to the service with the web search tool attached and the
+     model's thinking left at its default, so even a greeting waited on a
+     decision about searching and on several seconds of deliberation. The
+     tool is offered only when the question wants the world (find, look up,
+     check, news, prices, weather, scores, pictures, dates) or a thread is in
+     front; the gpt-5 family is asked at low effort, and briefly when nothing
+     is looked up; Gemini's thinking is switched off for chat where the
+     model allows. The small model of a generation is the default; the
+     picker in Configuration still offers the rest.

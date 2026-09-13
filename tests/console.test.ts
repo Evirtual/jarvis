@@ -115,6 +115,13 @@ test("a question is answered through the connected service, with the persona for
   assert.equal(gemini.calls.chat, 1);
 });
 
+test("the web is offered for a question that wants it, or when the console says a thread is in front", async () => {
+  const { core } = coreWith(storeWith({ gemini: "good" }));
+  assert.equal((await core.prepare(question("hello there"))).search, false);
+  assert.equal((await core.prepare(question("find the latest news on the cables"))).search, true);
+  assert.equal((await core.prepare({ ...question("and Germany?"), search: true })).search, true);
+});
+
 test("the reasons a question can't be asked are the user's words, with a code for the server", async () => {
   const none = coreWith(storeWith({}));
   await assert.rejects(none.core.prepare(question("hello")), (err: unknown) => err instanceof CoreError && err.code === "no_provider" && /No reasoning core/.test(err.message));
