@@ -16,7 +16,7 @@
 
 import type { ProviderId } from "../shared/types.js";
 import { PANEL_NAMES, type PanelName } from "./panels.js";
-export type ConfigTab = "connections" | "voice" | "quick";
+export type ConfigTab = "connections" | "voice" | "quick" | "access";
 
 export type Action =
   | { name: "new_thread"; branch?: boolean; title?: string; ask?: string; parent?: string; parentId?: string; group?: string }
@@ -119,6 +119,7 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   // Config — before the voice rules, so "open voice settings" is never read as
   // a voice called "settings"
   if (/\b(?:open|show)\s+(?:me\s+)?(?:the\s+)?voice settings\b/.test(q)) return { name: "open_config", tab: "voice" };
+  if (/\b(?:open|show)\s+(?:me\s+)?(?:the\s+)?(?:access|permissions?)(?:\s+settings)?\b/.test(q)) return { name: "open_config", tab: "access" };
   if (/\b(?:open|show)\s+(?:me\s+)?(?:the\s+)?(?:config|configuration|settings|connections|preferences)\b|^(?:config|settings)$/.test(q)) return { name: "open_config", tab: "connections" };
   if (/\bclose\s+(?:the\s+)?(?:config|configuration|settings|drawer)\b/.test(q)) return { name: "close_config" };
 

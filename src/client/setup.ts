@@ -142,8 +142,11 @@ const NEED_NAMES: Record<Need, PermissionName> = { mic: "microphone" as Permissi
 async function permissionState(need: Need): Promise<PermissionState | "unknown"> {
   try {
     const p = await navigator.permissions.query({ name: NEED_NAMES[need] });
-    // when the user answers the browser's own prompt, the row follows
-    p.onchange = () => { if (setupOpen() && step === NEEDS_STEP) void paintNeeds(); };
+    // when the user answers the browser's own prompt, the rows follow — in the guide and in Configuration
+    p.onchange = () => {
+      if (setupOpen() && step === NEEDS_STEP) void paintNeeds(body);
+      if (access.childElementCount) void paintNeeds(access);
+    };
     return p.state;
   } catch {
     return "unknown";
@@ -164,7 +167,7 @@ function needs(): string {
     : sound
       ? "Sound is allowed here: he greets you aloud the moment the console opens."
       : "A browser plays nothing before your first tap, so on opening he greets you in writing. To hear it: install the console, or allow sound for this site — the lock icon by the address, Site settings, Sound — and reload.";
-  const install = !isApp() && installPrompt ? `<button class="btn primary" type="button" id="setupInstall">Install the console</button>` : "";
+  const install = !isApp() && installPrompt ? `<button class="btn primary" type="button" data-setup-install>Install the console</button>` : "";
   return (
     `<p class="lead">Three things the browser asks about. Each is yours to allow, and none is needed to type to him.</p>` +
     needRow("mic", "Microphone", "To talk to him. Tapping JARVIS asks for it too, the first time.") +
@@ -175,9 +178,9 @@ function needs(): string {
 }
 
 /** Fills in each permission's state from the browser, and hides the button once it is granted. */
-async function paintNeeds(): Promise<void> {
+async function paintNeeds(root: ParentNode): Promise<void> {
   for (const need of ["mic", "geo"] as Need[]) {
-    const row = body.querySelector<HTMLElement>(`.need[data-need="${need}"]`);
+    const row = root.querySelector<HTMLElement>(`.need[data-need="${need}"]`);
     if (!row) return;
     const state = await permissionState(need);
     const st = row.querySelector<HTMLElement>(".st")!;
@@ -192,8 +195,8 @@ async function paintNeeds(): Promise<void> {
 }
 
 /** Asks the browser for one permission — its own prompt appears — and the row follows the answer. */
-async function allow(need: Need): Promise<void> {
-  const row = body.querySelector<HTMLElement>(`.need[data-need="${need}"]`);
+async function allow(need: Need, root: ParentNode): Promise<void> {
+  const row = root.querySelector<HTMLElement>(`.need[data-need="${need}"]`);
   const err = row?.querySelector<HTMLElement>(".err");
   try {
     if (need === "mic") {
@@ -208,8 +211,35 @@ async function allow(need: Need): Promise<void> {
       err.textContent = e instanceof Error && e.name === "NotFoundError" ? "No microphone was found on this device." : "Blocked in the browser. Allow it from the lock icon by the address, then try again.";
     }
   }
-  void paintNeeds();
+  void paintNeeds(root);
 }
+
+/** A click in a set of rows: Allow asks; Install takes the browser's offer. True when it was one of ours. */
+function needsClick(target: HTMLElement, root: HTMLElement): boolean {
+  const permBtn = target.closest<HTMLElement>("[data-setup-perm]");
+  if (permBtn) { void allow(permBtn.dataset.setupPerm as Need, root); return true; }
+  if (target.closest("[data-setup-install]") && installPrompt) {
+    const p = installPrompt;
+    installPrompt = null;
+    void p.prompt().then(() => p.userChoice).then((c) => {
+      if (c.outcome !== "accepted") installPrompt = p;
+      if (setupOpen() && step === NEEDS_STEP) render();
+      if (access.childElementCount) mountNeeds(access);
+    });
+    return true;
+  }
+  return false;
+}
+
+/** The same rows in Configuration → Access, drawn afresh each time the drawer or the tab is opened. */
+const access = $("accessNeeds");
+function mountNeeds(root: HTMLElement): void {
+  root.innerHTML = needs();
+  void paintNeeds(root);
+}
+access.addEventListener("click", (e) => { needsClick(e.target as HTMLElement, access); });
+$("openDrawer").addEventListener("click", () => mountNeeds(access));
+document.querySelector<HTMLElement>('.tab[data-tab="access"]')?.addEventListener("click", () => mountNeeds(access));
 
 function sayHello(): string {
   const address = getAddress();
@@ -226,7 +256,7 @@ function render(): void {
   title.textContent = STEPS[step] ?? "";
   dots.innerHTML = STEPS.map((_, i) => `<i${i === step ? ' class="on"' : ""}></i>`).join("");
   body.innerHTML = step === 0 ? whereYouAre() : step === 1 ? connect() : step === NEEDS_STEP ? needs() : sayHello();
-  if (step === NEEDS_STEP) void paintNeeds();
+  if (step === NEEDS_STEP) void paintNeeds(body);
   back.hidden = step === 0;
   const last = step === STEPS.length - 1;
   skip.hidden = last;
@@ -260,14 +290,7 @@ body.addEventListener("click", (e) => {
   if (connectBtn) { void saveKey(connectBtn.dataset.setupConnect as ProviderId); return; }
   const useBtn = target.closest<HTMLElement>("[data-setup-use]");
   if (useBtn) { void api.setActive(useBtn.dataset.setupUse as ProviderId).then(() => conn.refresh()).then(render); return; }
-  const permBtn = target.closest<HTMLElement>("[data-setup-perm]");
-  if (permBtn) { void allow(permBtn.dataset.setupPerm as Need); return; }
-  if (target.closest("#setupInstall") && installPrompt) {
-    const p = installPrompt;
-    installPrompt = null;
-    void p.prompt().then(() => p.userChoice).then((c) => { if (c.outcome !== "accepted") installPrompt = p; render(); });
-    return;
-  }
+  if (needsClick(target, body)) return;
   if (target.closest("#setupVoice")) {
     voice.markUserActed();
     voice.stop();
