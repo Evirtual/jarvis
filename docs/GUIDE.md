@@ -49,7 +49,7 @@ and writes, his own notices included.
 
 - **A clean screen is the starting state, and talk keeps it clean.** Saying
   something to JARVIS opens nothing: the answer is spoken and shown under him,
-  and kept in the conversation (Threads → Conversation). A thread opens when
+  and kept in the Conversation panel ("show the conversation", or tap the line). A thread opens when
   JARVIS has to look something up for you, or when you ask for one.
 - **A thread is a window.** One thread on its own is just that — no group, no
   label around it. Each gets its own colour, and a `#ABCD` tag so two threads
@@ -237,8 +237,8 @@ news in Cambodia"* opens a window and asks that question in it.
 
 **Conversation first.** JARVIS listens and talks back; the console follows.
 Anything he can answer from what he knows is said at the core, however long,
-and kept in the conversation transcript, where lists and tables render in
-full. Anything he had to find on the web is research, and research is kept: it
+and kept in the Conversation panel, where lists and tables render in full —
+say "show the conversation", or tap the line under him. Anything he had to find on the web is research, and research is kept: it
 goes in a thread of its own, named by him, with its sources — unless you say
 "just tell me", in which case the searched answer is said at the core. Ask for
 a thread, a window, or to keep something, and it is a thread. Pictures and

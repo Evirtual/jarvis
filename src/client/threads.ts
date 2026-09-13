@@ -129,21 +129,18 @@ $("newThread").addEventListener("click", () => {
  * --------------------------------------------------------------------- */
 
 /**
- * The conversation at the core, above the board's list: what was said outside
- * any thread, oldest first, drawn as replies are drawn in a window.
+ * The Conversation panel: what was said at the core, outside any thread,
+ * oldest first, drawn as replies are drawn in a window.
  */
 export function paintCoreChat(): void {
-  if (!panels.isOpen("threads")) return;
+  if (!panels.isOpen("conversation")) return;
   const box = $("coreChat");
   const rows = coreChat.lines.slice(-40);
+  $("convAux").textContent = `${coreChat.lines.length} line${coreChat.lines.length === 1 ? "" : "s"}`;
   const key = rows.map((l) => `${l.role}:${l.at}:${l.content.length}`).join("|");
   if (box.dataset.key === key) return;
   box.dataset.key = key;
   box.replaceChildren();
-  const head = document.createElement("div");
-  head.className = "tl-g";
-  head.innerHTML = `<i style="background:#6ff0ff"></i>Conversation<span class="n">${coreChat.lines.length}</span>`;
-  box.append(head);
   if (!rows.length) {
     const e = document.createElement("div");
     e.className = "tl-empty";
@@ -169,7 +166,6 @@ coreChat.onChange = paintCoreChat;
 
 export function paintThreadList(): void {
   if (!panels.isOpen("threads")) return;
-  paintCoreChat();
   const hue = (g: Group): string => getComputedStyle(document.querySelector<HTMLElement>(`.bubble[data-gid="${g.id}"]`) ?? document.body).getPropertyValue("--hue") || "#6ff0ff";
   const rows: string[] = [];
   for (const g of ws.visibleGroups) {

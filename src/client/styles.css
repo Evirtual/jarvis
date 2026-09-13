@@ -819,12 +819,14 @@ body.m-compact .setup-sheet {
 .cw-msg.jarvis { color: var(--text-hi); }
 .cw-msg.sys { color: var(--ice-dim); font-size: 10.5px; }
 
-/* ---------- the Threads list: the whole board as a list ---------- */
-.panel.float[data-panel="threads"] {
+/* ---------- the Threads list: the whole board as a list; the Conversation: the talk at the core ---------- */
+.panel.float[data-panel="threads"], .panel.float[data-panel="conversation"] {
   width: 320px; max-height: min(480px, var(--board-h));
   display: flex; flex-direction: column; overflow: hidden;
 }
 .panel.float[data-panel="threads"] .tl { min-height: 0; overflow-y: auto; }
+.panel.float[data-panel="conversation"] .tl-core { display: flex; flex-direction: column; min-height: 0; margin: 0; }
+.panel.float[data-panel="conversation"] .tl-chat { flex: 1 1 auto; min-height: 0; max-height: none; }
 .tl { display: flex; flex-direction: column; gap: 2px; }
 .tl-g {
   display: flex; align-items: center; gap: 7px; margin-top: 8px; padding: 4px 2px;
@@ -871,7 +873,7 @@ body.m-compact .setup-sheet {
   container-type: inline-size;
   animation: panelIn .28s cubic-bezier(.2,.9,.3,1);
 }
-.panel.float:not([data-panel="threads"]) { --surface-highlight: 0 0 38px color-mix(in srgb, var(--hue) 26%, transparent); }
+.panel.float:not([data-panel="threads"]):not([data-panel="conversation"]) { --surface-highlight: 0 0 38px color-mix(in srgb, var(--hue) 26%, transparent); }
 /* Each instrument has one colour, worn by its panel, by its reading in the
    deck and by its row in More — so the toggle and the box read as one thing. */
 .panel.float[data-panel="compute"], [data-open="compute"] { --hue: #68f4ff; }
@@ -1222,7 +1224,7 @@ body.m-compact .overlays:not(:has(> .panel.float:not([hidden]))) { display: none
 /* …except the Threads list, which on a phone is a modal sheet like More: it
    rises from the line where the fade over the bottom controls begins (main.ts
    lifts it out of the list), and a tap outside it closes it. */
-body.m-compact .panel.float[data-panel="threads"] {
+body.m-compact .panel.float[data-panel="threads"], body.m-compact .panel.float[data-panel="conversation"] {
   position: fixed; left: var(--edge) !important; right: var(--edge); top: auto !important;
   bottom: var(--sheet-bottom);
   width: auto !important; height: auto !important;
@@ -1330,7 +1332,7 @@ body.m-compact .tl-foot [data-all="tidy"] { display: none; }
    above it, so the button that opened the sheet can close it; a tap on the
    veil closes it too (main.ts). */
 .sheet-veil { position: absolute; inset: 0; z-index: 70; display: none; }
-body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden])) .sheet-veil {
+body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden]), .panel.float[data-panel="conversation"]:not([hidden])) .sheet-veil {
   display: block; animation: veilIn .2s var(--ease-soft);
 }
 @keyframes veilIn { from { opacity: 0; } }
@@ -1344,7 +1346,7 @@ body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="th
    gap from the bottom as from the sides, over the deck; a confirmation sits
    the same way. (The guide runs to the edge, full width: see its own rules.) */
 body.m-compact { --sheet-bottom: calc(var(--edge) + env(safe-area-inset-bottom, 0px)); }
-body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden])) :is(.core-label, .toast) {
+body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden]), .panel.float[data-panel="conversation"]:not([hidden])) :is(.core-label, .toast) {
   opacity: 0;
 }
 

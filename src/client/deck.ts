@@ -7,7 +7,7 @@ import { ICON, instrumentIcon as icon } from "./icons.js";
 import { $, esc } from "./dom.js";
 import { type PanelName } from "./panels.js";
 import { graph, radar, panels } from "./state.js";
-import { paintThreadList, paintThreadName } from "./threads.js";
+import { paintCoreChat, paintThreadList, paintThreadName } from "./threads.js";
 import { paintTelemetry } from "./readings.js";
 
 // The chips in the top bar are both a glance at the numbers and the way in.
@@ -17,6 +17,7 @@ document.querySelectorAll<HTMLElement>("[data-open]").forEach((b) => {
 panels.onChange = (): void => {
   document.querySelectorAll<HTMLElement>("[data-open]").forEach((b) => b.classList.toggle("on", panels.isOpen(b.dataset.open as PanelName)));
   if (panels.isOpen("threads")) paintThreadList();
+  if (panels.isOpen("conversation")) paintCoreChat();
   radar.visible = panels.isOpen("perimeter");
   // a panel's body is painted only while it is open — fill it the moment it opens
   paintTelemetry();
@@ -159,10 +160,12 @@ for (const s of SIDES) {
 }
 document.addEventListener("pointerdown", (e) => {
   for (const s of SIDES) if (menuOpen(s) && !moreWrapOf(s).contains(e.target as Node)) setMenu(s, false);
-  // On a phone the Threads list is a modal sheet: a tap anywhere else closes it.
+  // On a phone the Threads list and the Conversation are modal sheets: a tap anywhere else closes them.
   const t = e.target as Element;
-  if (mode === "compact" && panels.isOpen("threads") && t instanceof Element &&
-      !t.closest('.panel.float[data-panel="threads"], #pillThreads, .confirm-dialog, .confirm-backdrop')) panels.hide("threads");
+  if (mode !== "compact" || !(t instanceof Element)) return;
+  for (const sheet of ["threads", "conversation"] as const) {
+    if (panels.isOpen(sheet) && !t.closest(`.panel.float[data-panel="${sheet}"], #pillThreads, #coreSay, .confirm-dialog, .confirm-backdrop`)) panels.hide(sheet);
+  }
 });
 
 /* ===================================================================== *
@@ -184,10 +187,12 @@ export function applyMode(): void {
   const overlays = $("overlays"), list = $("windows");
   if (mode === "compact" && overlays.parentElement !== list) list.prepend(overlays);
   else if (mode !== "compact" && overlays.parentElement === list) list.after(overlays);
-  // …but the Threads list is a modal sheet on a phone, not an item in the list.
-  const threadsPanel = document.querySelector<HTMLElement>('.panel.float[data-panel="threads"]')!;
-  if (mode === "compact" && threadsPanel.parentElement === overlays) $("stage").append(threadsPanel);
-  else if (mode !== "compact" && threadsPanel.parentElement !== overlays) overlays.prepend(threadsPanel);
+  // …but the Threads list and the Conversation are modal sheets on a phone, not items in the list.
+  for (const name of ["conversation", "threads"]) {
+    const sheet = document.querySelector<HTMLElement>(`.panel.float[data-panel="${name}"]`)!;
+    if (mode === "compact" && sheet.parentElement === overlays) $("stage").append(sheet);
+    else if (mode !== "compact" && sheet.parentElement !== overlays) overlays.prepend(sheet);
+  }
   if (changed) graph.renderAll();
   panels.relayout();
   paintThreadName();

@@ -93,8 +93,13 @@
         <div class="overlays" id="overlays">
           <section class="panel float glass" data-panel="threads" hidden>
             <h2 class="drag">Threads<span class="tail"></span><span class="aux" id="threadsAux">—</span><button class="p-x" type="button" aria-label="Close Threads" title="Close Threads"></button></h2>
-            <div class="tl-core" id="coreChat"></div>
             <div class="tl" id="threadList"></div>
+          </section>
+
+          <!-- The conversation at the core: what you and JARVIS say outside any thread (core-chat.ts). -->
+          <section class="panel float glass" data-panel="conversation" hidden>
+            <h2 class="drag">Conversation<span class="tail"></span><span class="aux" id="convAux">—</span><button class="p-x" type="button" aria-label="Close Conversation" title="Close Conversation"></button></h2>
+            <div class="tl-core" id="coreChat"></div>
           </section>
 
           <section class="panel float glass" data-panel="compute" hidden>

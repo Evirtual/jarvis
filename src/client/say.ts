@@ -6,7 +6,7 @@
 import { addressed } from "./address.js";
 import { $ } from "./dom.js";
 import { line } from "./message.js";
-import { graph, voice } from "./state.js";
+import { graph, panels, voice } from "./state.js";
 import { drainQueue, queued } from "./ask.js";
 import { pendingConfirm } from "./confirm.js";
 import { coreChat } from "./core-chat.js";
@@ -103,11 +103,12 @@ export function hideSay(): void {
   coreSay.classList.remove("in");
   window.setTimeout(() => { if (!coreSay.classList.contains("in")) coreSay.hidden = true; }, 320);
 }
-coreSay.addEventListener("click", hideSay);
+// A tap on the line opens the whole conversation, and puts the line away.
+coreSay.addEventListener("click", () => { panels.show("conversation"); hideSay(); });
 
 /**
  * JARVIS speaks, at the core: a line of conversation, kept in the transcript
- * (Threads → Conversation) and spoken. Threads hold research; this is talk.
+ * (the Conversation panel) and spoken. Threads hold research; this is talk.
  */
 export function jarvis(text: string, opts: { speak?: boolean; record?: boolean } = {}): void {
   text = addressed(text);

@@ -57,7 +57,7 @@ export function localCommand(raw: string): boolean {
   if (/^(help|commands|what can you do|what can i say)$/.test(q)) {
     jarvis("Here's what I answer to directly, sir — it's in the conversation, and you can ask me to operate anything on this console in plain words.");
     coreChat.add("sys", HELP);
-    panels.show("threads"); // where the conversation is read
+    panels.show("conversation");
     return true;
   }
   if (short && /^(?:what(?:'s| is) the )?time(?: is it)?$|^what time is it$/.test(q)) {
@@ -123,7 +123,7 @@ export function localCommand(raw: string): boolean {
     coreChat.add("sys", "```\n" + S.hosts
       .map((h) => `${h.ip.padEnd(16)}${`${Math.round(h.rttMs)}ms`.padStart(6)}  ${h.hostname ?? h.vendor ?? h.mac ?? "unidentified"}`)
       .join("\n") + "\n```");
-    panels.show("threads");
+    panels.show("conversation");
     return true;
   }
   if (short && /\b(?:uplink|wi-?fi|my ip|ip address|isp|am i online|connection status|internet (?:status|connection|speed))\b/.test(q)) {

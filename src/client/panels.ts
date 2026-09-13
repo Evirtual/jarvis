@@ -16,12 +16,13 @@ import { recall, store } from "./dom.js";
 import { ICON } from "./icons.js";
 import { raise, stackKey, track } from "./stack.js";
 
-export const PANEL_NAMES = ["threads", "compute", "graphics", "storage", "perimeter", "uplink", "environment"] as const;
+export const PANEL_NAMES = ["threads", "conversation", "compute", "graphics", "storage", "perimeter", "uplink", "environment"] as const;
 export type PanelName = (typeof PANEL_NAMES)[number];
 
 /** Where each opens the first time: on the side of the deck its reading is on — this machine down the left, the world down the right. Threads opens under its corner button. */
 const DEFAULT_SEAT: Record<PanelName, { side: "l" | "r"; top: number }> = {
   threads: { side: "l", top: 64 },
+  conversation: { side: "l", top: 64 },
   compute: { side: "l", top: 64 },
   graphics: { side: "l", top: 270 },
   storage: { side: "l", top: 494 },

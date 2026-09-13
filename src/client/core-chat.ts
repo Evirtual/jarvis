@@ -2,7 +2,7 @@
  * The conversation at the core: what you say to JARVIS and what JARVIS says
  * back when no thread is involved — greetings, questions answered in a
  * breath, console operations, anything looked up and simply told. Kept in
- * this browser so it can be re-read (Threads panel → Conversation) and so
+ * this browser so it can be re-read (the Conversation panel) and so
  * follow-ups make sense: the last exchanges go to the model with each
  * question. Threads hold research; this holds the talk.
  */
