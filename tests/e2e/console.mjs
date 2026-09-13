@@ -194,6 +194,16 @@ await check('threads: new thread, subthread, group, move, collapse, expand, rena
   w = await ws(); assert(!w.groups.find((g) => g.id === trips.id).collapsed, 'Trips still collapsed');
   await say('rename Travel to Journeys'); await wait(800);
   w = await ws(); assert(w.threads.some((t) => t.title === 'Journeys'), 'rename failed: ' + w.threads.map((t) => t.title).join('|'));
+  // Folding one group never opens another: with the thread in front inside Trips and the only
+  // other group folded, folding Trips leaves both folded (it used to move into Second and open it).
+  await say('new group called Second'); await wait(600);
+  await say('collapse Second'); await wait(500);
+  await say('go to Journeys'); await wait(500);
+  await say('collapse Trips'); await wait(800);
+  w = await ws();
+  const folded = w.groups.filter((g) => /trips|second/i.test(g.title)).map((g) => ({ title: g.title, collapsed: !!g.collapsed }));
+  assert(folded.length === 2 && folded.every((g) => g.collapsed), 'folding one group opened another: ' + JSON.stringify(folded));
+  await say('expand Trips'); await say('expand Second'); await wait(600);
   await snap('threads');
   return { threads: w.threads.length, groups: w.groups.length };
 });

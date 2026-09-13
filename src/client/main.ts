@@ -29,6 +29,7 @@ import "./confirm.js";
 import "./actions.js";
 import "./ask.js";
 import "./drawer.js";
+import "./radar-split.js";
 import { markSetupDone, openSetup, setupDone } from "./setup.js";
 import { SERVERLESS } from "./server.js";
 

@@ -976,11 +976,21 @@ body.m-compact .setup-sheet {
 .btn.danger:hover:not(:disabled) { color: var(--red); border-color: var(--red); background: rgba(255,79,95,.08); }
 
 /* ---------- radar ---------- */
-#radar { width: 100%; height: auto; aspect-ratio: 1; display: block; cursor: crosshair; }
+/* The radar is square, as wide as the panel unless the line under it has been dragged (--radar-h). */
+#radar { width: min(var(--radar-h, 100%), 100%); height: auto; aspect-ratio: 1; display: block; margin: 0 auto; cursor: crosshair; }
+.radar-split {
+  height: 9px; margin: 6px 0 -1px; cursor: ns-resize; touch-action: none; position: relative;
+}
+.radar-split::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 1px; background: var(--line); }
+.radar-split::after {
+  content: ""; position: absolute; left: 50%; top: 2px; width: 28px; height: 5px; transform: translateX(-50%);
+  border-top: 1px solid var(--ice-dim); border-bottom: 1px solid var(--ice-dim); opacity: .6;
+}
+.radar-split:hover::after, .radar-split.on::after { opacity: 1; border-color: var(--ice); }
 .radar-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 7px; gap: 8px; }
 .radar-foot .info { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim); }
 .radar-foot .info b { color: var(--text-hi); font-weight: 600; }
-.hosts { margin-top: 8px; border-top: 1px solid var(--line); max-height: 116px; overflow-y: auto; }
+.hosts { margin-top: 0; max-height: 116px; overflow-y: auto; }
 /* Resized taller or shorter, Perimeter gives the difference to its host list:
    the radar and its footer keep their size, the list takes what's left (116px
    when the panel is its own size). */

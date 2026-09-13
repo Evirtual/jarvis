@@ -594,9 +594,13 @@ export class Stage {
   }
 
   setFolded(groupId: string, folded: boolean): void {
-    // The bubble you're working in doesn't fold away from under you.
+    // Folding the bubble you're working in moves you to the newest thread
+    // that is in the open — loose, or in a group that isn't folded. Never
+    // into a folded group: focusing a thread opens its group, and folding
+    // one group must not open another.
     if (folded && this.ws.active?.groupId === groupId && this.ws.visibleGroups.length > 1) {
-      const elsewhere = this.ws.live.filter((t) => t.groupId !== groupId).sort((a, b) => b.createdAt - a.createdAt)[0];
+      const open = new Set(this.ws.visibleGroups.filter((g) => g.id === GENERAL_ID || !g.collapsed).map((g) => g.id));
+      const elsewhere = this.ws.live.filter((t) => t.groupId !== groupId && open.has(t.groupId)).sort((a, b) => b.createdAt - a.createdAt)[0];
       if (elsewhere) this.ws.focus(elsewhere.id);
     }
     this.ws.setCollapsed(groupId, folded);
@@ -616,7 +620,8 @@ export class Stage {
       // each just hangs off the core on its own.
       const loose = g.id === GENERAL_ID;
       b.el.classList.toggle("loose", loose);
-      const folded = !loose && !!g.collapsed && !members.some((t) => t.id === this.ws.activeId);
+      // A folded group stays folded, the thread in front inside it or not: asking it something opens it (focus).
+      const folded = !loose && !!g.collapsed;
       b.el.classList.toggle("collapsed", folded);
       b.el.classList.toggle("here", members.some((t) => t.id === this.ws.activeId));
       b.el.style.setProperty("--hue", this.hueOf(g));
