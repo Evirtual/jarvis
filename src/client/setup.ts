@@ -163,7 +163,7 @@ async function permissionState(need: Need): Promise<PermissionState | "unknown">
 function needRow(need: Need, name: string, how: string): string {
   return (
     `<div class="need" data-need="${need}">` +
-    `<div class="need-h"><b>${name}</b><span class="st">…</span><button class="btn sm" type="button" data-setup-perm="${need}">Allow</button></div>` +
+    `<div class="need-h"><b>${name}</b><span class="st" hidden></span><button class="btn sm primary" type="button" data-setup-perm="${need}">Allow</button></div>` +
     `<p class="how">${how}</p><p class="err" hidden></p></div>`
   );
 }
@@ -192,8 +192,10 @@ async function paintNeeds(root: ParentNode): Promise<void> {
     const state = await permissionState(need);
     const st = row.querySelector<HTMLElement>(".st")!;
     const btn = row.querySelector<HTMLButtonElement>("button")!;
-    st.className = `st${state === "granted" ? " ok" : state === "denied" ? " bad" : ""}`;
-    st.textContent = state === "granted" ? "Allowed" : state === "denied" ? "Blocked" : state === "prompt" ? "Not yet" : "";
+    // Granted, the word says so and the button goes; otherwise the button is the state.
+    st.className = "st ok";
+    st.textContent = "Allowed";
+    st.hidden = state !== "granted";
     btn.hidden = state === "granted";
     const err = row.querySelector<HTMLElement>(".err")!;
     err.hidden = state !== "denied";
