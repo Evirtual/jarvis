@@ -1109,6 +1109,8 @@ Typecheck clean, 118 unit tests, 21 end-to-end scenarios, build clean.
      and the list fills it; the cap is for the resting panel only.
 118. The Conversation said "22 lines" in its title, "4" on its button
      (notices left out) and showed the last 40 of the 80 it keeps: three
-     numbers for one thing. It shows every message it keeps, and the title
-     and the button count those — "messages", since one is often more than
-     a line.
+     numbers for one thing. It shows every message it keeps; the button
+     counts what you and JARVIS said, and the title says that and how many
+     of the console's notices sit between them ("4 messages · 18 notices"),
+     so the button's number is explained the moment it opens — "messages",
+     since one is often more than a line.

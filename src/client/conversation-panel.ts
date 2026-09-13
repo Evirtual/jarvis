@@ -1,8 +1,9 @@
 /**
  * The Conversation panel: what was said at the core, outside any thread,
  * oldest first, drawn as replies are drawn in a window — every message kept
- * (core-chat.ts keeps the last 80), so the count in the title, the count on
- * the button and what the panel shows are one number.
+ * (core-chat.ts keeps the last 80). The button counts what you and JARVIS
+ * said; the title says that and how many of the console's notices sit
+ * between them, so the button's number is explained the moment it opens.
  */
 
 import { $ } from "./dom.js";
@@ -14,7 +15,8 @@ export function paintCoreChat(): void {
   if (!panels.isOpen("conversation")) return;
   const box = $("coreChat");
   const rows = coreChat.lines;
-  $("convAux").textContent = `${rows.length} message${rows.length === 1 ? "" : "s"}`;
+  const said = rows.filter((l) => l.role !== "sys").length, notices = rows.length - said;
+  $("convAux").textContent = `${said} message${said === 1 ? "" : "s"}${notices ? ` · ${notices} notice${notices === 1 ? "" : "s"}` : ""}`;
   const key = rows.map((l) => `${l.role}:${l.at}:${l.content.length}`).join("|");
   if (box.dataset.key === key) return;
   box.dataset.key = key;
@@ -41,9 +43,9 @@ export function paintCoreChat(): void {
   list.scrollTop = list.scrollHeight;
 }
 
-/** The count on the Conversation button: every message the panel shows — yours, JARVIS's and the console's notices. */
+/** The count on the Conversation button: what you and JARVIS said. The console's notices are kept in the panel, and counted there. */
 export function paintConversationCount(): void {
-  $("pConversation").textContent = String(coreChat.lines.length);
+  $("pConversation").textContent = String(coreChat.lines.filter((l) => l.role !== "sys").length);
 }
 
 export function wireConversationPanel(): void {
