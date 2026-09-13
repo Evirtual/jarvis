@@ -1053,3 +1053,29 @@ Found and fixed on the way:
      carried window had been let go, and the hit test found the window
      itself still under the pointer. The drop is judged while the window is
      still lifted, and the hit test passes over it.
+
+### 2026-09-14 — the simplification, in six steps
+
+Sizes: 1024×768 (desktop pane), 375×812 and 414×896. After each of the six
+steps of [PLAN-simplify.md](PLAN-simplify.md): typecheck clean, the unit tests
+(104 → 114 by the end), the end-to-end suite (22 → 21 scenarios; each now from
+a clean console, and run in CI), the web build; a live call to ChatGPT on
+gpt-5-mini after the SDK was replaced by plain fetch ("ready, sir." spoken
+through ChatGPT's voice), and a live directive (a group made by the model).
+
+By hand, desktop: a window dropped on another makes a group (fix 114); a window,
+a group and a panel carried and let go glide to their seats; a corner resize;
+the readings in every panel; the provider card on Connections and in the guide;
+the voice list with the device's voice beside the service's, and the choice
+kept over a reload; the styles unchanged to the eye after the split (the built
+sheet was compared rule by rule: only the chamfer no-ops, four specificity
+fixes and one redundant rule differ).
+
+By hand, phone: full-width windows in the list, each sized to what it holds;
+no horizontal overflow at 375; the grip on the thread in front.
+
+Found and fixed on the way:
+
+115. Setting a service's voices told the voice tab twice that its state had
+     changed — once from the choice, once from the list. Once now; a unit test
+     for the choice on its own (voice-choice.test.ts) caught it.

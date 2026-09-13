@@ -1,9 +1,15 @@
 # Plan: a simpler console
 
-**Status (2026-09-13): proposed.** A full reading of the repository — every
-source file, the styles, the tests, the workflows and the docs — with what
-should change, in what order, and what should be left alone. Nothing here is
-done yet.
+**Status (2026-09-14): done.** All six steps below were carried out, one
+commit each ("Simplify, step 1" to "step 6", 2026-09-13/14), each typechecked,
+unit-tested, run end to end and checked in a browser before the next. Two
+findings turned out narrower than written: the phone's `!important`s (D1)
+are not fights with the desktop rules but with the place and size the board
+writes on each element, so they stay, said so at the top of `phone.css`; and
+the end-to-end suite has 21 scenarios rather than 22 because the guide's two
+steps became one. Written 2026-09-13 as a proposal: a full reading of the
+repository — every source file, the styles, the tests, the workflows and the
+docs — with what should change, in what order, and what should be left alone.
 
 ## The short version
 

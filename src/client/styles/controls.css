@@ -1,0 +1,113 @@
+/* The controls everything is built from: a button, a switch row, a field,
+   a select, a slider, a hint, a disclosure, a tooltip. */
+
+/* ---------- settings switch ---------- */
+/* A setting: its name and switch on one line, the explanation beneath at full width. */
+/* Each setting is a card, as a service is on Connections. */
+/* ---------- a card: the one box a setting, a service or a query sits in ---------- */
+.switch-row, .provider { border: 1px solid var(--line); background: rgba(7,17,25,.7); padding: 11px 12px; margin-bottom: 9px; }
+.switch-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; cursor: pointer; }
+.switch-row > span { display: contents; }
+.switch-row b { grid-column: 1; grid-row: 1; color: var(--text-hi); font-weight: 600; font-size: 12px; }
+.switch-row .switch { grid-column: 2; grid-row: 1; }
+.switch-row small { grid-column: 1 / -1; display: block; color: var(--ice-dim); font-size: 10px; line-height: 1.5; }
+/* a faint line sets the explanation off from the name and switch above it */
+.switch-row > span > small:first-of-type { margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--line); }
+.switch {
+  appearance: none; -webkit-appearance: none; flex: none; cursor: pointer;
+  width: 40px; height: 22px; border-radius: 11px; position: relative;
+  background: #071119; border: 1px solid var(--line-hot); transition: background .18s, border-color .18s;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--ice-dim); transition: transform .18s, background .18s;
+}
+.switch:checked { background: rgba(111,240,255,.18); border-color: var(--ice); }
+.switch:checked::after { transform: translateX(18px); background: var(--ice); box-shadow: 0 0 8px rgba(111,240,255,.6); }
+.switch:focus-visible { outline: var(--focus); outline-offset: 2px; }
+
+.btn {
+  font-family: var(--f-hud); font-weight: 600; font-size: 9.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--ice-dim); background: transparent;
+  border: 1px solid var(--line-hot); padding: 7px 11px; cursor: pointer; white-space: nowrap;
+  transition: color .18s, border-color .18s, background .18s;
+  min-height: var(--ctl-h);
+}
+.btn.sm { min-height: 30px; padding: 4px 10px; }
+.btn.ghost { background: transparent; border-color: var(--line); color: var(--ice-dim); }
+.btn.ghost:hover { color: var(--ice); border-color: rgba(111,240,255,.4); }
+/* the readiness card's rows (readiness.ts): the same switch rows as Access, with a way in beside each */
+.ready { margin-top: 4px; }
+.ready .switch-row { margin-bottom: 8px; }
+.ready .switch-row .btn.sm { margin-top: 8px; justify-self: start; }
+.ready .switch-row.skipped .switch { opacity: .35; }
+/* Hovering a row lights its switch — the thing to set — and nothing else: the
+   buttons beside it keep their quiet look even under the pointer. */
+.ready .switch-row:hover .switch:not(:disabled) { border-color: var(--ice); }
+.ready .switch-row .btn, .ready .switch-row .btn:hover, .ready .switch-row .btn:focus { color: var(--ice-dim); border-color: var(--line); background: transparent; box-shadow: none; transform: none; }
+.ready .switch-row .btn:focus-visible { outline: var(--focus); outline-offset: 1px; }
+.btn:hover:not(:disabled) { color: var(--ice); border-color: var(--ice); background: var(--hover-bg); }
+.btn:focus-visible { outline: var(--focus); outline-offset: 2px; }
+.btn:disabled { opacity: .32; cursor: not-allowed; }
+.btn.on { color: var(--void); background: var(--ice); border-color: var(--ice); }
+.btn.wide { width: 100%; }
+.btn.primary { color: var(--void); background: var(--ice); border-color: var(--ice); font-weight: 700; }
+.btn.danger:hover:not(:disabled) { color: var(--red); border-color: var(--red); background: rgba(255,79,95,.08); }
+
+.row { display: flex; gap: 6px; align-items: stretch; }
+.row .btn { align-self: stretch; }
+.row > .grow { flex: 1; min-width: 0; }
+
+.field {
+  width: 100%; background: #071119; color: var(--text-hi); border: 1px solid var(--line-hot);
+  font-family: var(--f-mono); font-size: 12px; padding: 0 10px; height: var(--ctl-h); min-height: var(--ctl-h);
+}
+.field:focus-visible { outline: var(--focus); outline-offset: 1px; }
+.field::placeholder { color: #2a5a6c; }
+.ctl { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+.ctl-k { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); display: flex; justify-content: space-between; }
+.ctl-k .n { color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.ctl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.sel {
+  width: 100%; background: #071119; color: var(--text-hi); border: 1px solid var(--line-hot);
+  font-family: var(--f-mono); font-size: 12px; padding: 0 24px 0 10px; cursor: pointer;
+  appearance: none; -webkit-appearance: none; text-overflow: ellipsis; height: var(--ctl-h); min-height: var(--ctl-h);
+  background-image: linear-gradient(45deg, transparent 50%, var(--ice-dim) 50%), linear-gradient(135deg, var(--ice-dim) 50%, transparent 50%);
+  background-position: calc(100% - 13px) center, calc(100% - 8px) center;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+}
+.sel:focus-visible { outline: var(--focus); outline-offset: 1px; }
+.sel option { background: #071119; color: var(--text-hi); }
+.sl { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; background: #071119; border: 1px solid var(--line); outline: 0; cursor: pointer; }
+.sl::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 18px; background: var(--ice); box-shadow: 0 0 8px rgba(111,240,255,.6); cursor: pointer; }
+.sl::-moz-range-thumb { width: 11px; height: 18px; border: 0; border-radius: 0; background: var(--ice); }
+
+.hint { margin: 8px 0 0; font-size: 10px; color: var(--ice-dim); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 7px; }
+.hint.warn { color: var(--gold); }
+.hint b { color: var(--text-hi); font-weight: 600; }
+.hint a { color: var(--ice); text-decoration: none; border-bottom: 1px solid rgba(111,240,255,.35); }
+.hint a:hover { border-bottom-color: var(--ice); }
+.hint kbd { font-family: var(--f-mono); font-size: 9.5px; color: var(--text-hi); border: 1px solid var(--line-hot); padding: 0 4px; background: #071119; }
+
+/* ---------- less on the page, more on request ---------- */
+/* A disclosure: one short line closed, the detail beneath it when opened. */
+.disclose { margin: 8px 0 0; border-top: 1px dashed var(--line); }
+.disclose > summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 7px 0 2px;
+  font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim);
+}
+.disclose > summary::-webkit-details-marker { display: none; }
+.disclose > summary::before { content: "▸"; font-size: 9px; transition: transform .18s var(--ease); }
+.disclose[open] > summary::before { transform: rotate(90deg); }
+.disclose > summary:hover, .disclose > summary:focus-visible { color: var(--ice); }
+.disclose > summary:focus-visible { outline: var(--focus); outline-offset: 1px; }
+.disclose > .body { padding: 3px 0 4px; }
+.disclose > .body p { margin: 4px 0 0; }
+/* A tooltip on hover or focus, for a label that needs a sentence. */
+[data-tip] { position: relative; cursor: help; }
+[data-tip]:hover::after, [data-tip]:focus-visible::after {
+  content: attr(data-tip); position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 5;
+  width: max-content; max-width: 240px; padding: 6px 8px; white-space: normal;
+  font: 10.5px/1.4 var(--f-mono); letter-spacing: 0; text-transform: none; color: var(--text-hi);
+  background: #071119; border: 1px solid var(--line-hot); box-shadow: 0 8px 24px rgba(0,0,0,.5); pointer-events: none;
+}

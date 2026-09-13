@@ -1,0 +1,127 @@
+/* The palette, the type, the motion and the shared measures — and the few
+   rules that apply to the whole page: resets, the ambient, the shell, the
+   scrollbars, reduced motion, what the web version hides. */
+
+:root {
+  color-scheme: dark;
+
+  --void: #04080d;
+  --panel: #0a141d;
+  --panel-hi: #0e1e2a;
+  --line: #12313f;
+  --line-hot: #1d5468;
+  --ice: #6ff0ff;
+  --ice-dim: #2e7f96;
+  --text: #9db8c4;
+  --text-hi: #d6f2fa;
+  --gold: #ffb648;
+  --red: #ff4f5f;
+  --green: #56e39f;
+
+  --f-hud: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+
+  --ctl-h: 38px; /* one height for a button, a field and a select that sit in a row */
+
+  /* Motion: things here settle rather than snap. One curve for travel, one
+     for the small stuff, so the whole console moves with the same hand. */
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --ease-soft: cubic-bezier(.4, .8, .3, 1);
+  --travel: .42s;
+  /* One look for "under the pointer" and one for "on", wherever a control is; one focus ring. */
+  --hover-bg: rgba(111,240,255,.07);
+  --on-bg: rgba(111,240,255,.1);
+  --focus: 2px solid var(--ice);
+  /* One depth system for every movable surface on the board. */
+  --surface-depth: 0 18px 40px rgba(0,0,0,.42);
+  --surface-highlight: 0 0 30px color-mix(in srgb, var(--hue, var(--ice)) 14%, transparent);
+  --glass-blur: blur(16px) saturate(1.25);
+  --veil-bg: rgba(2, 8, 14, .46);
+  --veil-blur: blur(6px) saturate(.76);
+  /* A thread window is one fixed size, like an instrument panel: the screen
+     changing width never resizes it; it only narrows if it cannot fit at all. */
+  --thread-w: 440px;
+  /* the title row: nothing on the board reaches above this (HEADER_H in stage.ts)
+     — below the phone's clock, where the page is drawn under it */
+  --header-h: calc(56px + env(safe-area-inset-top, 0px));
+  /* One margin from the screen edge for everything that lines up with it —
+     the title row, the deck, and on a phone the list and the sheets. */
+  --edge: 16px;
+  /* on a phone, the room kept clear just above JARVIS for his status line and notices */
+  --status-room: 44px; /* CORE_STATUS_ROOM in stage.ts */
+  /* Title-bar icons: one button size and one glyph size for every box —
+     thread windows, groups and instrument panels alike. */
+  --ic-btn: 22px;
+  --ic: 16px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; -webkit-tap-highlight-color: transparent; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--f-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* ---------- ambient ---------- */
+.ambient { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+.ambient::before {
+  content: ""; position: absolute; inset: 0;
+  background:
+    linear-gradient(var(--line) 1px, transparent 1px) center / 44px 44px,
+    linear-gradient(90deg, var(--line) 1px, transparent 1px) center / 44px 44px;
+  opacity: .15;
+}
+.ambient::after {
+  content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 72% 58% at 50% 45%, transparent 32%, rgba(2,5,9,.85) 100%),
+    repeating-linear-gradient(180deg, rgba(111,240,255,.03) 0 1px, transparent 1px 3px);
+}
+/* ---------- one rule for everything beside a title ----------
+   A title's dot, icon, count, tag and buttons centre on the title's CAPITALS,
+   not on its line box: with this face the line box sits about a pixel below
+   the capitals, so flex centring leaves everything beside a title a pixel
+   low. Measured against the cap height (see the QA notes), applied once here
+   for every header — thread, group, instrument panel, the Threads list — so
+   they all read as one line. */
+.cw-head > :not(.cw-title), .bb-head > :not(.bb-title) { position: relative; top: -.5px; }
+.panel.float > h2 > *, .tl-g > * { position: relative; top: -1px; }
+
+/* ---------- shell ---------- */
+.shell {
+  position: relative; z-index: 2;
+  height: 100dvh;
+  padding: 0;
+  display: grid; grid-template-rows: minmax(0, 1fr);
+}
+
+/* ---------- scrollbars ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #060d14; }
+::-webkit-scrollbar-thumb { background: var(--line-hot); }
+* { scrollbar-width: thin; scrollbar-color: var(--line-hot) #060d14; }
+
+/* Grid and flex children default to min-width:auto, which lets long content
+   push the whole layout wider than the screen. Nothing here may do that. */
+.shell > * { min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; }
+}
+
+/* The default colour of a reading and of a More row — zero specificity, so an
+   instrument's own colour ([data-open="…"]) always wins. */
+:where(.pill, .menu-item) { --hue: var(--ice); }
+
+/* Published as a web page there is no server: the browser measures what it
+   can, and an instrument it can't read at all is not shown (see sensors.ts). */
+html.serverless [data-pc] { display: none !important; }
+html:not(.serverless) [data-web-only] { display: none !important; }

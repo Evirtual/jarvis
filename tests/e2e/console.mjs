@@ -3,7 +3,9 @@
  * threads and groups, the model's directives, panels, the Threads list, error
  * paths, input edges, persistence across a reload, a phone. A fake OpenAI
  * answers over the network, so the real client code — key check, streaming,
- * Markdown, directives — runs as it would against the service.
+ * Markdown, directives — runs as it would against the service. Every scenario
+ * starts from a clean console (fresh()), so each can run alone and a failure
+ * poisons nothing after it; every wait is for the thing itself, never a sleep.
  *
  *   npm run build:client:web && npm run test:e2e
  *
@@ -63,7 +65,7 @@ const sse = (text) => { const parts = []; for (let i = 0; i < text.length; i += 
   `event: response.completed\ndata: ${JSON.stringify({ type: 'response.completed', response: { id: 'r', object: 'response', status: 'completed', output: [] } })}\n\n`].join(''); };
 const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': '*', 'access-control-expose-headers': '*' };
 
-const browser = await puppeteer.launch({ executablePath, headless: process.env.JARVIS_HEADED ? false : 'new', args: ['--hide-scrollbars', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'], defaultViewport: { width: 1200, height: 800 } });
+const browser = await puppeteer.launch({ executablePath, headless: process.env.JARVIS_HEADED ? false : 'new', args: ['--hide-scrollbars', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required', ...(process.env.CI ? ['--no-sandbox'] : [])], defaultViewport: { width: 1200, height: 800 } });
 const context = browser.defaultBrowserContext();
 await context.overridePermissions(base.replace(/\/$/, ''), ['microphone', 'clipboard-read', 'clipboard-write']); // location is left unanswered, so the readiness card has something to show
 const page = await browser.newPage();
@@ -75,7 +77,9 @@ page.on('request', (r) => {
   const u = r.url();
   if (u.startsWith('https://api.openai.com/')) {
     if (r.method() === 'OPTIONS') return r.respond({ status: 204, headers: cors });
-    if (u.includes('/v1/models')) return r.respond({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ object: 'list', data: [{ id: 'gpt-4.1-mini', object: 'model' }, { id: 'gpt-4.1', object: 'model' }] }) });
+    // the voice: a tenth of a second of silence, as raw 24 kHz samples, so the speech path runs and nothing is refused
+    if (u.includes('/v1/audio/speech')) return r.respond({ status: 200, headers: { ...cors, 'content-type': 'audio/pcm' }, body: Buffer.alloc(4800) });
+    if (u.includes('/v1/models')) return r.respond({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ object: 'list', data: [{ id: 'gpt-4.1-mini', object: 'model' }, { id: 'gpt-4.1', object: 'model' }, { id: 'gpt-4o-mini-tts', object: 'model' }] }) });
     if (u.includes('/v1/responses')) {
       let question = '';
       try { const b = JSON.parse(r.postData() || '{}'); const last = [...(b.input || [])].reverse().find((t) => t.role === 'user'); question = (last?.content || '').split('\n\n[')[0]; } catch {}
@@ -99,11 +103,31 @@ page.on('request', (r) => {
 });
 
 /* ---------------- helpers ---------------- */
+
+/* ---------------- helpers ---------------- */
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Wait for something on the page — and say what never came, rather than time out in silence. */
+const until = async (fn, what, timeout = 10000, ...args) => {
+  try { await page.waitForFunction(fn, { timeout, polling: 50 }, ...args); }
+  catch { throw new Error(`never happened: ${what}`); }
+};
+/** Wait for the board (localStorage's workspace) to satisfy `pred`, a function of it written to run in the page. */
+const untilWs = (pred, what, timeout = 10000) => until((src) => (0, eval)(`(${src})`)(JSON.parse(localStorage.getItem('jarvis.workspace') || '{}')), what, timeout, pred.toString());
+/** Wait for the fake service to have been asked something (from question number `from` on) that matches. */
+const untilAsked = async (from, re, timeout = 20000) => { const t0 = Date.now(); while (!asked.slice(from).some((q) => re.test(q))) { if (Date.now() - t0 > timeout) throw new Error(`never asked: ${re} (asked: ${JSON.stringify(asked.slice(from))})`); await wait(100); } };
 const say = async (text) => { await page.evaluate((t) => { const i = document.getElementById('input'); i.value = t; i.form.requestSubmit(); }, text); };
-const untilIdle = async (timeout = 20000) => { await page.waitForFunction(() => !/Thinking|Searching/.test(document.getElementById('logState')?.textContent || '') && ![...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].some((m) => /Thinking…|Searching the web…/.test(m.textContent)), { timeout }).catch(() => null); await wait(400); };
+/** JARVIS has finished answering: nothing is being thought about or streamed (say.ts marks the command form busy). */
+const untilIdle = (timeout = 20000) => until(() => document.getElementById('cmdForm').getAttribute('aria-busy') !== 'true' && ![...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].some((m) => /Thinking…|Searching the web…/.test(m.textContent)), 'JARVIS to finish answering', timeout);
 /** What JARVIS last said at the core (the line under him), whole. */
 const coreSaid = () => page.evaluate(() => document.getElementById('coreReply')?.textContent || '');
+const untilSaid = (re, timeout = 10000) => until((s) => new RegExp(s, 'i').test(document.getElementById('coreReply')?.textContent || ''), `the core to say ${re}`, timeout, re.source);
+const untilNotice = (re, timeout = 10000) => until((s) => new RegExp(s, 'i').test(document.getElementById('coreNotice')?.textContent || ''), `a notice saying ${re}`, timeout, re.source);
+const untilWindow = (re, timeout = 10000) => until((s) => [...document.querySelectorAll('section.chatwin .cw-title')].some((t) => new RegExp(s, 'i').test(t.textContent.trim())), `a window called ${re}`, timeout, re.source);
+const untilPanels = (pred, what, timeout = 10000) => until((src) => (0, eval)(`(${src})`)([...document.querySelectorAll('.panel.float')].filter((p) => !p.hidden).map((p) => p.dataset.panel)), what, timeout, pred.toString());
+const untilDrawer = (open) => until((o) => document.getElementById('drawer').classList.contains('open') === o, open ? 'the drawer to open' : 'the drawer to close', 5000, open);
+const untilConfirm = (open) => until((o) => !document.getElementById('confirmDialog').hidden === o, open ? 'a confirmation to appear' : 'the confirmation to go', 5000, open);
+const untilGuide = (open) => until((o) => !document.getElementById('setup').hidden === o, open ? 'the guide to open' : 'the guide to close', 5000, open);
+const click = (sel) => page.evaluate((s) => { const el = document.querySelector(s); if (!el) throw new Error('nothing to click at ' + s); el.click(); }, sel);
 // which services hold a key and which is in use — never the keys themselves
 const cores = () => page.evaluate(() => { const s = JSON.parse(localStorage.getItem('jarvis.cores') || '{}'); return { active: s.active, with: Object.keys(s.providers || {}) }; });
 const ws = () => page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.workspace') || '{}'));
@@ -117,158 +141,216 @@ const board = () => page.evaluate(() => ({
   guideOpen: !document.getElementById('setup').hidden,
   title: document.title,
 }));
+
+const DESKTOP = { width: 1200, height: 800 };
+const PHONE = { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 };
+const KEY_OPENAI = 'sk-proj-' + 'A1b2C3d4'.repeat(8);
+const KEY_GEMINI = 'AIza' + 'Q1w2E3r4'.repeat(4);
+
+/** Connect a service the way a person does: Configuration → Connections, the key, Connect. */
+async function connectService(id, key) {
+  await click('#openDrawer'); await untilDrawer(true);
+  await click('.tab[data-tab="connections"]');
+  await until((i) => document.querySelector(`#providers input[data-key="${i}"]`), `${id}'s key field`, 5000, id);
+  await page.type(`#providers input[data-key="${id}"]`, key);
+  await click(`#providers [data-act="save"][data-id="${id}"]`);
+  await until((i) => document.querySelector(`#providers .provider.ready select[data-model="${i}"]`), `${id} to connect`, 15000, id);
+  await click('#closeDrawer'); await untilDrawer(false);
+}
+
+/**
+ * A clean console for the scenario, whatever the one before did: nothing
+ * kept in the browser, the guide already seen, the fake service's failures
+ * cleared, and ChatGPT connected through Configuration (the real path)
+ * unless the scenario wants to start unconnected. Every scenario begins
+ * here, so each can run alone and a failure poisons nothing after it.
+ */
+async function fresh({ connect = true, viewport = DESKTOP } = {}) {
+  failNext = null; failLeft = 0; geminiFail = null; geminiFailLeft = 0;
+  await page.setViewport(viewport);
+  await page.goto('about:blank'); // the old page goes first, so nothing it saves on the way out survives the clearing
+  await page.goto(base, { waitUntil: 'networkidle2', timeout: 60000 });
+  await page.evaluate((seen) => { localStorage.clear(); if (seen) localStorage.setItem('jarvis.setupDone', '1'); }, connect);
+  await page.reload({ waitUntil: 'networkidle2', timeout: 60000 });
+  await until(() => /m-(desk|compact)/.test(document.body.className) && document.getElementById('input'), 'the console to boot');
+  if (connect) { await connectService('openai', KEY_OPENAI); await until(() => /ChatGPT/.test(document.title), 'the title to name ChatGPT'); }
+}
+
 const results = [];
-const check = async (name, fn) => { try { const detail = await fn(); results.push({ name, ok: true, detail }); } catch (e) { results.push({ name, ok: false, detail: e instanceof Error ? e.message : String(e) }); } };
+const check = async (name, fn) => {
+  const t0 = Date.now();
+  try { const detail = await fn(); results.push({ name, ok: true, ms: Date.now() - t0, detail }); }
+  catch (e) {
+    results.push({ name, ok: false, ms: Date.now() - t0, detail: e instanceof Error ? e.message : String(e) });
+    await page.screenshot({ path: path.join(outDir, `fail-${results.length}.png`) }).catch(() => null);
+  }
+};
 const assert = (cond, msg) => { if (!cond) throw new Error(msg); };
 const snap = (n) => page.screenshot({ path: path.join(outDir, `full-${n}.png`) });
 
-/* ---------------- scenarios ---------------- */
-await page.goto(base, { waitUntil: 'networkidle2', timeout: 60000 }); await wait(1500);
+/* ---------------- scenarios: each from a clean console ---------------- */
 
-await check('guide: opens on a first visit at step 1', async () => { const b = await board(); assert(b.guideOpen, 'guide not open'); return await page.evaluate(() => document.getElementById('setupTitle').textContent); });
-await check('guide: connect a key from the card, model picker, spare/use, permissions, done', async () => {
-  await page.evaluate(() => document.getElementById('setupNext').click()); await wait(300);
-  await page.type('#setupBody input[data-key="openai"]', 'sk-proj-' + 'A1b2C3d4'.repeat(8));
-  await page.evaluate(() => document.querySelector('#setupBody [data-act="save"][data-id="openai"]').click());
-  await page.waitForFunction(() => document.querySelector('#setupBody .provider.ready'), { timeout: 15000 });
+await check('guide: opens on a first visit; connect a key from the card, model picker, permissions, done; the readiness card', async () => {
+  await fresh({ connect: false });
+  await untilGuide(true);
+  const step1 = await page.evaluate(() => document.getElementById('setupTitle').textContent);
+  await click('#setupNext');
+  await until(() => document.querySelector('#setupBody input[data-key="openai"]'), 'the key field in the guide');
+  await page.type('#setupBody input[data-key="openai"]', KEY_OPENAI);
+  await click('#setupBody [data-act="save"][data-id="openai"]');
+  await until(() => document.querySelector('#setupBody .provider.ready'), 'the guide to show ChatGPT connected', 15000);
   const models = await page.$$eval('#setupBody select[data-model] option', (o) => o.map((x) => x.value));
   assert(models.includes('gpt-4.1'), 'model list missing');
-  await page.select('#setupBody select[data-model="openai"]', 'gpt-4.1'); await wait(600);
-  const chosen = await page.evaluate(() => document.querySelector('#setupBody select[data-model="openai"]')?.value);
-  assert(chosen === 'gpt-4.1', 'model change did not stick: ' + chosen);
+  await page.select('#setupBody select[data-model="openai"]', 'gpt-4.1');
+  await until(() => document.querySelector('#setupBody select[data-model="openai"]')?.value === 'gpt-4.1', 'the model change to stick');
   const masked = await page.evaluate(() => document.querySelector('#setupBody .keyline .mask')?.textContent);
   assert(masked && masked.includes('…'), 'masked key missing: ' + masked);
-  await page.evaluate(() => document.getElementById('setupNext').click()); await wait(500);
+  await click('#setupNext');
+  await until(() => document.querySelectorAll('#setupBody .switch-row').length === 3, 'the permissions step');
   const rows = await page.$$eval('#setupBody .switch-row', (r) => r.map((x) => x.querySelector('b').textContent));
   assert(rows.join() === 'Microphone,Location,Sound', 'rows: ' + rows.join());
   // flip the microphone on: the fake mic is granted without a prompt
   await page.evaluate(() => { const s = document.querySelector('#setupBody input[data-setup-perm="mic"]'); s.checked = true; s.dispatchEvent(new Event('change', { bubbles: true })); });
-  await wait(1200);
+  await until(() => { const s = document.querySelector('#setupBody input[data-setup-perm="mic"]'); return s && s.checked; }, 'the microphone switch to stay on', 5000);
   const mic = await page.evaluate(() => { const s = document.querySelector('#setupBody input[data-setup-perm="mic"]'); return { checked: s.checked, disabled: s.disabled }; });
-  await page.evaluate(() => document.getElementById('setupNext').click()); await wait(300);
-  await page.evaluate(() => document.getElementById('setupNext').click()); await wait(600);
-  const b = await board(); assert(!b.guideOpen, 'guide still open'); assert(b.title.includes('ChatGPT'), 'title: ' + b.title);
+  await click('#setupNext');
+  await click('#setupNext');
+  await untilGuide(false);
+  const b = await board(); assert(b.title.includes('ChatGPT'), 'title: ' + b.title);
   // Location and sound were left undone: the readiness card stays on the board, drawn like a thread,
   // counted as no thread; marking the two not needed sends it away by itself.
-  assert(b.windows.length === 1 && /what j.a.r.v.i.s. needs/i.test(b.windows[0].title), 'no readiness card: ' + JSON.stringify(b.windows));
+  await untilWindow(/what j\.a\.r\.v\.i\.s\. needs/);
+  assert((await board()).windows.length === 1, 'more than the readiness card on the board: ' + JSON.stringify((await board()).windows));
   const count = await page.evaluate(() => document.getElementById('pThreads').textContent);
   assert(count === '0', 'the card counted as a thread: ' + count);
   const cardRows = await page.$$eval('.chatwin[data-kind="setup"] .switch-row b', (r) => r.map((x) => x.textContent));
   assert(cardRows.join() === 'A service,Microphone,Location,Sound', 'card rows: ' + cardRows.join());
-  for (let i = 0; i < 2; i++) { await page.evaluate(() => document.querySelector('.chatwin[data-kind="setup"] [data-ready="skip"]')?.click()); await wait(700); }
-  const after = await board();
-  assert(after.windows.length === 0, 'the card stayed after everything was set: ' + JSON.stringify(after.windows));
-  return { chosen, masked, mic, done: await page.evaluate(() => localStorage.getItem('jarvis.setupDone')), cardRows };
+  // "Not needed" on each row still undone; the card goes by itself once nothing is left (how many rows that
+  // takes depends on what the browser already grants — the fake microphone, and sound after a gesture)
+  let skips = 0;
+  while (await page.evaluate(() => !!document.querySelector('.chatwin[data-kind="setup"]')) && skips < 3) {
+    const before = await page.evaluate(() => document.querySelectorAll('.chatwin[data-kind="setup"] .switch-row.skipped').length);
+    await click('.chatwin[data-kind="setup"] .switch-row:not(.skipped) [data-ready="skip"]'); skips++;
+    await until((n) => !document.querySelector('.chatwin[data-kind="setup"]') || document.querySelectorAll('.chatwin[data-kind="setup"] .switch-row.skipped').length > n, 'Not needed to take', 5000, before);
+  }
+  await until(() => !document.querySelector('section.chatwin'), 'the card to go once everything is set');
+  return { step1, masked, mic, skips, done: await page.evaluate(() => localStorage.getItem('jarvis.setupDone')), cardRows };
 });
 
 await check('local commands: help, time, date, hi, status answer at the core, without a model or a thread', async () => {
+  await fresh();
   const before = asked.length;
-  for (const c of ['help', 'what time is it', "what's the date", 'hello', 'status']) { await say(c); await wait(700); }
+  for (const c of ['help', 'what time is it', "what's the date", 'hello']) await say(c);
+  await until(() => document.querySelectorAll('#coreChat .cw-msg.sys ul li').length >= 10, 'the help list in the conversation');
+  await say('status');
+  await untilSaid(/tolerance|percent|load/);
   const b = await board();
   const sysList = await page.evaluate(() => document.querySelectorAll('#coreChat .cw-msg.sys ul li').length);
   assert(asked.length === before, 'a local command went to the model');
   assert(b.windows.length === 0, 'a local command opened a thread');
-  assert(sysList >= 10, 'help list items in the conversation: ' + sysList);
-  assert(/tolerance|percent|load/i.test(await coreSaid()), 'status not said at the core: ' + await coreSaid());
-  await say('close all panels'); await wait(400);
   return { windows: b.windows.length, helpItems: sysList };
 });
 
 await check('conversation: talk stays at the core, is kept, and is not a thread; a reply with no marker is the core too', async () => {
-  const before = (await board()).windows.length;
+  await fresh();
   await say('how are you today'); await untilIdle();
   const said = await coreSaid();
   assert(/Noted, sir/.test(said), 'not answered at the core: ' + said);
-  assert((await board()).windows.length === before, 'conversation opened a thread');
+  assert((await board()).windows.length === 0, 'conversation opened a thread');
   await say('and with no marker'); await untilIdle();
   assert(/Marked nowhere/.test(await coreSaid()), 'a reply without a marker did not land at the core: ' + await coreSaid());
-  assert((await board()).windows.length === before, 'a markerless reply opened a thread');
+  assert((await board()).windows.length === 0, 'a markerless reply opened a thread');
   const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.conversation') || '[]').map((l) => l.role + ':' + l.content.slice(0, 20)));
   assert(kept.some((l) => l.startsWith('user:how are you')) && kept.some((l) => l.startsWith('assistant:Noted')), 'transcript: ' + JSON.stringify(kept));
   // The Conversation panel: its button opens it with the lines, its count sits on the button, Clear empties it.
   const badge = await page.evaluate(() => { const b = document.getElementById('pillConversation').getBoundingClientRect(), c = document.getElementById('pConversation').getBoundingClientRect(); return { count: document.getElementById('pConversation').textContent, onButton: c.left >= b.left - 4 && c.right <= b.right + 6 }; });
   assert(badge.onButton && Number(badge.count) >= 2, 'conversation count not on its button: ' + JSON.stringify(badge));
-  await page.evaluate(() => document.getElementById('pillConversation').click()); await wait(500);
-  const opened = await page.evaluate(() => ({ open: !document.querySelector('.panel.float[data-panel="conversation"]').hidden, lines: document.querySelectorAll('#coreChat .cw-msg').length }));
-  assert(opened.open && opened.lines >= 2, 'conversation panel: ' + JSON.stringify(opened));
-  await page.evaluate(() => [...document.querySelectorAll('#coreChat button')].find((b) => /clear/i.test(b.textContent)).click()); await wait(300);
-  const cleared = await page.evaluate(() => ({ lines: document.querySelectorAll('#coreChat .cw-msg').length, stored: localStorage.getItem('jarvis.conversation'), count: document.getElementById('pConversation').textContent }));
-  assert(cleared.lines === 0 && cleared.stored === '[]' && cleared.count === '0', 'clear: ' + JSON.stringify(cleared));
-  await page.evaluate(() => document.getElementById('pillConversation').click()); await wait(300);
-  assert(await page.evaluate(() => document.querySelector('.panel.float[data-panel="conversation"]').hidden), 'the button did not close the panel');
-  // the model hears the recent conversation: the question sent carries what was said before it
+  await click('#pillConversation');
+  await untilPanels((p) => p.includes('conversation'), 'the Conversation panel to open');
+  const opened = await page.evaluate(() => ({ lines: document.querySelectorAll('#coreChat .cw-msg').length }));
+  assert(opened.lines >= 2, 'conversation panel: ' + JSON.stringify(opened));
+  await page.evaluate(() => [...document.querySelectorAll('#coreChat button')].find((b) => /clear/i.test(b.textContent)).click());
+  await until(() => document.querySelectorAll('#coreChat .cw-msg').length === 0, 'Clear to empty the conversation');
+  const cleared = await page.evaluate(() => ({ stored: localStorage.getItem('jarvis.conversation'), count: document.getElementById('pConversation').textContent }));
+  assert(cleared.stored === '[]' && cleared.count === '0', 'clear: ' + JSON.stringify(cleared));
+  await click('#pillConversation');
+  await untilPanels((p) => !p.includes('conversation'), 'the button to close the panel');
   return { said: said.slice(0, 30), kept: kept.length };
 });
 
 await check('model: research opens its own thread, markdown renders, injection stays text, two quick questions answer in order at the core', async () => {
+  await fresh();
   await say('give me a markdown report'); await untilIdle();
+  await untilWindow(/markdown report/);
   const b0 = await board();
-  assert(b0.windows.length === 1 && /markdown report/i.test(b0.windows[0].title), 'no thread named by the model: ' + JSON.stringify(b0.windows));
+  assert(b0.windows.length === 1, 'more than the one thread named by the model: ' + JSON.stringify(b0.windows));
   const md = await page.evaluate(() => { const w = document.querySelector('section.chatwin'); const b = w.querySelector('.cw-body'); return { table: b.querySelectorAll('table').length, li: b.querySelectorAll('li').length, pre: b.querySelectorAll('pre').length, scripts: b.querySelectorAll('script').length, imgs: b.querySelectorAll('img').length, scriptAsText: b.textContent.includes('<script>alert(1)</script>') }; });
   assert(md.table === 1 && md.li >= 3 && md.pre === 1, 'markdown: ' + JSON.stringify(md));
   assert(md.scripts === 0 && md.imgs === 0 && md.scriptAsText, 'injection: ' + JSON.stringify(md));
   const n = asked.length;
   await say('first quick one'); await say('second quick one');
-  for (let i = 0; i < 60 && asked.length < n + 2; i++) await wait(250);
-  await untilIdle(30000);
+  await untilAsked(n, /second quick one/); await untilIdle(30000);
   const order = asked.slice(n);
   assert(order.length === 2 && order[0].includes('first') && order[1].includes('second'), 'order: ' + JSON.stringify(order));
   assert((await board()).windows.length === 1, 'a quick question opened a thread');
   await say('a follow up please'); await untilIdle();
-  const w = await ws();
-  assert(w.threads[0].turns.some((t) => /Following on/.test(t.content)), 'a follow-up did not land in the thread in front: ' + JSON.stringify(w.threads[0].turns.map((t) => t.content.slice(0, 20))));
+  await untilWs((w) => w.threads[0].turns.some((t) => /Following on/.test(t.content)), 'the follow-up to land in the thread in front');
   return { md, order };
 });
 
-await check('threads: new thread, subthread, group, move, collapse, expand, rename', async () => {
-  await say('new thread called Travel'); await wait(800);
-  let b = await board(); assert(b.windows.some((w) => /travel/i.test(w.title)), 'no Travel window');
-  await say('branch off'); await wait(800);
-  let w = await ws(); const travel = w.threads.find((t) => /travel/i.test(t.title)); const sub = w.threads.find((t) => t.parentId === travel?.id);
-  assert(sub, 'no subthread of Travel');
-  await say('new group called Trips'); await untilIdle(); await wait(400);
-  b = await board(); assert(b.groups.some((g) => /trips/i.test(g.title)), 'no Trips group: ' + JSON.stringify(b.groups));
-  await say('move Travel into Trips'); await untilIdle(); await wait(400);
-  w = await ws(); const trips = w.groups.find((g) => /trips/i.test(g.title)); const travelNow = w.threads.find((t) => /travel/i.test(t.title));
-  assert(trips && travelNow.groupId === trips.id, 'Travel not in Trips');
-  await say('collapse Trips'); await untilIdle(); await wait(400);
-  w = await ws(); assert(w.groups.find((g) => g.id === trips.id).collapsed === true, 'Trips not collapsed');
-  await say('expand Trips'); await untilIdle(); await wait(400);
-  w = await ws(); assert(!w.groups.find((g) => g.id === trips.id).collapsed, 'Trips still collapsed');
-  await say('rename Travel to Journeys'); await untilIdle(); await wait(400);
-  w = await ws(); assert(w.threads.some((t) => t.title === 'Journeys'), 'rename failed: ' + w.threads.map((t) => t.title).join('|'));
+await check('threads: new thread, subthread, group, move, collapse, expand, rename; folding one group never opens another', async () => {
+  await fresh();
+  await say('new thread called Travel'); await untilWindow(/travel/);
+  await say('branch off');
+  await untilWs((w) => { const t = w.threads.find((x) => /travel/i.test(x.title)); return t && w.threads.some((x) => x.parentId === t.id); }, 'a subthread of Travel');
+  await say('new group called Trips'); await untilIdle();
+  await untilWs((w) => w.groups.some((g) => /trips/i.test(g.title)), 'the Trips group');
+  await say('move Travel into Trips'); await untilIdle();
+  await untilWs((w) => { const g = w.groups.find((x) => /trips/i.test(x.title)); return g && w.threads.find((t) => /travel/i.test(t.title))?.groupId === g.id; }, 'Travel to be in Trips');
+  await say('collapse Trips'); await untilIdle();
+  await untilWs((w) => w.groups.find((g) => /trips/i.test(g.title))?.collapsed === true, 'Trips to fold');
+  await say('expand Trips'); await untilIdle();
+  await untilWs((w) => !w.groups.find((g) => /trips/i.test(g.title))?.collapsed, 'Trips to open');
+  await say('rename Travel to Journeys'); await untilIdle();
+  await untilWs((w) => w.threads.some((t) => t.title === 'Journeys'), 'the rename');
   // Folding one group never opens another: with the thread in front inside Trips and the only
   // other group folded, folding Trips leaves both folded (it used to move into Second and open it).
-  await say('new group called Second'); await untilIdle(); await wait(400);
-  await say('collapse Second'); await untilIdle(); await wait(400);
-  await say('go to Journeys'); await wait(500);
-  await say('collapse Trips'); await untilIdle(); await wait(400);
-  w = await ws();
+  await say('new group called Second'); await untilIdle();
+  await untilWs((w) => w.groups.some((g) => /second/i.test(g.title)), 'the Second group');
+  await say('collapse Second'); await untilIdle();
+  await untilWs((w) => w.groups.find((g) => /second/i.test(g.title))?.collapsed === true, 'Second to fold');
+  await say('go to Journeys');
+  await untilWs((w) => w.activeId === w.threads.find((t) => t.title === 'Journeys')?.id, 'Journeys in front');
+  await say('collapse Trips'); await untilIdle();
+  await untilWs((w) => w.groups.find((g) => /trips/i.test(g.title))?.collapsed === true, 'Trips to fold again');
+  const w = await ws();
   const folded = w.groups.filter((g) => /trips|second/i.test(g.title)).map((g) => ({ title: g.title, collapsed: !!g.collapsed }));
   assert(folded.length === 2 && folded.every((g) => g.collapsed), 'folding one group opened another: ' + JSON.stringify(folded));
-  await say('expand Trips'); await untilIdle(); await say('expand Second'); await untilIdle(); await wait(400);
+  await say('expand Trips'); await untilIdle(); await say('expand Second'); await untilIdle();
+  await untilWs((x) => x.groups.filter((g) => /trips|second/i.test(g.title)).every((g) => !g.collapsed), 'both groups open');
   await snap('threads');
   return { threads: w.threads.length, groups: w.groups.length };
 });
 
 await check('directives from the model: new_thread with ask, link, rename, open_config; junk ignored', async () => {
-  await say('go back to Journeys'); await wait(600);
+  await fresh();
+  await say('new thread called Journeys'); await untilWindow(/journeys/);
   const n = asked.length;
-  await say('plan a trip'); for (let i = 0; i < 80 && !asked.slice(n).some((q) => /weather in lisbon/i.test(q)); i++) await wait(250); await untilIdle(30000); await wait(800);
-  let w = await ws();
-  const lisbon = w.threads.find((t) => t.title === 'Lisbon');
-  assert(lisbon, 'no Lisbon thread from directive: ' + w.threads.map((t) => t.title).join('|'));
-  assert(asked.slice(n).some((q) => /weather in lisbon/i.test(q)), 'the new thread did not ask its question: ' + JSON.stringify(asked.slice(n)));
-  assert(lisbon.turns.some((t) => t.role === 'assistant' && /21°/.test(t.content)), 'Lisbon not answered');
-  await say('link them'); await untilIdle(); await wait(600);
-  await say('rename this'); await untilIdle(); await wait(600);
-  w = await ws(); assert(w.threads.some((t) => t.title === 'Renamed by JARVIS'), 'rename_thread directive failed: ' + w.threads.map((t) => t.title).join('|'));
-  await say('open access'); await untilIdle(); await wait(600);
-  let b = await board(); assert(b.drawerOpen && b.activeTab === 'Access', 'open_config: ' + JSON.stringify({ open: b.drawerOpen, tab: b.activeTab }));
-  await page.evaluate(() => document.getElementById('closeDrawer').click()); await wait(300);
+  await say('plan a trip');
+  await untilAsked(n, /weather in lisbon/i); await untilIdle(30000);
+  await untilWs((w) => w.threads.find((t) => t.title === 'Lisbon')?.turns.some((t) => t.role === 'assistant' && /21°/.test(t.content)), 'Lisbon to be asked and answered', 20000);
+  const lisbon = (await ws()).threads.find((t) => t.title === 'Lisbon');
+  await say('link them'); await untilIdle(); await untilSaid(/Linked/);
+  await say('rename this'); await untilIdle();
+  await untilWs((w) => w.threads.some((t) => t.title === 'Renamed by JARVIS'), 'the rename_thread directive');
+  await say('open access'); await untilIdle(); await untilDrawer(true);
+  let b = await board(); assert(b.activeTab === 'Access', 'open_config: ' + JSON.stringify({ open: b.drawerOpen, tab: b.activeTab }));
+  await click('#closeDrawer'); await untilDrawer(false);
   const before = (await ws()).threads.length;
-  await say('be naughty'); await untilIdle(30000); await wait(1500);
-  w = await ws();
+  const m = asked.length;
+  await say('be naughty'); await untilIdle(30000);
+  await untilAsked(m, /say hi/i); await untilIdle(30000); // the one directive that was allowed: a thread whose title is only text
+  const w = await ws();
   const evil = w.threads.find((t) => t.title.includes('<img'));
   const asText = await page.evaluate(() => ({ imgs: document.querySelectorAll('section.chatwin img').length, titles: [...document.querySelectorAll('.cw-title')].map((t) => t.textContent) }));
   assert(asText.imgs === 0, 'a title became an element');
@@ -277,275 +359,250 @@ await check('directives from the model: new_thread with ask, link, rename, open_
 });
 
 await check('panels: show radar, open weather, close all', async () => {
-  await say('show the radar'); await wait(600);
-  let b = await board(); assert(b.panels.includes('perimeter'), 'radar not open: ' + b.panels);
-  await say('open the weather'); await wait(600);
-  b = await board(); assert(b.panels.includes('environment'), 'weather not open: ' + b.panels);
-  await say('close all panels'); await wait(600);
-  b = await board(); assert(b.panels.length === 0, 'panels still open: ' + b.panels);
+  await fresh();
+  await say('show the radar'); await untilPanels((p) => p.includes('perimeter'), 'the radar to open');
+  await say('open the weather'); await untilPanels((p) => p.includes('environment'), 'the weather to open');
+  await say('close all panels'); await untilPanels((p) => p.length === 0, 'the panels to close');
   return true;
 });
 
-await check('closing the thread in front: nothing takes its place, a follow-up opens its own thread, "this thread" has to be named', async () => {
+await check('closing the thread in front: nothing takes its place, a follow-up opens no thread, "this thread" has to be named', async () => {
+  await fresh();
+  await say('new thread called Front'); await untilWindow(/front/);
+  await say('new thread called Other'); await untilWindow(/other/);
   let w = await ws();
   const front = w.threads.find((t) => t.id === w.activeId && !t.archivedAt);
-  assert(front, 'no thread in front to close');
-  const liveBefore = w.threads.filter((t) => !t.archivedAt).map((t) => t.id);
-  await say('close this chat'); await wait(800);
+  assert(front && /other/i.test(front.title), 'the newest thread is not in front: ' + JSON.stringify(front));
+  await say('close this chat');
+  await untilWs((x) => !!x.threads.find((t) => /other/i.test(t.title))?.archivedAt, 'the thread in front to be put away');
   w = await ws();
-  assert(w.threads.find((t) => t.id === front.id)?.archivedAt, 'the thread in front was not put away');
   assert(w.activeId === '', 'another thread was put in front after the close: ' + w.activeId);
   // a reply the model addresses to "the thread" with none in front is conversation: said at the core, written nowhere
-  await say('follow up'); await untilIdle(); await wait(400);
+  await say('follow up'); await untilIdle();
+  await untilSaid(/Following on/);
   w = await ws();
-  assert(/Following on/.test(await coreSaid()), 'the follow-up was not said at the core: ' + await coreSaid());
-  assert(w.threads.filter((t) => !t.archivedAt).length === liveBefore.length - 1, 'the follow-up opened a thread: ' + JSON.stringify(w.threads.map((t) => [t.title, !!t.archivedAt])));
+  assert(w.threads.filter((t) => !t.archivedAt).length === 1, 'the follow-up opened a thread: ' + JSON.stringify(w.threads.map((t) => [t.title, !!t.archivedAt])));
   assert(w.threads.every((t) => !t.turns.some((x) => x.content === 'follow up')), 'the follow-up was written into a thread');
   assert(w.activeId === '', 'something is in front after a follow-up at the core: ' + w.activeId);
   // "this thread" names nothing: a line says so, no thread is touched
-  await say('close this chat'); await wait(800);
-  const line = (await board()).notice;
-  assert(/no thread in front/i.test(line || ''), 'no word that nothing is in front: ' + line);
+  await say('close this chat'); await untilNotice(/no thread in front/);
   w = await ws();
-  assert(w.threads.filter((t) => !t.archivedAt).length === liveBefore.length - 1, 'a thread that was not in front was closed');
-  // restore what this scenario put away, so the next one finds the board as it was
-  await say('restore the last one'); await wait(600);
-  await say('restore ' + front.title); await wait(600);
-  w = await ws();
-  assert(!w.threads.find((t) => t.id === front.id)?.archivedAt, 'restore by name failed: ' + front.title);
+  assert(w.threads.filter((t) => !t.archivedAt).length === 1, 'a thread that was not in front was closed');
+  await say('restore the last one');
+  await untilWs((x) => !x.threads.find((t) => /other/i.test(t.title))?.archivedAt, 'restore to bring the thread back');
   return { closed: front.title };
 });
 
-await check('threads list: put away, restore, put all away, restore, tidy, delete everything with confirm', async () => {
-  await say('close this chat'); await wait(800);
-  let w = await ws(); const away = w.threads.filter((t) => t.archivedAt);
-  assert(away.length >= 1, 'nothing put away');
-  await say('show the threads'); await wait(800);
-  let b = await board(); assert(b.panels.includes('threads'), 'threads panel not open');
-  await page.evaluate(() => document.querySelector('.panel.float[data-panel="threads"] [data-act="restore"]')?.click()); await wait(800);
-  w = await ws(); assert(w.threads.filter((t) => t.archivedAt).length === away.length - 1, 'restore from the list failed');
-  await say('put all away'); await wait(800);
-  w = await ws(); assert(w.threads.every((t) => t.archivedAt), 'not all put away');
-  await say('restore Journeys'); await wait(800);
-  w = await ws(); assert(w.threads.some((t) => t.title === 'Journeys' && !t.archivedAt), 'restore by name failed');
-  await say('new thread called Second'); await wait(600);
-  await say('tidy up'); await wait(800);
-  await say('delete everything'); await wait(600);
-  const dialog = await page.evaluate(() => !document.querySelector('.confirm-dialog')?.hidden && !!document.querySelector('.confirm-dialog'));
-  assert(dialog, 'no confirm dialog for delete everything');
-  await page.evaluate(() => document.getElementById('confirmCancel').click()); await wait(400);
-  w = await ws(); assert(w.threads.length > 0, 'cancel did not keep the board');
-  await say('delete everything'); await wait(600);
-  await page.evaluate(() => document.getElementById('confirmAccept').click()); await wait(800);
+await check('threads list: put away, restore, put all away, restore by name, tidy, delete everything with confirm', async () => {
+  await fresh();
+  await say('new thread called Journeys'); await untilWindow(/journeys/);
+  await say('new thread called Second'); await untilWindow(/second/);
+  await say('close this chat'); await untilWs((w) => w.threads.some((t) => t.archivedAt), 'a thread put away');
+  await say('show the threads'); await untilPanels((p) => p.includes('threads'), 'the Threads list');
+  await click('.panel.float[data-panel="threads"] [data-act="restore"]');
+  await untilWs((w) => w.threads.every((t) => !t.archivedAt), 'restore from the list');
+  await say('put all away'); await untilWs((w) => w.threads.every((t) => t.archivedAt), 'all put away');
+  await say('restore Journeys'); await untilWs((w) => w.threads.some((t) => t.title === 'Journeys' && !t.archivedAt), 'restore by name');
+  await say('tidy up');
+  await say('delete everything'); await untilConfirm(true);
+  await click('#confirmCancel'); await untilConfirm(false);
+  let w = await ws(); assert(w.threads.length === 2, 'cancel did not keep the board: ' + w.threads.length);
+  await say('delete everything'); await untilConfirm(true);
+  await click('#confirmAccept'); await untilWs((x) => x.threads.length === 0, 'delete everything to empty the board');
   w = await ws();
   return { after: w.threads.length, groups: w.groups.length };
 });
 
 await check('error paths: 429 then 500 from the service give a friendly line, then it recovers', async () => {
-  const untilAnswered = async () => { for (let i = 0; i < 80; i++) { const st = await page.evaluate(() => ({ busy: document.getElementById('logState')?.textContent })); if (st.busy !== 'Thinking' && st.busy !== 'Searching the web') break; await wait(250); } await wait(600); };
-  failNext = 429; failLeft = 5; await say('are you there'); await untilAnswered();
+  await fresh();
+  failNext = 429; failLeft = 5; await say('are you there'); await untilIdle(30000);
   let last = await coreSaid();
   assert(/limit|busy|moment|try again/i.test(last || ''), '429 line: ' + last);
-  failNext = 500; failLeft = 5; await say('still there'); await untilAnswered();
+  failNext = 500; failLeft = 5; await say('still there'); await untilIdle(30000);
   last = await coreSaid();
   assert(last && !/Thinking/.test(last), '500 left it thinking: ' + last);
-  await say('and now'); await untilAnswered();
-  last = await coreSaid();
-  assert(/Noted, sir/.test(last || ''), 'did not recover: ' + last);
-  return { recovered: last.slice(0, 40) };
+  await say('and now'); await untilIdle(); await untilSaid(/Noted, sir/);
+  return { recovered: (await coreSaid()).slice(0, 40) };
 });
 
 await check('a spare service: answers when the first is busy, with one notice; both down is one line, not two boxes', async () => {
-  const untilAnswered = async () => { for (let i = 0; i < 80; i++) { const st = await page.evaluate(() => ({ busy: document.getElementById('logState')?.textContent })); if (st.busy !== 'Thinking' && st.busy !== 'Searching the web') break; await wait(250); } await wait(600); };
+  await fresh();
   // connect a second service in Configuration; ChatGPT stays the one in use
-  await say('open config'); await wait(500);
-  await page.evaluate(() => document.querySelector('.tab[data-tab="connections"]').click()); await wait(200);
-  await page.type('#providers input[data-key="gemini"]', 'AIza' + 'Q1w2E3r4'.repeat(4));
-  await page.evaluate(() => document.querySelector('#providers [data-act="save"][data-id="gemini"]').click());
-  await page.waitForFunction(() => document.querySelectorAll('#providers .provider.ready').length === 2, { timeout: 15000 });
-  await page.evaluate(() => document.getElementById('closeDrawer').click()); await wait(300);
+  await connectService('gemini', KEY_GEMINI);
   assert(/ChatGPT/.test(await page.title()), 'the service in use changed: ' + await page.title());
-  let line = '';
-  try {
+  assert((await cores()).with.sort().join() === 'gemini,openai', 'two services expected: ' + JSON.stringify(await cores()));
   // ChatGPT at its limit: the notice says so and names the spare; the spare answers at the core
-  failNext = 429; failLeft = 5; await say('who is there'); await untilAnswered();
-  let b = await board(); line = await coreSaid();
+  failNext = 429; failLeft = 5; await say('who is there'); await untilIdle(30000); await untilSaid(/Gemini here/);
+  const b = await board(); const line = await coreSaid();
   assert(/answering through Gemini/i.test(b.notice || ''), 'no word of the spare: ' + b.notice);
-  assert(/Gemini here/.test(line), 'the spare did not answer: ' + line);
   // both down: one line under the core carrying both reasons, and no notice left over it
-  failNext = 429; failLeft = 5; geminiFail = 503; geminiFailLeft = 5; await say('anyone there'); await untilAnswered();
-  line = await coreSaid();
+  failNext = 429; failLeft = 5; geminiFail = 503; geminiFailLeft = 5; await say('anyone there'); await untilIdle(30000);
+  await untilSaid(/Gemini is busy/);
+  const both = await coreSaid();
   const shown = await page.evaluate(() => ({ notice: !document.getElementById('coreNotice').hidden, reply: !document.getElementById('coreReply').hidden, boxes: document.querySelectorAll('.core-line').length }));
-  assert(/limit|quota/i.test(line) && /Gemini is busy/i.test(line), 'not both reasons in one line: ' + line);
+  assert(/limit|quota/i.test(both), 'not both reasons in one line: ' + both);
   assert(shown.reply && !shown.notice && shown.boxes === 1, 'a notice left over the line, or two boxes: ' + JSON.stringify(shown));
-  } finally {
-  // put Gemini away again — whatever came of the checks — so the rest of the suite sees one service
   failNext = null; failLeft = 0; geminiFail = null; geminiFailLeft = 0;
-  await say('open config'); await wait(500);
-  await page.evaluate(() => document.querySelector('.tab[data-tab="connections"]').click()); await wait(200);
-  await page.evaluate(() => document.querySelector('#providers [data-act="remove"][data-id="gemini"]').click()); await wait(800);
-  await page.waitForFunction(() => document.querySelectorAll('#providers .provider.ready').length === 1, { timeout: 15000 });
-  const left = await cores();
-  assert(left.with.join() === 'openai' && left.active === 'openai', 'Gemini not gone: ' + JSON.stringify(left));
-  await page.evaluate(() => document.getElementById('closeDrawer').click()); await wait(300);
-  }
-  await say('and now'); await untilAnswered();
-  assert(/Noted, sir/.test(await coreSaid()), 'did not recover: ' + await coreSaid());
+  await say('and now'); await untilIdle(); await untilSaid(/Noted, sir/);
   return { line: line.slice(0, 80) };
 });
 
 await check('input edges: empty, whitespace, 5000 characters cut to 4000 with a notice, a long reply', async () => {
+  await fresh();
   const n = asked.length;
-  await say(''); await say('   '); await wait(400);
+  await say(''); await say('   ');
+  await say('hello'); // a local line: by the time it has answered, nothing empty can still be on its way
   assert(asked.length === n, 'empty input reached the model');
-  await say('x'.repeat(5000)); await untilIdle(30000);
+  await say('x'.repeat(5000)); await untilAsked(n, /^x{100}/); await untilIdle(30000);
   assert(asked.length === n + 1 && asked[n].length === 4000, 'long input should be cut to 4000: ' + asked[n]?.length + ' ' + JSON.stringify(asked.slice(n).map((q) => q.slice(0, 12) + '…' + q.slice(3990, 4060))));
   const capNote = await page.evaluate(() => [...document.querySelectorAll('.cw-msg.sys')].some((m) => /4,000/.test(m.textContent)) || /4,000/.test(document.getElementById('coreNotice')?.textContent || ''));
   assert(capNote, 'no notice about the 4,000-character cap');
-  await say('give me something slow'); await untilIdle(30000); await wait(500);
+  await say('give me something slow'); await untilIdle(30000); await untilWindow(/slow one/);
+  await until(() => ([...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].pop()?.textContent.length ?? 0) > 1900, 'the long reply whole');
   const len = await page.evaluate(() => [...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].pop()?.textContent.length);
-  assert(len > 1900, 'long reply cut: ' + len);
-  assert((await board()).windows.some((w) => /slow one/i.test(w.title)), 'the long research reply did not get its thread');
   return { sent: asked[n].length, replied: len };
 });
 
 await check('configuration: tabs, copy icon, re-check, disconnect and reconnect', async () => {
-  await page.evaluate(() => document.getElementById('openDrawer').click()); await wait(400);
-  for (const t of ['voice', 'access', 'quick', 'connections']) { await page.evaluate((x) => document.querySelector(`.tab[data-tab="${x}"]`).click(), t); await wait(200); }
+  await fresh();
+  await click('#openDrawer'); await untilDrawer(true);
+  for (const t of ['voice', 'access', 'quick', 'connections']) { await click(`.tab[data-tab="${t}"]`); await until((x) => document.querySelector(`.tab[data-tab="${x}"]`).classList.contains('on'), `the ${t} tab`, 5000, t); }
   const tabs = await page.$$eval('.tab', (t) => t.map((x) => x.textContent));
   assert(tabs.join() === 'Connections,Voice,Access,Quick', 'tab order: ' + tabs.join());
-  await page.evaluate(() => document.querySelector('#providers [data-act="copy"][data-id="openai"]').click()); await wait(300);
-  const copied = await page.evaluate(() => document.querySelector('#providers [data-act="copy"][data-id="openai"]').classList.contains('done'));
+  // the copy: a tick for a moment when the browser lets the page write the clipboard (headless Chrome may not)
+  await click('#providers [data-act="copy"][data-id="openai"]');
+  await until(() => /Copied|refused/.test(document.querySelector('#providers [data-act="copy"][data-id="openai"]')?.getAttribute('title') || ''), 'the copy to be tried', 5000);
+  const copied = await page.evaluate(() => document.querySelector('#providers [data-act="copy"][data-id="openai"]').getAttribute('title'));
   const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => 'unreadable');
-  await page.evaluate(() => document.querySelector('#providers [data-act="recheck"][data-id="openai"]').click()); await wait(1500);
-  await page.evaluate(() => document.querySelector('#providers [data-act="remove"][data-id="openai"]').click()); await wait(800);
-  const form = await page.evaluate(() => !!document.querySelector('#providers input[data-key="openai"]'));
-  assert(form, 'disconnect did not show the key form');
+  await click('#providers [data-act="recheck"][data-id="openai"]');
+  await until(() => document.querySelector('#providers .provider.ready [data-act="recheck"]'), 'the re-check to finish', 15000);
+  await click('#providers [data-act="remove"][data-id="openai"]');
+  await until(() => document.querySelector('#providers input[data-key="openai"]'), 'disconnect to show the key form', 5000);
   await page.type('#providers input[data-key="openai"]', 'sk-proj-' + 'Z9y8X7w6'.repeat(8));
-  await page.evaluate(() => document.querySelector('#providers [data-act="save"][data-id="openai"]').click());
-  await page.waitForFunction(() => document.querySelector('#providers .provider.ready'), { timeout: 15000 });
-  await page.evaluate(() => document.getElementById('closeDrawer').click());
+  await click('#providers [data-act="save"][data-id="openai"]');
+  await until(() => document.querySelector('#providers .provider.ready'), 'the reconnect', 15000);
+  await click('#closeDrawer'); await untilDrawer(false);
   return { copied, clipStartsWith: String(clip).slice(0, 8) };
 });
 
 await check('persistence: reload keeps threads, groups, active thread and title', async () => {
-  await say('new thread called Keep me'); await wait(500); await say('remember this'); await untilIdle();
-  await say('new group called Later'); await untilIdle(); await say('move Keep me into Later'); await untilIdle(); await wait(400);
+  await fresh();
+  await say('new thread called Keep me'); await untilWindow(/keep me/);
+  await say('remember this'); await untilIdle();
+  await say('new group called Later'); await untilIdle(); await untilWs((w) => w.groups.some((g) => /later/i.test(g.title)), 'the Later group');
+  await say('move Keep me into Later'); await untilIdle();
+  await untilWs((w) => { const g = w.groups.find((x) => /later/i.test(x.title)); return g && w.threads.find((t) => /keep me/i.test(t.title))?.groupId === g.id; }, 'Keep me to be in Later');
   const before = await ws();
-  await page.reload({ waitUntil: 'networkidle2' }); await wait(1500);
+  await page.reload({ waitUntil: 'networkidle2' });
+  await until(() => /m-(desk|compact)/.test(document.body.className) && document.querySelector('section.chatwin'), 'the board back after the reload');
   const after = await ws(); const b = await board();
   assert(after.threads.length === before.threads.length && after.groups.length === before.groups.length, 'counts changed on reload');
   assert(after.activeId === before.activeId, 'active thread changed');
   assert(b.windows.some((w) => /keep me/i.test(w.title)), 'Keep me not drawn after reload');
-  assert(b.title.includes('ChatGPT'), 'service not remembered: ' + b.title);
+  await until(() => /ChatGPT/.test(document.title), 'the service to be remembered');
   return { threads: after.threads.length, groups: after.groups.length };
 });
 
 await check('phone: list layout, ask, no horizontal overflow', async () => {
-  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
-  await page.reload({ waitUntil: 'networkidle2' }); await wait(1500);
+  await fresh({ viewport: PHONE });
   await say('a phone question'); await untilIdle();
+  await say('new thread called Pocket'); await untilWindow(/pocket/);
+  await say('a line for it'); await untilIdle();
   const m = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth > window.innerWidth, windows: document.querySelectorAll('section.chatwin').length, compact: document.body.className }));
+  assert(/m-compact/.test(m.compact), 'not the phone layout: ' + m.compact);
   assert(!m.overflow, 'horizontal overflow on a phone');
   // Threads share the list's height by what they hold (stage.ts fitList): every one is limited to its own
   // content and keeps at least a few lines, so none is stretched past what it has to show.
+  await until(() => [...document.querySelectorAll('section.chatwin')].every((w) => parseFloat(w.style.maxHeight) > 0), 'the phone list to size its threads', 5000);
   const fit = await page.evaluate(() => [...document.querySelectorAll('section.chatwin')].map((w) => ({ max: parseFloat(w.style.maxHeight), min: parseFloat(w.style.minHeight), h: w.getBoundingClientRect().height })));
   assert(fit.length && fit.every((f) => f.max > 0 && f.h <= f.max + 2 && f.h >= Math.min(150, f.max) - 2), 'phone threads not sized to their content: ' + JSON.stringify(fit));
   await snap('phone');
-  await page.setViewport({ width: 1200, height: 800 }); await page.reload({ waitUntil: 'networkidle2' }); await wait(1000);
   return m;
 });
 
-
-await check('windows: fold and unfold by the title bar, fold by command, Esc stops the voice and closes the keyboard', async () => {
-  await say('new thread called Foldy'); await wait(500); await say('a line to fold'); await untilIdle();
+await check('windows: fold and unfold by command, a letter opens the keyboard, Esc closes it', async () => {
+  await fresh();
+  await say('new thread called Foldy'); await untilWindow(/foldy/);
+  await say('a line to fold'); await untilIdle();
   const id = await page.evaluate(() => [...document.querySelectorAll('section.chatwin')].find((w) => /foldy/i.test(w.querySelector('.cw-title')?.textContent))?.dataset.id);
   assert(id, 'no Foldy window');
-  const foldedBefore = await page.evaluate((i) => document.querySelector(`section.chatwin[data-id="${i}"] .cw-body`).childElementCount, id);
-  await say('fold this thread'); await wait(700);
-  const foldedByCmd = await page.evaluate((i) => document.querySelector(`section.chatwin[data-id="${i}"] .cw-body`).childElementCount, id);
-  await say('open up this thread'); await wait(700);
-  const reopened = await page.evaluate((i) => document.querySelector(`section.chatwin[data-id="${i}"] .cw-body`).childElementCount, id);
+  const bodyCount = (i) => page.evaluate((x) => document.querySelector(`section.chatwin[data-id="${x}"] .cw-body`).childElementCount, i);
+  const foldedBefore = await bodyCount(id);
+  await say('fold this thread'); await until((i) => document.querySelector(`section.chatwin[data-id="${i}"] .cw-body`).childElementCount === 0, 'the window to fold', 5000, id);
+  const foldedByCmd = await bodyCount(id);
+  await say('open up this thread'); await until((i) => document.querySelector(`section.chatwin[data-id="${i}"] .cw-body`).childElementCount > 0, 'the window to open', 5000, id);
+  const reopened = await bodyCount(id);
   assert(foldedBefore > 0 && foldedByCmd === 0 && reopened > 0, `fold: ${foldedBefore} → ${foldedByCmd} → ${reopened}`);
-  await page.keyboard.type('h'); await wait(300);
-  const kb = await page.evaluate(() => { const r = document.getElementById('input').getBoundingClientRect(); return r.width > 0 && document.getElementById('input').value === 'h'; });
-  await page.keyboard.press('Escape'); await wait(300);
-  const kbClosed = await page.evaluate(() => document.getElementById('input').getBoundingClientRect().width === 0 || document.getElementById('input').value === '');
-  assert(kb, 'a letter did not open the keyboard with the letter in it');
-  return { foldedBefore, foldedByCmd, reopened, kbOpenedByLetter: kb, kbClosedByEsc: kbClosed };
+  await page.keyboard.type('h');
+  await until(() => document.getElementById('input').getBoundingClientRect().width > 0 && document.getElementById('input').value === 'h', 'a letter to open the keyboard with the letter in it', 5000);
+  await page.keyboard.press('Escape');
+  await until(() => document.getElementById('input').getBoundingClientRect().width === 0 || document.getElementById('input').value === '', 'Esc to close the keyboard', 5000);
+  return { foldedBefore, foldedByCmd, reopened };
 });
 
 await check('voice commands: mute, unmute, switch to a service that is not connected', async () => {
-  await say('mute'); await wait(500);
-  const muted = await page.evaluate(() => !document.getElementById('voiceOut').checked);
-  await say('unmute'); await wait(500);
-  const unmuted = await page.evaluate(() => document.getElementById('voiceOut').checked);
-  assert(muted && unmuted, `mute ${muted} unmute ${unmuted}`);
-  await say('switch to Gemini'); await wait(800);
+  await fresh();
+  await say('mute'); await until(() => !document.getElementById('voiceOut').checked, 'mute to take');
+  await say('unmute'); await until(() => document.getElementById('voiceOut').checked, 'unmute to take');
+  await say('switch to Gemini'); await untilNotice(/gemini/);
   const b = await board();
   assert(b.title.includes('ChatGPT'), 'switched to an unconnected service: ' + b.title + ' ' + JSON.stringify(await cores()));
-  assert(/gemini/i.test(b.notice || ''), 'no word about Gemini not being connected: ' + b.notice);
   return { notice: b.notice };
 });
 
 await check('configuration: quick queries run, voice choice persists, the guide reopens from Connections', async () => {
-  await page.evaluate(() => document.getElementById('openDrawer').click()); await wait(300);
-  await page.evaluate(() => document.querySelector('.tab[data-tab="quick"]').click()); await wait(200);
+  await fresh();
+  await click('#openDrawer'); await untilDrawer(true);
+  await click('.tab[data-tab="quick"]');
   const n = asked.length;
-  await page.evaluate(() => document.querySelector('#quick [data-cmd="status"]').click()); await wait(900);
+  await click('#quick [data-cmd="status"]'); await untilSaid(/load|percent|tolerance/);
   assert(asked.length === n, 'status went to the model');
   const statusLine = await coreSaid();
-  assert(/load|percent|tolerance/i.test(statusLine || ''), 'status: ' + statusLine);
-  await page.evaluate(() => document.querySelector('.tab[data-tab="voice"]').click()); await wait(200);
+  await click('.tab[data-tab="voice"]');
+  await until(() => document.querySelectorAll('#voiceSel option').length > 1, 'the voice list');
   const options = await page.evaluate(() => [...document.querySelectorAll('#voiceSel option')].map((x) => x.value).filter((v) => v.includes(':')));
   const pick = options.find((v) => v.startsWith('openai:') && !v.endsWith('fable')) ?? options[0];
-  await page.select('#voiceSel', pick); await wait(500);
+  await page.select('#voiceSel', pick);
+  await until((p) => localStorage.getItem('jarvis.voice.openai') === p.split(':')[1], 'the choice to be remembered for ChatGPT', 5000, pick);
   const remembered = await page.evaluate(() => localStorage.getItem('jarvis.voice.openai'));
   // The device's own voices stay on offer beside the service's, and the choice survives a reload.
   const device = options.find((v) => v.startsWith('device:'));
   assert(device !== undefined, 'no device voice listed while connected: ' + options.join(' '));
-  await page.select('#voiceSel', device); await wait(500);
-  const onDevice = await page.evaluate(() => ({
-    value: document.getElementById('voiceSel').value,
-    note: document.getElementById('voiceNote').textContent,
-    sliders: !document.getElementById('pitchSl').closest('.ctl-row').hidden,
-  }));
-  assert(onDevice.value === device && /this device/i.test(onDevice.note) && onDevice.sliders, 'device voice not taken: ' + JSON.stringify(onDevice));
-  await page.reload({ waitUntil: 'networkidle2' }); await wait(1500);
-  const kept = await page.evaluate(() => document.getElementById('voiceSel').value);
-  assert(kept === device, 'device voice forgotten on reload: ' + kept);
-  await page.evaluate(() => document.getElementById('openDrawer').click()); await wait(300);
-  await page.evaluate(() => document.querySelector('.tab[data-tab="voice"]').click()); await wait(200);
-  await page.select('#voiceSel', pick); await wait(500);
-  assert((await page.evaluate(() => document.getElementById('voiceSel').value)) === pick, 'service voice not taken back');
-  await page.evaluate(() => document.querySelector('.tab[data-tab="connections"]').click()); await wait(200);
-  await page.evaluate(() => document.getElementById('showSetup').click()); await wait(400);
+  await page.select('#voiceSel', device);
+  await until((d) => document.getElementById('voiceSel').value === d && /this device/i.test(document.getElementById('voiceNote').textContent), 'the device voice to be taken', 5000, device);
+  const onDevice = await page.evaluate(() => ({ value: document.getElementById('voiceSel').value, note: document.getElementById('voiceNote').textContent, sliders: !document.getElementById('pitchSl').closest('.ctl-row').hidden }));
+  assert(onDevice.sliders, 'the device voice\'s sliders are hidden: ' + JSON.stringify(onDevice));
+  await page.reload({ waitUntil: 'networkidle2' });
+  await until(() => /m-(desk|compact)/.test(document.body.className), 'the console back after the reload');
+  await until((d) => document.getElementById('voiceSel').value === d, 'the device voice remembered on reload', 10000, device);
+  await click('#openDrawer'); await untilDrawer(true);
+  await click('.tab[data-tab="voice"]');
+  await page.select('#voiceSel', pick);
+  await until((p) => document.getElementById('voiceSel').value === p, 'the service voice taken back', 5000, pick);
+  await click('.tab[data-tab="connections"]');
+  await click('#showSetup'); await untilGuide(true);
   const b = await board();
-  assert(b.guideOpen && !b.drawerOpen, 'guide did not open from Connections');
-  await page.evaluate(() => document.getElementById('setupSkip').click()); await wait(300);
+  assert(!b.drawerOpen, 'the drawer stayed open under the guide');
+  await click('#setupSkip'); await untilGuide(false);
   return { statusLine: (statusLine || '').slice(0, 50), pick, remembered };
 });
 
 await check('deleting: a group and a thread for good, both behind a confirm', async () => {
-  await say('new group called Doomed'); await untilIdle(); await wait(400);
-  await say('delete the Doomed group'); await wait(600);
-  let dlg = await page.evaluate(() => !document.getElementById('confirmDialog').hidden);
-  assert(dlg, 'no confirm for deleting a group');
-  await page.evaluate(() => document.getElementById('confirmAccept').click()); await wait(700);
-  let w = await ws(); assert(!w.groups.some((g) => /doomed/i.test(g.title)), 'group survived');
-  await say('new thread called Gone'); await wait(500);
-  await say('delete this thread permanently'); await wait(600);
-  dlg = await page.evaluate(() => !document.getElementById('confirmDialog').hidden);
-  assert(dlg, 'no confirm for deleting a thread for good');
-  await page.evaluate(() => document.getElementById('confirmAccept').click()); await wait(700);
-  w = await ws(); assert(!w.threads.some((t) => /^gone$/i.test(t.title)), 'thread survived');
+  await fresh();
+  await say('new group called Doomed'); await untilIdle(); await untilWs((w) => w.groups.some((g) => /doomed/i.test(g.title)), 'the Doomed group');
+  await say('delete the Doomed group'); await untilConfirm(true);
+  await click('#confirmAccept'); await untilWs((w) => !w.groups.some((g) => /doomed/i.test(g.title)), 'the group to go');
+  await say('new thread called Gone'); await untilWindow(/^gone$/);
+  await say('delete this thread permanently'); await untilConfirm(true);
+  await click('#confirmAccept'); await untilWs((w) => !w.threads.some((t) => /^gone$/i.test(t.title)), 'the thread to go');
+  const w = await ws();
   return { threads: w.threads.length, groups: w.groups.length };
 });
 
 results.push({ name: 'page errors', ok: pageErrors.length === 0, detail: pageErrors });
 results.push({ name: 'console errors', ok: consoleErrors.length === 0, detail: consoleErrors.slice(0, 10) });
 fs.writeFileSync(path.join(outDir, 'e2e-full.json'), JSON.stringify({ results, asked }, null, 1));
-for (const r of results) console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.name}${r.ok ? '' : '  —  ' + (typeof r.detail === 'string' ? r.detail : JSON.stringify(r.detail))}`);
+for (const r of results) console.log(`${r.ok ? 'PASS' : 'FAIL'}  ${r.name}${r.ms ? `  (${(r.ms / 1000).toFixed(1)}s)` : ''}${r.ok ? '' : '  —  ' + (typeof r.detail === 'string' ? r.detail : JSON.stringify(r.detail))}`);
 console.log(`\n${results.filter((r) => r.ok).length}/${results.length} passed`);
 const passed = results.filter((r) => r.ok).length;
 await browser.close(); server.close();

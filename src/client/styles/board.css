@@ -1,0 +1,192 @@
+/* THE STAGE — the core in the middle, conversations floating around it:
+   the room, the status line, the groups (bubbles) and the bin. */
+
+.centre { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+/* The core is the source of a single wash of light that flows through the board. */
+/* The tallest any box may be: from the title row down to the space kept clear
+   above JARVIS (--core-clear is published by stage.ts; --status-room is his status line
+   and notices). Every box fits above him, so none can cover him even on a
+   screen too narrow to step aside. */
+.stage { --board-h: calc(100% - var(--header-h) - var(--core-clear, 140px) - var(--status-room)); }
+.stage {
+  position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
+  background:
+    /* JARVIS's light: fixed at his spot (bottom centre, 72px up) and a fixed
+       size, so like the grid it never slides or stretches as the window resizes */
+    radial-gradient(ellipse 1600px 1080px at 50% calc(100% - 72px), rgba(57,132,157,.19), rgba(26,82,104,.13) 35%, rgba(12,48,66,.08) 65%, transparent 100%),
+    linear-gradient(to top, rgba(17,57,73,.24), rgba(12,42,58,.17) 48%, rgba(7,24,35,.08) 100%),
+    #050b11;
+}
+.masthead {
+  position: absolute; top: calc(18px + env(safe-area-inset-top, 0px)); left: 50%; z-index: 2; transform: translateX(-50%);
+  white-space: nowrap; pointer-events: none;
+  font-family: var(--f-hud); font-size: 14px; font-weight: 700; letter-spacing: .24em;
+  color: rgba(177,232,246,.82); text-shadow: 0 0 16px rgba(111,240,255,.25);
+}
+/* a faint floor grid, receding — the room the windows float in */
+.stage::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    linear-gradient(rgba(29,84,104,.16) 1px, transparent 1px) center / 56px 56px,
+    linear-gradient(90deg, rgba(29,84,104,.16) 1px, transparent 1px) center / 56px 56px;
+  mask-image: linear-gradient(to top, #000, rgba(0,0,0,.82) 45%, transparent 100%);
+}
+#graph { position: absolute; inset: 0; z-index: 1; pointer-events: none; display: block; }
+/* The phone's bars over the page's edges, as two empty elements stage.ts can
+   measure: the core and the board keep clear of the gesture bar, the title row
+   of the clock. Zero everywhere else. */
+.safe-probe { position: absolute; left: 0; width: 0; visibility: hidden; pointer-events: none; }
+.safe-probe[data-edge="top"] { top: 0; height: env(safe-area-inset-top, 0px); }
+.safe-probe[data-edge="bottom"] { bottom: 0; height: env(safe-area-inset-bottom, 0px); }
+
+/* The status line: one fixed place just above JARVIS. His status word, the
+   line he is saying and the bin all sit on it, bottom edge on the line, so
+   nothing that comes and goes ever appears at a different height. The line
+   or the bin takes it over while showing. */
+.core-label {
+  position: absolute; left: var(--core-x, 50%); top: var(--status-y, 70%); transform: translate(-50%, -100%);
+  z-index: 205; text-align: center; pointer-events: none; white-space: nowrap;
+  transition: opacity .2s var(--ease-soft);
+}
+.stage:has(.core-line.in) .core-label, .stage:has(.bin.in) .core-label { opacity: 0; }
+.stage:has(.bin.in) .core-line { opacity: 0; }
+.core-state {
+  display: block; font-family: var(--f-hud); font-size: 10px; font-weight: 700;
+  letter-spacing: .32em; text-transform: uppercase; color: var(--ice);
+  text-shadow: 0 0 12px rgba(111,240,255,.45);
+}
+
+/* No stacking context of its own (no z-index), so each window and group
+   stacks against the instrument panels directly — see stack.ts. */
+.windows { position: absolute; inset: 0; pointer-events: none; }
+
+/* ---------- bubbles: one group of threads, hanging off the core ----------
+   Not boxes: soft fields with uneven corners that breathe at rest and glide
+   when they move. Position is a transform, so moving one is a single smooth
+   thing rather than a jump. */
+.bubble {
+  --hue: #6ff0ff;
+  --drift: 13s;
+  --surface-highlight: 0 0 24px color-mix(in srgb, var(--hue) 10%, transparent);
+  position: absolute; left: 0; top: 0; pointer-events: auto;
+  display: flex; flex-direction: column;
+  max-height: var(--board-h); /* never taller than fits above JARVIS (see .stage) */
+  padding: 0 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--hue) 26%, transparent);
+  border-radius: 0;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.22) inset, var(--surface-depth);
+  animation: bubbleIn .5s var(--ease);
+  transition: transform var(--travel) var(--ease), border-color .35s var(--ease-soft),
+              box-shadow .35s var(--ease-soft), width .3s var(--ease);
+  will-change: transform;
+}
+/* Fades in where it belongs. It must not animate `transform`: that is the
+   bubble's position, and animating it makes bubbles fly in from the corner. */
+@keyframes bubbleIn { from { opacity: 0; filter: blur(7px); } }
+/* the one you're in is simply brighter — the shape never morphs under you */
+.bubble.here {
+  border-color: color-mix(in srgb, var(--hue) 52%, transparent);
+  box-shadow: var(--surface-highlight), var(--surface-depth);
+}
+.bubble.drop {
+  border-color: var(--hue);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hue) 30%, transparent), 0 0 44px color-mix(in srgb, var(--hue) 26%, transparent);
+  transform-origin: center;
+}
+/* no animation switch here either: turning the entrance animation back on
+   when it is let go would replay it as a blink */
+.bubble.dragging { transition: none; }
+/* not yet seated (stage.ts): invisible, and no transition into its first seat */
+.bubble.unplaced { visibility: hidden; transition: none; }
+/* ungrouped threads: no shell, no name — just the windows, each on its own
+   strand from the core. A group only appears when there is one. */
+.bubble.loose {
+  inset: 0; width: auto; height: auto; max-height: none;
+  border: 0; background: none; box-shadow: none; padding: 0;
+  -webkit-backdrop-filter: none; backdrop-filter: none; /* a host, not a pane: nothing behind it is blurred */
+  pointer-events: none; animation: none; transform: none !important;
+  /* no stacking context: each loose window stacks on its own (stack.ts) */
+  will-change: auto;
+}
+.bubble.loose > .bb-head { display: none; }
+.bubble.loose > .bb-list { position: absolute; inset: 0; display: block; overflow: visible; padding: 0; }
+/* A loose window travels to its seat as a bubble does — the same time and
+   easing (--travel) — whether the seat moved or it was carried and let go:
+   its place (left/top) and the carry (transform) ease together, so from
+   wherever it was dropped it glides to where it is put down. */
+.bubble.loose .chatwin {
+  position: absolute; pointer-events: auto;
+  transition: opacity .35s var(--ease-soft), border-color .3s var(--ease-soft), box-shadow .3s var(--ease-soft),
+              left var(--travel) var(--ease), top var(--travel) var(--ease), transform var(--travel) var(--ease);
+}
+.bubble.loose .chatwin:not(.sized) { width: var(--thread-w); }
+.bb-head {
+  display: flex; align-items: center; gap: 7px; padding: 8px 4px 7px; margin-bottom: 2px;
+  cursor: grab; user-select: none; touch-action: none;
+}
+.bubble.dragging .bb-head { cursor: grabbing; }
+.bb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hue); box-shadow: 0 0 8px var(--hue); flex: none; }
+.bb-title {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--f-hud); font-weight: 700; font-size: 9.5px; letter-spacing: .22em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--hue) 80%, #fff);
+}
+.bb-count { font-size: 10px; color: var(--ice-dim); font-variant-numeric: tabular-nums; }
+/* The small buttons on a box's bar — a window's, a group's, a panel's — are one control: see "bar buttons" in windows.css. */
+/* Invisible corner hit targets keep the visual surface clean. */
+.bubble.loose .bb-grip, .bubble.collapsed .bb-grip { display: none; }
+/* Inside a group only the group is sized; its threads take its width. */
+.bubble:not(.loose) .cw-grip { display: none; }
+.bubble.sizing { transition: none; }
+.bubble.sized .bb-list { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+/* A sized group sizes its threads: they take its width, and share out its
+   height — each grows with it until its whole conversation shows, and shrinks
+   with it, scrolling inside itself, down to its title and a line. */
+.bubble.sized:not(.loose) .chatwin { width: auto; max-width: none; }
+.bubble.sized:not(.loose) .chatwin:not(.shut) { flex: 0 1 auto; min-height: 82px; }
+.bubble.sized:not(.loose) .chatwin:not(.shut) .cw-body { flex: 1 1 auto; min-height: 0; max-height: none; }
+.bb-list {
+  display: flex; flex-direction: column; gap: 6px; min-height: 0;
+  overflow-y: auto; overflow-x: hidden; padding: 1px 2px 2px 1px;
+}
+/* folded: the whole group becomes one orb on its spoke */
+.bb-node { display: none; }
+.bubble.collapsed {
+  padding: 0; border-radius: 50%; width: 116px !important; height: 116px;
+  background: radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--hue) 16%, transparent), rgba(5,11,17,.62) 72%);
+  animation: bubbleIn .5s var(--ease), orbBreathe var(--drift) ease-in-out infinite;
+}
+@keyframes orbBreathe { 50% { box-shadow: 0 0 46px color-mix(in srgb, var(--hue) 16%, transparent), 0 24px 60px rgba(0,0,0,.34); } }
+.bubble.collapsed .bb-head, .bubble.collapsed .bb-list { display: none; }
+.bubble.collapsed .bb-node {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  width: 100%; height: 100%; border: 0; background: transparent; color: inherit; cursor: grab; padding: 10px; border-radius: 50%;
+  font: inherit; text-align: center; touch-action: none;
+}
+.bb-node b { font-family: var(--f-hud); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: color-mix(in srgb, var(--hue) 85%, #fff); max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb-node span { font-size: 10px; color: var(--ice-dim); }
+.bb-node:focus-visible { outline: var(--focus); outline-offset: 2px; }
+
+/* ---------- the bin: it rises when you pick something up ---------- */
+.bin {
+  position: absolute; left: var(--core-x, 50%); top: var(--status-y, 70%); z-index: 216; pointer-events: none;
+  display: flex; align-items: center; gap: 9px; padding: 11px 18px;
+  border: 1px dashed rgba(255,79,95,.5); border-radius: 999px;
+  background: rgba(20,8,11,.72); backdrop-filter: blur(10px);
+  color: #ff8d98; font-family: var(--f-hud); font-size: 9.5px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase; white-space: nowrap;
+  transform: translate(-50%, calc(-100% + 18px)) scale(.94); opacity: 0;
+  transition: transform .34s var(--ease), opacity .28s var(--ease-soft), background .2s, border-color .2s;
+}
+.bin.in { transform: translate(-50%, -100%) scale(1); opacity: 1; }
+.bin.hot {
+  border-style: solid; border-color: var(--red); color: #fff;
+  background: rgba(120,24,34,.8);
+  transform: translate(-50%, calc(-100% - 4px)) scale(1.08);
+  box-shadow: 0 0 34px rgba(255,79,95,.35);
+}
+.bin svg { width: 17px; height: 17px; }
+
+/* While the web is open its own heading is the title; the masthead steps aside. */
+.masthead { transition: opacity .2s var(--ease-soft); }
+.stage:has(.web.in) .masthead { opacity: 0; }

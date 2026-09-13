@@ -1,0 +1,100 @@
+/* The context web: what else is about this thread, as a layer over the board. */
+
+/* ---------- the context web: what else is about this thread ---------- */
+/* The board stays visible behind a light dim, so the web reads as a layer
+   over your threads rather than a different screen. Its nodes are small
+   versions of the thread windows: the same glass, colour and tag. */
+.web {
+  position: absolute; inset: 0; z-index: 220; cursor: zoom-out;
+  opacity: 0; transition: opacity .26s var(--ease-soft);
+}
+.web.in { opacity: 1; }
+.web-head {
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 2;
+  display: flex; align-items: baseline; gap: 10px; white-space: nowrap; pointer-events: none;
+  max-width: calc(100% - 24px);
+}
+.web-head span {
+  font-family: var(--f-hud); font-size: 10px; font-weight: 700; letter-spacing: .24em;
+  text-transform: uppercase; color: var(--ice);
+}
+.web-head b {
+  font-family: var(--f-hud); font-size: 12px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-hi); overflow: hidden; text-overflow: ellipsis;
+}
+.web-head em { font-style: normal; font-size: 10.5px; color: var(--ice-dim); }
+.web.narrow .web-head { flex-direction: column; align-items: center; gap: 2px; }
+.web.narrow .web-head b { display: none; }
+/* strands and cards drift together with the pointer, so the strands stay
+   fixed to the cards' edges */
+.web-strands {
+  position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+  transform: translate(calc(var(--px, 0) * -12px), calc(var(--py, 0) * -8px));
+  transition: transform .45s var(--ease-soft);
+}
+/* each strand is two strokes of the connected thread's own colour: a wide
+   soft glow and a bright core, thicker the closer the connection */
+.web-strands path {
+  fill: none; stroke: currentColor; stroke-linecap: round;
+  stroke-width: calc(1.4px + var(--near) * 2.2px);
+  stroke-opacity: calc(.45 + var(--near) * .5);
+  filter: drop-shadow(0 0 5px currentColor);
+  stroke-dasharray: 2400; stroke-dashoffset: 2400;
+  animation: strand .9s var(--ease) var(--delay, 0ms) forwards;
+}
+@keyframes strand { to { stroke-dashoffset: 0; } }
+.web-nodes {
+  position: absolute; inset: 0;
+  transform: translate(calc(var(--px, 0) * -12px), calc(var(--py, 0) * -8px));
+  transition: transform .45s var(--ease-soft);
+}
+.web-node {
+  --hue: #6ff0ff; --near: .5; --delay: 0ms;
+  position: absolute; transform: translate(-50%, -50%) scale(.86); opacity: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  width: 232px; padding: 9px 11px 10px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--hue) calc(40% + var(--near) * 45%), transparent);
+  border-radius: 10px;
+  box-shadow: 0 10px 34px rgba(0,0,0,.45), 0 0 calc(10px + var(--near) * 18px) color-mix(in srgb, var(--hue) 22%, transparent);
+  animation: web-bloom .5s var(--ease) var(--delay) forwards;
+  transition: box-shadow .25s, border-color .25s, transform .25s var(--ease);
+}
+@keyframes web-bloom { to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+.web-node:hover {
+  transform: translate(-50%, -50%) scale(1.04); border-color: var(--hue);
+  box-shadow: 0 12px 38px rgba(0,0,0,.5), 0 0 34px color-mix(in srgb, var(--hue) 38%, transparent);
+}
+.web-node header { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.web-node header i {
+  flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--hue);
+  box-shadow: 0 0 8px var(--hue);
+}
+.web-node header b {
+  flex: 1; min-width: 0; font-family: var(--f-hud); font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; font-size: 11.5px; color: var(--text-hi);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.web-node header small { flex: none; font-size: 10px; color: color-mix(in srgb, var(--hue) 75%, #fff); opacity: .85; }
+.web-node p {
+  margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.web-why { display: flex; flex-wrap: wrap; gap: 4px; }
+.web-why span {
+  font-size: 10px; padding: 1px 7px; border-radius: 999px; white-space: nowrap;
+  color: color-mix(in srgb, var(--hue) 70%, #fff);
+  border: 1px solid color-mix(in srgb, var(--hue) 35%, transparent);
+  background: color-mix(in srgb, var(--hue) 10%, transparent);
+}
+.web-node.me {
+  --near: 1; cursor: default; width: 268px; z-index: 1;
+  border-color: var(--hue);
+  box-shadow: 0 12px 40px rgba(0,0,0,.5), 0 0 0 3px color-mix(in srgb, var(--hue) 16%, transparent), 0 0 48px color-mix(in srgb, var(--hue) 30%, transparent);
+  animation-delay: 0ms;
+}
+.web-node.me header b { font-size: 12.5px; }
+.web.narrow .web-node { width: min(300px, calc(100% - 32px)); }
+.web-none {
+  position: absolute; transform: translate(-50%, -50%); text-align: center;
+  font-size: 11.5px; color: var(--ice-dim); max-width: 280px;
+}

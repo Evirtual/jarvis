@@ -1,0 +1,29 @@
+/* COMPONENTS — the two materials everything in the console is made of, so
+   every box and every overlay looks and behaves the same. Use the class;
+   never restyle the background or the blur on the element itself.
+   (Imported last on purpose, in styles.css: a class here wins over an
+   element's own base rule of the same weight, such as .panel.)
+
+   .glass  a surface: thread windows, groups, instrument panels, the web's
+           cards, the More sheets, the configuration drawer, dialogs, the
+           keyboard and notices. Tinted by --hue where the element has one.
+           (The gradient is written per rule, not as a :root variable, so
+           that --hue resolves on each box rather than on :root.)
+   .veil   what lies behind anything modal: the configuration drawer, a
+           confirmation, the context web. One dim and one blur for all.
+
+   Other shared pieces: .ic (icon button), .btn (text button), .pill (a
+   reading), and --ic-btn / --ic for every title-bar button and glyph. */
+
+.glass {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--hue, var(--ice)) 8%, rgba(14,30,42,.56)),
+    rgba(6,14,21,.64));
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+.veil {
+  background: var(--veil-bg);
+  backdrop-filter: var(--veil-blur);
+  -webkit-backdrop-filter: var(--veil-blur);
+}

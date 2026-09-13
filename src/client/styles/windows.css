@@ -1,0 +1,165 @@
+/* A thread window: its bar and buttons, its body, a reply's Markdown,
+   pictures and players, the grips that size it, and how it is carried. */
+
+/* ---------- thread windows, inside their bubble ---------- */
+.chatwin {
+  --hue: var(--ice);
+  --surface-highlight: 0 0 24px color-mix(in srgb, var(--hue) 10%, transparent);
+  position: relative; pointer-events: auto; flex: none;
+  /* One fixed width whatever the screen (see --thread-w); a size chosen with
+     a corner grip stays inline. */
+  width: var(--thread-w);
+  max-width: calc(100vw - 32px);
+  display: flex; flex-direction: column;
+  border: 1px solid color-mix(in srgb, var(--hue) 45%, var(--line));
+  border-radius: 0;
+  box-shadow: 0 0 0 1px rgba(111,240,255,.04) inset, var(--surface-depth);
+  opacity: .8;
+  transition: opacity .35s var(--ease-soft), border-color .3s var(--ease-soft),
+              width var(--travel) var(--ease), box-shadow .3s var(--ease-soft), transform var(--travel) var(--ease);
+  animation: winIn .5s var(--ease);
+  overflow: hidden;
+}
+@keyframes winIn { from { opacity: 0; transform: translateY(8px) scale(.97); filter: blur(5px); } }
+.chatwin:hover { opacity: .98; transform: translateY(-1px); }
+.chatwin.on {
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--hue) 58%, transparent);
+  box-shadow: var(--surface-highlight), var(--surface-depth);
+}
+/* resized by hand: the corner grip */
+.cw-grip, .bb-grip { position: absolute; width: 18px; height: 18px; touch-action: none; opacity: 0; }
+.cw-grip[data-corner="se"], .bb-grip[data-corner="se"] { right: 0; bottom: 0; cursor: nwse-resize; }
+.cw-grip[data-corner="nw"], .bb-grip[data-corner="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+.cw-grip[data-corner="ne"], .bb-grip[data-corner="ne"] { right: 0; top: 0; cursor: nesw-resize; }
+.cw-grip[data-corner="sw"], .bb-grip[data-corner="sw"] { left: 0; bottom: 0; cursor: nesw-resize; }
+/* the edges between the corners: a thin strip along each side (corners sit on top) */
+.cw-grip[data-corner="n"], .bb-grip[data-corner="n"] { top: 0; left: 18px; right: 18px; width: auto; height: 6px; cursor: ns-resize; }
+.cw-grip[data-corner="s"], .bb-grip[data-corner="s"] { bottom: 0; left: 18px; right: 18px; width: auto; height: 6px; cursor: ns-resize; }
+.cw-grip[data-corner="e"], .bb-grip[data-corner="e"] { right: 0; top: 18px; bottom: 18px; height: auto; width: 6px; cursor: ew-resize; }
+.cw-grip[data-corner="w"], .bb-grip[data-corner="w"] { left: 0; top: 18px; bottom: 18px; height: auto; width: 6px; cursor: ew-resize; }
+/* A window inside a group is placed by the group, so it can only grow from its
+   right edge, bottom edge or bottom-right corner; a left or top one there
+   would move the wrong edge. */
+.bubble:not(.loose) .cw-grip:not([data-corner="se"]):not([data-corner="e"]):not([data-corner="s"]) { display: none; }
+.chatwin.sizing { transition: none; }
+.chatwin.sized .cw-body { overflow-y: auto; }
+.chatwin .cw-body { max-height: min(420px, calc(100vh - 320px)); }
+/* picked up to move to another bubble */
+/* Carried by a transform from where it sits (stage.ts): it is never moved to
+   another parent mid-drag, since that would reload a video playing in it. */
+.bubble .chatwin.lifted {
+  /* A loose window's own rule (.bubble.loose .chatwin, board.css) eases its
+     transform over .3s, which made a carried window trail behind the pointer;
+     this rule weighs the same and comes later, so it wins: it must follow the
+     pointer exactly. The z-index is written on every window (stack.ts), so
+     only !important lifts the carried one above them all. */
+  z-index: 199 !important; transition: none; will-change: transform;
+  /* Nothing else changes while it is carried — not its glass, not its entrance
+     animation (switching that off and on again replays the fade-in, which
+     reads as a blink when it is put down). */
+  box-shadow: 0 0 0 1px var(--ice), 0 24px 60px rgba(0,0,0,.6);
+}
+/* the group it is carried out of stops clipping it for the moment */
+.bubble.carrying .bb-list { overflow: visible; }
+/* an embedded player must not swallow the pointer while something is carried */
+.stage.carrying iframe { pointer-events: none; }
+.chatwin.lifted .cw-head { cursor: grabbing; }
+
+.cw-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 9px 9px 11px; border-bottom: 1px solid var(--line);
+  background: rgba(6,13,20,.55); cursor: grab; user-select: none; touch-action: none;
+}
+.chatwin.shut .cw-head { border-bottom: 0; }
+.chatwin.shut .cw-body { display: none; }
+.chatwin.shut .cw-chev { transform: rotate(-90deg); }
+.chatwin.shut { opacity: .72; }
+.chatwin.shut:hover { opacity: .95; }
+/* the window a dragged thread would join to make a group */
+.chatwin.drop {
+  opacity: 1; border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(255,182,72,.3), 0 0 34px rgba(255,182,72,.26);
+}
+.cw-dot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--hue) 65%, var(--line-hot)); flex: none; }
+.chatwin.on .cw-dot { background: var(--hue); box-shadow: 0 0 8px var(--hue); }
+.cw-title {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--f-hud); font-weight: 700; font-size: 11.5px; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--text);
+}
+.cw-link { color: var(--ice); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ice) 48%, transparent); text-underline-offset: 2px; }
+.cw-link:hover, .cw-link:focus-visible { color: #dffbff; text-decoration-color: currentColor; }
+/* A picture or player is the full width of the thread; its height follows (a player keeps 16:9). */
+.cw-media { display: block; width: 100%; margin: 10px 0; padding: 0; border: 1px solid var(--line); background: rgba(4,12,18,.66); }
+/* Cards in a row sit the same distance apart as the thread's edge padding (margins collapse to the larger). */
+.cw-media + .cw-media { margin-top: 12px; }
+.cw-media img, .cw-media iframe { display: block; width: 100%; max-width: none; border: 0; }
+.cw-media > a { display: block; width: 100%; max-width: none; }
+.cw-media img { height: auto; background: #050b11; }
+.cw-media iframe { aspect-ratio: 16 / 9; }
+.cw-media > a:not(:has(img)) { margin-top: 4px; font: 10px var(--f-hud); letter-spacing: .1em; text-transform: uppercase; }
+.cw-ref { color: var(--ice-dim); font: 9px var(--f-mono); letter-spacing: .04em; white-space: nowrap; }
+.chatwin.on .cw-title { color: var(--hue); }
+.cw-count { font-size: 11px; color: var(--ice-dim); font-variant-numeric: tabular-nums; }
+/* Window furniture: drawn icons, big enough to hit and to read. */
+/* ---------- bar buttons: the same control on every box's bar ---------- */
+.cw-head button, .bb-add, .bb-fold, .p-x {
+  width: var(--ic-btn); height: var(--ic-btn); flex: none; display: grid; place-items: center;
+  background: transparent; border: 0; border-radius: 7px; color: var(--ice-dim); cursor: pointer; padding: 0; min-height: 0;
+  transition: color .18s, background .18s, transform .18s var(--ease);
+}
+.cw-head button svg, .bb-add svg, .bb-fold svg, .p-x svg { width: var(--ic); height: var(--ic); }
+.cw-head button:hover, .bb-add:hover, .bb-fold:hover, .p-x:hover { color: var(--ice); background: var(--on-bg); transform: translateY(-1px); }
+.cw-head button:focus-visible, .bb-add:focus-visible, .bb-fold:focus-visible, .p-x:focus-visible { outline: var(--focus); outline-offset: 1px; }
+.bb-add:hover, .bb-fold:hover { color: var(--hue); background: color-mix(in srgb, var(--hue) 12%, transparent); } /* a group's take its hue */
+.cw-head .cw-x:hover { color: var(--gold); background: rgba(255,182,72,.12); }
+.cw-head .cw-del:hover { color: var(--red); background: rgba(255,79,95,.12); }
+.cw-chev { display: grid; place-items: center; width: var(--ic-btn); height: var(--ic-btn); color: var(--ice-dim); transition: transform .25s var(--ease); }
+.cw-chev svg { width: var(--ic); height: var(--ic); }
+
+.cw-body {
+  overflow-y: auto; padding: 10px 12px 12px; min-height: 36px;
+  display: flex; flex-direction: column; gap: 8px;
+  font-size: 12px; line-height: 1.5;
+}
+.cw-msg { overflow-wrap: anywhere; }
+/* A reply's Markdown, drawn token by token (message.ts): blocks stack with a small gap. */
+.cw-msg > * + *, .cw-msg li > * + *, .cw-quote > * + * { margin-top: 6px; }
+.cw-msg .cw-p { margin: 0; }
+.cw-msg .cw-h { margin: 0; font-weight: 600; color: var(--ice); }
+.cw-msg .cw-h[data-level="1"], .cw-msg .cw-h[data-level="2"] { font-size: 1.1em; letter-spacing: .01em; }
+.cw-msg .cw-h[data-level="1"] { font-family: var(--f-hud); text-transform: uppercase; letter-spacing: .12em; font-size: .95em; }
+.cw-msg ul.cw-list, .cw-msg ol.cw-list { margin: 0; padding-left: 1.5em; }
+.cw-msg li + li { margin-top: 2px; }
+.cw-msg li::marker { color: var(--ice-dim); font-variant-numeric: tabular-nums; }
+.cw-msg .cw-task { margin-right: 5px; color: var(--ice-dim); }
+.cw-msg li:has(> .cw-task) { list-style: none; margin-left: -1.5em; }
+.cw-msg b { font-weight: 600; color: var(--ice); }
+.cw-msg s { opacity: .7; }
+.cw-msg code {
+  font-family: var(--f-mono); font-size: .92em; padding: 0 4px; border-radius: 3px;
+  background: rgba(111,240,255,.08); color: var(--text-hi);
+}
+.cw-msg pre.cw-code {
+  margin: 0; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere;
+  border: 1px solid var(--line); background: rgba(4,12,18,.66); position: relative;
+}
+.cw-msg pre.cw-code code { padding: 0; border-radius: 0; background: none; font-size: .92em; }
+.cw-msg pre.cw-code[data-lang]::before {
+  content: attr(data-lang); position: absolute; top: 4px; right: 8px;
+  font: 8.5px var(--f-hud); letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim);
+}
+.cw-msg .cw-quote { margin: 0; padding: 0 0 0 10px; border-left: 2px solid var(--ice-dim); color: var(--ice-dim); }
+.cw-msg .cw-table-wrap { overflow-x: auto; }
+.cw-msg .cw-table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.cw-msg .cw-table th, .cw-msg .cw-table td { padding: 3px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.cw-msg .cw-table th { color: var(--ice); font-weight: 600; }
+.cw-msg .cw-table tbody tr:last-child td { border-bottom: 0; }
+.cw-msg hr.cw-hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.cw-msg.user { white-space: pre-wrap; }
+.cw-msg.user { color: var(--gold); padding-left: 9px; border-left: 2px solid rgba(255,182,72,.45); }
+.cw-msg.jarvis { color: var(--text-hi); }
+.cw-msg.sys { color: var(--ice-dim); font-size: 10.5px; }
+
+.chatwin.shut .cw-w, .chatwin.shut .cw-b, .chatwin.shut .cw-del { display: none; }

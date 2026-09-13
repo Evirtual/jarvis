@@ -1,0 +1,210 @@
+/* COMPACT — phone. The core is the screen; one conversation sheet under it,
+   the other threads as tabs, instruments as a bottom sheet. No page scroll:
+   it behaves like an app, not a document.
+
+   The !important here are not fights with the desktop rules: the board
+   writes a window's place and size on the element itself (left, top, width,
+   height, transform, max-height — stage.ts, stack.ts), and those inline
+   values are what a phone's list has to override. */
+
+body.m-compact .shell { padding: 0; }
+/* the deck keeps its shape on a phone: readings, JARVIS, controls */
+body.m-compact .deck { padding: 0 var(--edge) calc(4px + env(safe-area-inset-bottom)); gap: 6px; }
+/* The phone's own bars above and below the page — the clock, the gesture bar —
+   are painted by the phone in the app's theme colour (#060e15, the board's
+   edge; index.html and the manifest). The page can't draw on them, so the
+   board meets them in that colour: its top and bottom edges fade to it, and
+   the seam disappears. */
+body.m-compact .stage::after {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; /* under the canvas (1): the core keeps its light */
+  background:
+    linear-gradient(to bottom, #060e15, transparent var(--header-h)),
+    linear-gradient(to top, #060e15, rgba(6,14,21,.7) 20px, transparent calc(var(--deck-h, 96px) - 24px));
+}
+body.m-compact .core-seat { width: 120px; }
+body.m-compact .pill.more { height: 30px; padding: 0 9px; }
+body.m-compact .ic { width: 40px; height: 40px; }
+/* Sheets open above JARVIS, never over him: they stop at the top of the core. */
+body.m-compact .menu {
+  position: fixed; left: var(--edge); right: var(--edge); top: auto; bottom: var(--sheet-bottom); z-index: 80;
+  min-width: 0; height: auto; max-height: calc(100dvh - var(--sheet-bottom) - var(--header-h) - 4px); padding: 12px;
+  overflow-y: auto; overscroll-behavior: contain;
+  border-color: rgba(111,240,255,.4);
+}
+body.m-compact .menu-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin: -2px 0 8px; padding: 0 2px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ice); font-family: var(--f-hud); font-size: 10px;
+  font-weight: 700; letter-spacing: .18em; text-transform: uppercase;
+}
+body.m-compact .menu-close {
+  width: 34px; height: 34px; display: grid; place-items: center; padding: 0;
+  border: 1px solid var(--line); background: transparent; color: var(--ice-dim);
+  cursor: pointer;
+}
+body.m-compact .menu-close svg { width: var(--ic); height: var(--ic); }
+body.m-compact .menu-close:hover, body.m-compact .menu-close:focus-visible { color: var(--ice); border-color: var(--ice); }
+body.m-compact .menu-close:focus-visible { outline: var(--focus); outline-offset: 1px; }
+body.m-compact .menu-item { min-height: 52px; }
+
+/* Conversations: on a phone the board becomes one scrolling list between the
+   title and the deck. Every window is full width, groups are sections of the
+   list, and each window folds only when you tap its own title bar — exactly as
+   on the desktop. Nothing folds or shrinks on its own. */
+/* The list uses the whole height, down to the bottom edge. Over the bottom
+   controls it fades to a faint trace, so JARVIS, his status line and the deck
+   buttons always show through; the padding lets the last item scroll up clear
+   of them. (JARVIS is drawn on the canvas beneath the list.) */
+body.m-compact .windows {
+  position: absolute; top: var(--header-h); left: var(--edge); right: var(--edge); bottom: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  padding-bottom: calc(var(--core-clear, 140px) + var(--status-room));
+  pointer-events: auto; overflow-y: auto; overscroll-behavior: contain;
+  --fade-from: calc(100% - var(--core-clear, 140px) - var(--status-room));
+  -webkit-mask-image: linear-gradient(to bottom, #000 var(--fade-from), rgba(0,0,0,.34) calc(var(--fade-from) + 1px), rgba(0,0,0,.1) calc(var(--fade-from) + 48px));
+  mask-image: linear-gradient(to bottom, #000 var(--fade-from), rgba(0,0,0,.34) calc(var(--fade-from) + 1px), rgba(0,0,0,.1) calc(var(--fade-from) + 48px));
+  /* one list under the sheets: a tapped thread never rises over an open sheet */
+  z-index: 3;
+}
+/* Threads share the screen by what they hold: each starts from nothing and
+   grows equally, but never past its own content — so a short exchange keeps
+   its size and the room it doesn't need goes to the long ones; two long ones
+   split the space; one alone may use all of it, but only if it has that much
+   to show. A thread with anything in it keeps at least a few lines; past that
+   the list scrolls. (Flex: basis 0, grow 1; the limits — each thread's own
+   natural height — are measured and set by stage.ts fitList.) */
+body.m-compact .bubble {
+  position: static; animation: none; flex: 1 1 0; min-height: 0; max-height: none;
+  width: auto !important; transform: none !important; padding: 0 8px 8px;
+}
+body.m-compact .bubble.collapsed { width: auto !important; height: auto; border-radius: 0; padding: 0 8px; animation: none; }
+body.m-compact .bubble.collapsed .bb-head { display: flex; }
+body.m-compact .bubble.collapsed .bb-node { display: none; }
+body.m-compact .bubble .bb-grip { display: none; }
+body.m-compact .bb-head { cursor: pointer; padding: 10px 4px; }
+body.m-compact .bb-list { flex: 1 1 auto; min-height: 0; flex-direction: column; flex-wrap: nowrap; overflow: visible; gap: 8px; max-height: none !important; }
+/* Loose windows are placed freely on the desktop board; on a phone they are
+   simply part of the list. */
+body.m-compact .bubble.loose > .bb-list { position: static; inset: auto; display: flex; }
+body.m-compact .chatwin {
+  position: static !important; left: auto !important; top: auto !important;
+  width: 100% !important; max-width: none; max-height: none; flex: 1 1 0; min-height: 0;
+  opacity: 1; animation: none; margin: 0;
+}
+body.m-compact .chatwin .cw-body { font-size: 13.5px; height: auto !important; max-height: none !important; flex: 1 1 auto; min-height: 0; }
+body.m-compact .chatwin .cw-grip { display: none; }
+/* The phone's grip: three 45° lines at the bottom of the thread in front — drag
+   for a height of your own, double-tap to let it share the list again. Shown on
+   that one thread only, so the list stays clean. */
+.cw-grip-m { display: none; }
+body.m-compact .chatwin.on .cw-grip-m {
+  display: grid; place-items: end; position: absolute; right: 0; bottom: 0;
+  width: 32px; height: 32px; touch-action: none; cursor: nwse-resize; color: var(--hue); opacity: .75;
+}
+/* the usual resize corner: parallel 45° lines, each ending on the right and the bottom border */
+body.m-compact .chatwin.on .cw-grip-m svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.2; }
+body.m-compact .chatwin.sizing { box-shadow: 0 0 0 1px var(--hue), var(--surface-depth); }
+body.m-compact .chatwin.sizing .cw-grip-m { opacity: 1; }
+body.m-compact .chatwin.on .cw-body { padding-bottom: 16px; } /* room for the grip beside the last line */
+body.m-compact .cw-head { cursor: pointer; padding: 10px 12px; }
+
+/* the command line hugs the bottom edge, above the home indicator */
+body.m-compact .stage .cmd { width: calc(100% - 2 * var(--edge)); bottom: calc(var(--deck-h, 96px) - 2px); }
+body.m-compact #input { font-size: 16px; } /* 16px stops iOS zooming on focus */
+
+/* Instruments on a phone are part of the thread list (applyMode in deck.ts moves the
+   panels' container to the top of it): they scroll with the threads instead of
+   covering them, and as many can be open as you like. */
+body.m-compact .overlays {
+  position: static; display: flex; flex-direction: column; gap: 10px; flex: none; pointer-events: auto;
+}
+body.m-compact .overlays:not(:has(> .panel.float:not([hidden]))) { display: none; }
+/* …except the Threads list, which on a phone is a modal sheet like More: it
+   rises from the line where the fade over the bottom controls begins (main.ts
+   lifts it out of the list), and a tap outside it closes it. */
+body.m-compact .panel.float[data-panel="threads"], body.m-compact .panel.float[data-panel="conversation"] {
+  position: fixed; left: var(--edge) !important; right: var(--edge); top: auto !important;
+  bottom: var(--sheet-bottom);
+  width: auto !important; height: auto !important;
+  max-height: calc(100dvh - var(--sheet-bottom) - var(--header-h) - 4px);
+  overflow-y: auto; overscroll-behavior: contain; z-index: 220 !important; /* above the deck (200), which it now overlaps */
+  box-shadow: 0 18px 44px rgba(0,0,0,.55);
+}
+body.m-compact .panel.float {
+  position: relative; left: auto !important; top: auto !important; flex: none;
+  width: auto !important; height: auto !important; max-height: none; overflow: visible;
+  animation: sheetUp .26s cubic-bezier(.2,.9,.3,1);
+}
+body.m-compact .panel.float > h2.drag { cursor: default; }
+@keyframes sheetUp { from { transform: translateY(24px); opacity: 0; } }
+body.m-compact .drawer { width: 100%; max-width: 100%; }
+/* A confirmation, too, is a sheet above the deck on a phone — the same small
+   gap from the sides and the bottom as the Threads list and the More sheets. */
+body.m-compact .confirm-dialog {
+  left: var(--edge); right: var(--edge); top: auto; bottom: var(--sheet-bottom);
+  width: auto; transform: none;
+  box-shadow: 0 18px 44px rgba(0,0,0,.55);
+  animation: sheetUp .26s cubic-bezier(.2,.9,.3,1);
+}
+
+/* The line under the core, the guide and a notice, on a phone. */
+body.m-compact .core-line { max-width: calc(100% - 24px); font-size: 11.5px; max-height: 38vh; }
+body.m-compact .setup { padding: 0; align-items: flex-end; }
+body.m-compact .setup-sheet {
+  position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom, 0px);
+  width: auto; max-height: calc(100dvh - var(--header-h) - 4px);
+  box-shadow: 0 18px 44px rgba(0,0,0,.55);
+  animation: sheetUp .26s cubic-bezier(.2,.9,.3,1);
+}
+/* On a phone a notice is one line, so it always fits the room kept for it
+   between JARVIS and whatever sheet is open above him. */
+body.m-compact .core-notice { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* On a phone the threads are a list, so there is nothing to tidy. */
+body.m-compact .tl-foot [data-all="tidy"] { display: none; }
+
+/* On a phone an open sheet — either More, or the Threads list — sits over the
+   same blurred veil as every other modal. The deck and the title row stay
+   above it, so the button that opened the sheet can close it; a tap on the
+   veil closes it too (deck.ts). */
+.sheet-veil { position: absolute; inset: 0; z-index: 70; display: none; }
+body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden]), .panel.float[data-panel="conversation"]:not([hidden])) .sheet-veil {
+  display: block; animation: veilIn .2s var(--ease-soft);
+}
+@keyframes veilIn { from { opacity: 0; } }
+
+/* Phone sheets (More, Threads) come down close to the bottom buttons, leaving
+   the same gap above them as the buttons keep from the bottom edge: the 40px
+   buttons sit 30px up (tops at 70px), so a sheet ends 30px above that, at
+   100px — deck height + 4px. While one is open, JARVIS's status word and
+   notices step aside rather than show through it. */
+/* Where the Threads list and the More menus stop on a phone: the same small
+   gap from the bottom as from the sides, over the deck; a confirmation sits
+   the same way. (The guide runs to the edge, full width: see its own rules.) */
+body.m-compact { --sheet-bottom: calc(var(--edge) + env(safe-area-inset-bottom, 0px)); }
+body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden]), .panel.float[data-panel="conversation"]:not([hidden])) :is(.core-label, .core-line) {
+  opacity: 0;
+}
+
+/* Phone list details:
+   - loose threads have no group frame, so none of a group's inner padding —
+     they line up with the 16px edge like everything else;
+   - a little room at the top, and no hover lift, so a tapped thread's top
+     border is never clipped by the list's edge;
+   - a thread alone on the board fills the list down to its bottom padding —
+     the line where the fade over the bottom controls begins — so the whole
+     card, border and all, stays clear of them; its conversation scrolls
+     inside it. (The padding is the list's, not the thread's.) */
+body.m-compact .bubble.loose { padding: 0; }
+body.m-compact .windows { padding-top: 6px; scroll-padding-top: 6px; }
+body.m-compact .chatwin:hover { transform: none; }
+
+/* Phone: dragging a thread up or down the list by its title bar (stage.ts).
+   It rides above the others, which glide out of its way. */
+body.m-compact .bb-list.reorder > .chatwin { transition: transform .18s var(--ease); }
+body.m-compact .chatwin.reordering {
+  position: relative !important; z-index: 5; transition: none !important;
+  box-shadow: 0 0 0 1px var(--ice), 0 18px 44px rgba(0,0,0,.55);
+}
+body.m-compact .cw-head { touch-action: none; }

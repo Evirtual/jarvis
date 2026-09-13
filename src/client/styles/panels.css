@@ -1,0 +1,167 @@
+/* The instrument panels and what they show — readouts, meters, the radar,
+   the weather — and the Threads list and the Conversation, which float the
+   same way. */
+
+/* ---------- grid ---------- */
+.hud { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
+
+.panel {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--panel-hi), var(--panel));
+  padding: 10px 12px 12px;
+}
+.panel > h2 {
+  margin: 0 0 9px; font-family: var(--f-hud); font-size: 9.5px; font-weight: 700;
+  letter-spacing: .22em; text-transform: uppercase; color: var(--ice-dim);
+  display: flex; align-items: center; gap: 8px;
+}
+.panel > h2 .tail { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-hot), transparent); }
+.panel > h2 .aux { color: var(--text); font-size: 9px; letter-spacing: .08em; font-family: var(--f-mono); }
+
+/* ---------- readouts ---------- */
+.kv { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 11px; padding: 3px 0; }
+.kv .k { font-family: var(--f-hud); font-weight: 600; font-size: 8.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); white-space: nowrap; }
+.kv .v { color: var(--text-hi); text-align: right; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kv .v.gold { color: var(--gold); }
+
+.meter { margin: 6px 0 2px; }
+.meter .row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; font-size: 11px; }
+.meter .row .nm { color: var(--text); }
+.meter .row .nu { color: var(--text-hi); font-variant-numeric: tabular-nums; font-weight: 500; }
+.meter .row .nu .u { color: var(--ice-dim); font-size: 9px; margin-left: 2px; }
+.track { height: 4px; background: #071119; border: 1px solid var(--line); overflow: hidden; }
+.fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--ice-dim), var(--ice)); box-shadow: 0 0 7px rgba(111,240,255,.5); transition: width .45s ease; }
+.fill.warn { background: linear-gradient(90deg, #8a5f1c, var(--gold)); box-shadow: 0 0 7px rgba(255,182,72,.45); }
+.fill.crit { background: linear-gradient(90deg, #7a2530, var(--red)); box-shadow: 0 0 7px rgba(255,79,95,.45); }
+
+/* per-core grid: one cell per real logical core */
+.cores { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; margin: 7px 0 4px; }
+.core { height: 22px; background: #071119; border: 1px solid var(--line); position: relative; overflow: hidden; }
+.core i { position: absolute; left: 0; right: 0; bottom: 0; display: block; background: linear-gradient(180deg, var(--ice), var(--ice-dim)); height: 0; transition: height .4s ease; }
+.core.hot i { background: linear-gradient(180deg, var(--gold), #8a5f1c); }
+.core.max i { background: linear-gradient(180deg, var(--red), #7a2530); }
+
+/* ---------- the Threads list: the whole board as a list; the Conversation: the talk at the core ---------- */
+.panel.float[data-panel="threads"], .panel.float[data-panel="conversation"] {
+  width: 320px; max-height: min(480px, var(--board-h));
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.panel.float[data-panel="threads"] .tl { min-height: 0; overflow-y: auto; }
+.panel.float[data-panel="conversation"] .tl-core { display: flex; flex-direction: column; min-height: 0; margin: 0; }
+.panel.float[data-panel="conversation"] .tl-chat { flex: 1 1 auto; min-height: 0; max-height: none; }
+.tl { display: flex; flex-direction: column; gap: 2px; }
+.tl-g {
+  display: flex; align-items: center; gap: 7px; margin-top: 8px; padding: 4px 2px;
+  font-family: var(--f-hud); font-size: 9px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--ice-dim); border-bottom: 1px solid var(--line);
+}
+.tl-g:first-child { margin-top: 0; }
+.tl-g i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.tl-g .n { margin-left: auto; font-family: var(--f-mono); letter-spacing: 0; }
+.tl-row {
+  --depth: 0;
+  display: flex; align-items: center; gap: 6px; padding: 6px 4px 6px calc(6px + var(--depth) * 14px);
+  font-size: 11.5px; color: var(--text); cursor: pointer; border-left: 2px solid transparent;
+}
+.tl-row:hover { background: var(--hover-bg); }
+.tl-row.on { border-left-color: var(--ice); color: var(--text-hi); background: var(--on-bg); }
+.tl-row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-ref { color: var(--ice-dim); font: 9px var(--f-mono); }
+.tl-row .sub { color: var(--ice-dim); font-size: 10px; }
+.tl-row button { background: transparent; border: 1px solid transparent; color: var(--ice-dim); cursor: pointer; font: inherit; font-size: 10px; padding: 2px 6px; min-height: 0; }
+.tl-row button:hover { color: var(--ice); border-color: var(--line-hot); }
+.tl-row button.del:hover { color: var(--red); border-color: var(--red); }
+.tl-row button:focus-visible { outline: var(--focus); outline-offset: 1px; }
+.tl-empty { font-size: 10.5px; color: var(--ice-dim); padding: 6px 4px; }
+.tl-foot { display: flex; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.tl-foot button {
+  flex: 1; background: transparent; border: 1px solid var(--line-hot); color: var(--ice-dim); cursor: pointer;
+  font-family: var(--f-hud); font-size: 9.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+  padding: 7px 6px; border-radius: 0; transition: color .18s, border-color .18s, background .18s;
+}
+.tl-foot button:hover { color: var(--ice); border-color: var(--ice); background: var(--hover-bg); }
+.tl-foot button.del:hover { color: var(--red); border-color: var(--red); background: rgba(255,79,95,.08); }
+.tl-foot button:focus-visible { outline: var(--focus); outline-offset: 1px; }
+
+/* System panels float over the stage as glass: see-through, blurred, closable. */
+.overlays { position: absolute; inset: 0; pointer-events: none; }
+.panel.float {
+  --hue: var(--ice);
+  position: absolute; width: 292px; min-width: 210px; min-height: 90px; max-height: var(--board-h); overflow: auto;
+  pointer-events: auto;
+  border: 1px solid color-mix(in srgb, var(--hue) 52%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--hue) 16%, transparent) inset, var(--surface-depth);
+  container-type: inline-size;
+  animation: panelIn .28s cubic-bezier(.2,.9,.3,1);
+  /* to its seat as a window and a bubble travel: the same time and easing; none while carried or sized */
+  transition: left var(--travel) var(--ease), top var(--travel) var(--ease);
+}
+.panel.float:not([data-panel="threads"]):not([data-panel="conversation"]) { --surface-highlight: 0 0 38px color-mix(in srgb, var(--hue) 26%, transparent); }
+/* Each instrument has one colour, worn by its panel, by its reading in the
+   deck and by its row in More — so the toggle and the box read as one thing. */
+.panel.float[data-panel="compute"], [data-open="compute"] { --hue: #68f4ff; }
+.panel.float[data-panel="graphics"], [data-open="graphics"] { --hue: #ffbc5b; }
+.panel.float[data-panel="storage"], [data-open="storage"] { --hue: #65efb4; }
+.panel.float[data-panel="perimeter"], [data-open="perimeter"] { --hue: #ad91ff; }
+.panel.float[data-panel="uplink"], [data-open="uplink"] { --hue: #61d8ff; }
+.panel.float[data-panel="environment"], [data-open="environment"] { --hue: #72e6c9; }
+.panel.float > h2 { color: color-mix(in srgb, var(--hue) 74%, #d6f2fa); }
+.panel.float > h2 .tail { background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 58%, transparent), transparent); }
+.panel.float .kv .k, .panel.float .radar-foot .info { color: color-mix(in srgb, var(--hue) 60%, #2e7f96); }
+.panel.float .fill { background: linear-gradient(90deg, color-mix(in srgb, var(--hue) 54%, #12313f), var(--hue)); box-shadow: 0 0 8px color-mix(in srgb, var(--hue) 52%, transparent); }
+.panel.float:hover { box-shadow: var(--surface-highlight), var(--surface-depth); }
+.panel.float .kv { font-size: clamp(10px, 3.2cqw, 16px); }
+.panel.float .kv .k, .panel.float .radar-foot .info { font-size: clamp(8px, 2.45cqw, 12px); }
+.panel.float .host { font-size: clamp(10px, 3.1cqw, 15px); }
+.panel.float .host .ms, .panel.float .host .tag { font-size: clamp(8px, 2.7cqw, 12px); }
+.panel.float .meter { margin-block: clamp(4px, 1.8cqw, 10px); }
+.panel.float .track { height: clamp(2px, .9cqw, 6px); }
+@keyframes panelIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+.panel.float > h2.drag { cursor: grab; user-select: none; touch-action: none; margin: -10px -12px 9px; padding: 9px 8px 8px 12px; border-bottom: 1px solid rgba(111,240,255,.1); }
+.panel.float.dragging > h2.drag { cursor: grabbing; }
+.panel.float.dragging, .panel.float.sizing { transition: none; }
+/* the same close button, the same size, as a thread window's */
+.p-x { margin-left: 2px; }
+.p-x:hover { color: var(--gold); background: rgba(255,182,72,.12); } /* a close, like a window's × */
+.panel.float > h2 .mi-ic { width: var(--ic); height: var(--ic); flex: none; color: var(--hue); margin-right: -1px; }
+
+/* ---------- radar ---------- */
+/* The radar is square, as wide as the panel unless the line under it has been dragged (--radar-h). */
+#radar { width: min(var(--radar-h, 100%), 100%); height: auto; aspect-ratio: 1; display: block; margin: 0 auto; cursor: crosshair; }
+.radar-split {
+  height: 9px; margin: 6px 0 -1px; cursor: ns-resize; touch-action: none; position: relative;
+}
+.radar-split::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 1px; background: var(--line); }
+.radar-split::after {
+  content: ""; position: absolute; left: 50%; top: 2px; width: 28px; height: 5px; transform: translateX(-50%);
+  border-top: 1px solid var(--ice-dim); border-bottom: 1px solid var(--ice-dim); opacity: .6;
+}
+.radar-split:hover::after, .radar-split.on::after { opacity: 1; border-color: var(--ice); }
+.radar-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 7px; gap: 8px; }
+.radar-foot .info { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim); }
+.radar-foot .info b { color: var(--text-hi); font-weight: 600; }
+.hosts { margin-top: 0; max-height: 116px; overflow-y: auto; }
+/* Resized taller or shorter, Perimeter gives the difference to its host list:
+   the radar and its footer keep their size, the list takes what's left (116px
+   when the panel is its own size). */
+.panel.float[data-panel="perimeter"] { width: 312px; display: flex; flex-direction: column; }
+.panel.float[data-panel="perimeter"] > * { flex-shrink: 0; }
+.panel.float[data-panel="perimeter"] > .hosts { flex: 1 1 116px; min-height: 48px; max-height: none; }
+.host { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; padding: 5px 2px; border-bottom: 1px dashed rgba(18,49,63,.6); font-size: 11px; }
+.host:last-child { border-bottom: 0; }
+.host:hover, .host.lit { background: var(--hover-bg); }
+.host .ip { color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.host .ms { color: var(--ice-dim); font-variant-numeric: tabular-nums; font-size: 10px; }
+.host .tag { font-size: 9.5px; color: var(--ice-dim); grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.host.gw .ip { color: var(--gold); }
+.host.self .ip { color: var(--green); }
+
+/* ---------- weather ---------- */
+.wx { display: flex; align-items: center; gap: 13px; }
+.wx .glyph { font-size: 34px; line-height: 1; filter: saturate(.7); }
+.wx .now .t { font-family: var(--f-hud); font-weight: 700; font-size: 26px; color: var(--text-hi); }
+.wx .now .d { font-size: 10.5px; color: var(--ice-dim); }
+.wx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin-top: 9px; }
+
+.spark { width: 100%; height: 34px; display: block; margin: 5px 0 2px; }
+.rows { display: block; }

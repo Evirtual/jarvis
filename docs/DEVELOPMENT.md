@@ -91,11 +91,11 @@ the web version answers the same API calls in the browser
 | `src/client/deck.ts`, `layout.ts`, `panels.ts`, `drawer.ts` | The deck and title row; which layout the screen gets; the instrument panels; the configuration drawer |
 | `src/client/say.ts`, `address.ts` | The line under the core (a notice and the reply, one box), lines in a window, his status word; sir or ma'am |
 | `src/client/radar.ts`, `core-draw.ts`, `icons.ts`, `stack.ts`, `motion.ts` | The Perimeter radar, JARVIS drawn, every icon, one stacking order, whether to hold still |
-| `src/client/styles.css` | Ends with the two shared materials, `.glass` (every box) and `.veil` (behind anything modal); use the class rather than restyling an element |
+| `src/client/styles.css`, `styles/` | One file per concern — tokens, deck, board, windows, web, core-line, dialogs, panels, controls, drawer, phone — imported in that order, the two shared materials last: `.glass` (every box) and `.veil` (behind anything modal); use the class rather than restyling an element |
 | `src/client/public/` | The logo, app icons, manifest, the service worker that makes it installable, robots and sitemap |
 | `scripts/icons.mjs` | Renders every icon size and the social preview image from `icon.svg` |
 | `tests/` | Node's test runner over the pure modules |
-| `.github/workflows/` | `ci.yml` (typecheck, tests, build on every push) and `pages.yml` (publishes the web version) |
+| `.github/workflows/` | `ci.yml` (typecheck, unit tests, build, and the console end to end in Chrome, on every push) and `pages.yml` (publishes the web version) |
 | `docs/QA.md` | The manual test plan and a log of every run |
 | `docs/PLAN-*.md` | Design decisions: the connection as the core; code mode; the evaluation and plan for a simpler console (`PLAN-simplify.md`) |
 | `docs/SUPPORT.md`, `.github/FUNDING.yml` | How to support the project, the sponsor tiers, and what puts the Sponsor button on the repository |
@@ -113,6 +113,12 @@ relatedness for the web, the command parser, how an
 older save's positions are converted, model ranking, and the directive
 whitelist (the model can't delete or confirm).
 
-**What they don't:** anything in a browser — the canvas, dragging, resizing,
-stacking, layout, media embedding and the voice pipeline are checked by hand,
-and end to end in both versions, against [QA.md](QA.md).
+**End to end** (`npm run build:client:web && npm run test:e2e`, and in CI):
+the web version in a real Chromium against a fake ChatGPT and Gemini — the
+guide, Configuration, threads and groups, the model's directives, panels, the
+Threads list, error paths, input edges, a reload, a phone. Every scenario
+starts from a clean console, so each runs alone and a failure poisons nothing
+after it; every wait is for the thing itself, never a sleep.
+
+**What neither covers:** dragging, resizing, stacking, media embedding and the
+sound of the voice — checked by hand, in both versions, against [QA.md](QA.md).

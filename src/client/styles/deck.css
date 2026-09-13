@@ -1,0 +1,174 @@
+/* THE DECK — the bottom of the screen: JARVIS in the middle with a new
+   thread on his left and typing on his right, the readings split either
+   side — this machine left, the world around it right. He never moves, so
+   there is always one place to look and one place to press. The title row,
+   the More menus and the keyboard are here too. */
+
+.deck {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 200;
+  height: var(--deck-h, 96px);
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr); align-items: center; gap: 10px;
+  padding: 0 var(--edge) calc(6px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+.deck .dock-l { justify-content: flex-start; }
+.deck .dock-r { justify-content: flex-end; }
+body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
+
+/* The title row: threads in the top-left corner, configuration in the
+   top-right, level with the JARVIS title. The board never reaches up here
+   (see HEADER_H in stage.ts; panels sit by the same room, surface.ts). */
+.topbar {
+  position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); left: var(--edge); right: var(--edge); z-index: 200; height: 38px;
+  display: flex; align-items: center; justify-content: space-between;
+  pointer-events: none;
+}
+.topbar > * { pointer-events: auto; }
+.topbar-l { display: flex; gap: 8px; }
+.ic-count {
+  position: absolute; top: 1px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px;
+  display: grid; place-items: center; border-radius: 8px;
+  font: 600 9.5px/1 var(--f-mono); font-variant-numeric: tabular-nums; color: var(--ice);
+  background: rgba(6,16,24,.92); border: 1px solid rgba(111,240,255,.4);
+  pointer-events: none;
+}
+/* The deck's menus open inside it, so while one is open the whole deck rises
+   above notices, the web and a carried window — but stays under a confirmation. */
+.deck:has(.menu:not([hidden])) { z-index: 230; }
+.deck > * { pointer-events: auto; }
+/* the gap JARVIS is drawn in, on the canvas below */
+.core-seat { width: 150px; height: 100%; pointer-events: none; }
+.ic {
+  position: relative; /* the count badge sits on its corner */
+  width: 38px; height: 38px; flex: none; display: grid; place-items: center;
+  border: 1px solid transparent; border-radius: 12px; background: transparent;
+  color: var(--ice-dim); cursor: pointer;
+  transition: color .2s, border-color .2s, background .2s, transform .2s var(--ease);
+}
+.ic svg { width: 19px; height: 19px; }
+.ic:hover { color: var(--ice); border-color: rgba(111,240,255,.25); background: var(--hover-bg); transform: translateY(-1px); }
+.ic:focus-visible { outline: var(--focus); outline-offset: 2px; }
+.ic.on { color: var(--ice); border-color: rgba(111,240,255,.45); background: var(--on-bg); }
+.ic.primary { color: var(--gold); border-color: rgba(255,182,72,.45); }
+
+.spacer { flex: 1 1 auto; }
+
+/* The dock takes whatever room the header has left; chips that don't fit fold
+   into the More menu (see fitDock in deck.ts). Overflow stays visible so the
+   menu can drop below the header. */
+.dock { display: flex; gap: 6px; flex: 1 1 auto; min-width: 0; justify-content: flex-end; flex-wrap: nowrap; }
+.dock .pill { flex: none; white-space: nowrap; }
+.dock .mi-ic { width: 14px; height: 14px; flex: none; color: color-mix(in srgb, var(--hue, var(--ice)) 70%, #5c8a9a); }
+.dock .pill.on .mi-ic { color: var(--hue, var(--ice)); }
+/* A reading wears its instrument's glass: the panel's gradient, blur and edge. */
+.dock > .pill[data-open], .dock .pill.more {
+  border-color: color-mix(in srgb, var(--hue) 34%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--hue) 8%, rgba(14,30,42,.56)),
+    rgba(6,14,21,.64));
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+}
+.dock > .pill[data-open]:hover, .dock .pill.more:hover {
+  border-color: color-mix(in srgb, var(--hue) 62%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--hue) 14%, rgba(14,30,42,.6)),
+    rgba(6,14,21,.68));
+}
+.dock > .pill[data-open].on, .dock .pill.more[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--hue) 80%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--hue) 18%, rgba(14,30,42,.6)),
+    color-mix(in srgb, var(--hue) 6%, rgba(6,14,21,.7)));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--hue) 24%, transparent);
+}
+.dock > .pill[data-open].warn { border-color: var(--gold); }
+.dock > .pill[data-open].crit { border-color: var(--red); }
+.menu-item[data-open] .mi-ic { color: color-mix(in srgb, var(--hue) 70%, #5c8a9a); }
+.menu-item[data-open].on { border-left-color: var(--hue); background: color-mix(in srgb, var(--hue) 10%, transparent); }
+.menu-item[data-open].on .mi-ic { color: var(--hue); }
+/* Readings in the deck are compact on every screen: the icon already says what
+   they are. Their names are spelled out only inside the More menu. */
+.dock > .pill[data-rank] .k { display: none; }
+.dock > .pill[data-rank] { gap: 5px; }
+.more-wrap { position: relative; flex: none; }
+.pill.more { gap: 5px; align-items: center; justify-content: center; min-width: 30px; }
+.more-ic { width: 15px; height: 15px; color: var(--ice-dim); }
+.pill.more[aria-expanded="true"] .more-ic { color: var(--ice); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+.pill.more[aria-expanded="true"] { border-color: var(--ice); background: var(--on-bg); }
+.menu {
+  position: absolute; left: 0; bottom: calc(100% + 10px); z-index: 60; min-width: 210px;
+  display: flex; flex-direction: column; gap: 0; padding: 4px 6px;
+  border: 1px solid rgba(111,240,255,.22);
+  box-shadow: 0 18px 44px rgba(0,0,0,.55);
+  animation: panelIn .18s cubic-bezier(.2,.9,.3,1);
+}
+.menu-head { display: none; }
+.menu-close { display: none; }
+/* what a row is; how it is laid out is below ("dropdown rows") */
+.menu-item { min-height: 40px; width: 100%; text-align: left; cursor: pointer; background: transparent; color: var(--text); font: inherit; }
+.menu-item .k { font-family: var(--f-hud); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); }
+.menu-item .v { font-size: 12.5px; color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.menu-item.on { border-color: var(--ice); }
+.menu-item.on .k { color: var(--ice); }
+.menu-item.warn .v { color: var(--gold); } .menu-item.crit .v { color: var(--red); }
+.menu-item.static { cursor: default; }
+.menu-item.static:hover { border-color: transparent; background: transparent; }
+.pill {
+  font: inherit; color: inherit; cursor: pointer;
+  transition: border-color .18s, background .18s, box-shadow .18s;
+  display: flex; align-items: baseline; gap: 6px;
+  border: 1px solid var(--line); background: var(--panel);
+  padding: 4px 9px;
+}
+.pill .k { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); }
+.pill .v { font-size: 12px; color: var(--text-hi); font-variant-numeric: tabular-nums; font-weight: 500; }
+.pill.warn { border-color: var(--gold); } .pill.warn .v { color: var(--gold); }
+.pill.crit { border-color: var(--red); } .pill.crit .v { color: var(--red); }
+.pill:hover { border-color: var(--line-hot); background: var(--panel-hi); }
+.pill:focus-visible { outline: var(--focus); outline-offset: 2px; }
+.pill.on { border-color: var(--ice); background: var(--on-bg); box-shadow: 0 0 12px rgba(111,240,255,.18); }
+.pill.on .k { color: var(--ice); }
+
+/* Every reading in the deck is one height, whatever is inside it. */
+.dock > .pill, .pill.more { height: 30px; align-items: center; padding-top: 0; padding-bottom: 0; }
+
+/* ---------- dropdown rows: separated, iconned, obviously tappable ---------- */
+.menu-item {
+  display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 12px;
+  border: 0; border-bottom: 1px solid rgba(29,84,104,.45); border-left: 2px solid transparent;
+  padding: 11px 10px 11px 8px;
+}
+.menu-item:last-child { border-bottom: 0; }
+.menu-item:hover, .menu-item:focus-visible { border-color: rgba(29,84,104,.45); border-left-color: var(--ice-dim); background: var(--hover-bg); }
+.menu-item:focus-visible { outline: var(--focus); outline-offset: -2px; }
+.menu-item.on { border-left-color: var(--ice); background: var(--on-bg); }
+.menu-item.on .mi-ic { color: var(--ice); }
+.mi-ic { width: 18px; height: 18px; color: var(--ice-dim); }
+.menu-item .v { text-align: right; }
+
+/* The two controls beside JARVIS read as part of him: a faint ring each. */
+.deck .ic.side { border-color: rgba(111,240,255,.16); background: rgba(6,14,21,.5); }
+.deck .ic.side:hover { border-color: rgba(111,240,255,.4); }
+.deck .ic.side.on { border-color: rgba(111,240,255,.5); background: var(--on-bg); }
+
+/* ---------- command bar ---------- */
+.cmd { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line-hot); background: var(--panel); padding: 8px 10px; }
+.cmd .prompt { font-family: var(--f-hud); font-weight: 700; font-size: 11px; letter-spacing: .18em; color: var(--ice); white-space: nowrap; }
+#input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text-hi); font-family: var(--f-mono); font-size: 13px; }
+#input::placeholder { color: #2a5a6c; }
+
+/* The keyboard, when you want it: it rises above the deck, centred on JARVIS. */
+.stage .cmd {
+  position: absolute; left: 50%; bottom: calc(var(--deck-h, 96px) - 4px); z-index: 210;
+  width: min(620px, calc(100% - 40px)); transform: translateX(-50%);
+  border: 1px solid rgba(111,240,255,.35); border-radius: 14px;
+  padding: 8px 14px;
+  animation: keyIn .32s var(--ease);
+  box-shadow: 0 18px 44px rgba(0,0,0,.5);
+}
+@keyframes keyIn { from { opacity: 0; transform: translate(-50%, 14px) scale(.97); } }
+.cmd[aria-busy="true"] #input { opacity: .55; }

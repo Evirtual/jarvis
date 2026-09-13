@@ -1,0 +1,56 @@
+/* The configuration drawer: its tabs, the Connections cards, Quick. */
+
+/* ---------- drawer ---------- */
+.scrim { position: fixed; inset: 0; z-index: 240; opacity: 0; pointer-events: none; transition: opacity .22s; }
+.scrim.open { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 392px; max-width: 94vw; z-index: 241;
+  border-left: 1px solid color-mix(in srgb, var(--ice) 45%, transparent);
+  /* the shadow only while open: closed, the drawer sits just off the right
+     edge and its shadow would bleed onto the board */
+  box-shadow: none;
+  transform: translateX(100%); transition: transform .26s cubic-bezier(.3,.9,.3,1);
+  display: flex; flex-direction: column; overflow-y: auto; padding: 16px 16px 24px; gap: 12px;
+}
+.drawer.open { transform: translateX(0); box-shadow: -24px 0 60px rgba(0,0,0,.45); }
+.drawer-head { display: flex; align-items: center; gap: 10px; }
+.drawer-head h2 { margin: 0; font-family: var(--f-hud); font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--text-hi); }
+.tabs { display: flex; gap: 4px; }
+.tab { flex: 1; }
+#showSetup { margin-top: 14px; }
+
+/* ---------- connections ---------- */
+.provider.ready { border-color: var(--line-hot); }
+.provider.active { border-color: var(--ice); background: var(--hover-bg); }
+.provider-head { display: flex; align-items: center; gap: 9px; }
+.provider-head .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-hot); flex: none; }
+.provider.ready .dot { background: var(--ice-dim); }
+.provider.active .dot { background: var(--ice); box-shadow: 0 0 8px var(--ice); }
+.provider.bad .dot { background: var(--red); }
+.provider-head .nm { font-family: var(--f-hud); font-weight: 700; font-size: 13px; letter-spacing: .06em; color: var(--text-hi); }
+.provider-head .badge { font-family: var(--f-hud); font-size: 8px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; border: 1px solid var(--green); color: var(--green); padding: 1px 5px; }
+.provider .blurb { font-size: 10.5px; color: var(--ice-dim); margin: 5px 0 8px; line-height: 1.45; }
+.provider .cost { font-size: 10px; color: var(--gold); margin: 6px 0 2px; line-height: 1.45; }
+.provider .err { font-size: 10.5px; color: var(--red); margin: 0 0 9px; line-height: 1.45; }
+.provider .hint { margin-bottom: 10px; }
+.steps { margin: 0; padding-left: 18px; font-size: 10.5px; color: var(--text); line-height: 1.65; }
+.steps li::marker { color: var(--ice-dim); }
+.steps a { color: var(--ice); }
+.keyline { display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 8px; }
+.keyline .mask { color: var(--text-hi); font-variant-numeric: tabular-nums; }
+.keyline .src { margin-left: auto; font-size: 9px; color: var(--ice-dim); font-family: var(--f-hud); letter-spacing: .12em; text-transform: uppercase; }
+/* the word on a service's head — "In use" — set like the key line's source note */
+.provider .src { font-size: 9px; color: var(--ice-dim); font-family: var(--f-hud); letter-spacing: .12em; text-transform: uppercase; }
+.provider .src.on, .keyline .src.on { color: var(--ice); }
+/* The copy icon sits right by the key: a small sheet-over-sheet, a tick for a moment once copied. */
+.keyline .copy { flex: none; width: 20px; height: 20px; padding: 0; border: 0; background: transparent; color: var(--ice-dim); cursor: pointer; display: inline-grid; place-items: center; margin-left: -2px; }
+.keyline .copy svg { width: 14px; height: 14px; }
+.keyline .copy:hover { color: var(--ice); }
+.keyline .copy:focus-visible { color: var(--ice); outline: var(--focus); outline-offset: 1px; }
+.keyline .copy.done { color: var(--green); }
+
+.quick { display: flex; flex-direction: column; gap: 5px; }
+.quick button { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line); background: rgba(7,17,25,.7); padding: 9px 10px; cursor: pointer; text-align: left; width: 100%; color: var(--text); font-family: var(--f-mono); font-size: 11.5px; min-height: var(--ctl-h); }
+.quick button:hover { border-color: var(--ice); color: var(--text-hi); background: var(--hover-bg); }
+.quick button:focus-visible { outline: var(--focus); outline-offset: 1px; }
+.quick .idx { font-family: var(--f-hud); font-size: 8.5px; font-weight: 700; color: var(--ice-dim); border: 1px solid var(--line-hot); padding: 1px 4px; flex: none; }
