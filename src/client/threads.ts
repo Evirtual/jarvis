@@ -162,7 +162,12 @@ export function paintCoreChat(): void {
   box.append(foot);
   list.scrollTop = list.scrollHeight;
 }
-coreChat.onChange = paintCoreChat;
+/** The count on the Conversation button: lines said, yours and JARVIS's — notices not counted. */
+function paintConversationCount(): void {
+  $("pConversation").textContent = String(coreChat.lines.filter((l) => l.role !== "sys").length);
+}
+coreChat.onChange = (): void => { paintCoreChat(); paintConversationCount(); };
+paintConversationCount();
 
 export function paintThreadList(): void {
   if (!panels.isOpen("threads")) return;
