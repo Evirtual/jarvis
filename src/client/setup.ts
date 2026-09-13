@@ -159,7 +159,7 @@ function needs(): string {
     // No page can ask for this one: the switch shows the browser's answer, and the line says where the real one is.
     `<label class="switch-row need"><span><b>Voice on opening</b><small>${sound
       ? "JARVIS greets you aloud the moment the console opens."
-      : "To hear the greeting as the console opens: in the browser's site settings for this site, set Sound to Allow, then reload. Installed as an app, it is allowed already."}</small></span>` +
+      : "Replies are spoken once you have clicked or typed; only the greeting at opening is not. To hear that too: in the browser's site settings for this site, set Sound to Allow, then reload. Installed as an app, it is allowed already."}</small></span>` +
     `<input type="checkbox" class="switch" disabled${sound ? " checked" : ""} aria-label="Voice on opening"></label>`
   );
 }
