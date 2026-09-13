@@ -54,7 +54,21 @@ paintThread();
 // A greeting, but never a thread the user didn't ask for: on a clean screen it
 // is simply said under the core.
 const opening = `Good ${partOfDay()}, sir. Bringing the sensors up now.`;
-if (!graph.active?.turns.length) toast(opening);
+const greeting = !graph.active?.turns.length;
+if (greeting) toast(opening);
+/**
+ * Said aloud only where the browser lets sound start unasked — an installed
+ * app, or a site allowed to play — and with a service's voice to say it.
+ * A browser tab that withholds sound keeps it written; no click says it.
+ */
+function greetAloud(): void {
+  if (!greeting) return;
+  void voice.canSoundNow().then((yes) => {
+    if (!yes) return;
+    voice.markUserActed();
+    voice.speak(opening);
+  });
+}
 refreshLinks(false);
 if (mode === "desk") input.focus();
 paintHosts();
@@ -81,6 +95,7 @@ conn.onChange = (c): void => {
 if (!SERVERLESS) void api.status().catch(() => sys("Console server unreachable."));
 startReadings();
 void conn.refresh().then(() => {
+  greetAloud(); // the service's voice is only known from here
   // A first visit with nothing connected gets the guide; someone already
   // connected has no need of it, and someone who closed it isn't nagged.
   if (conn.anyReady) markSetupDone();

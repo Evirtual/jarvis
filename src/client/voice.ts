@@ -123,6 +123,22 @@ export class Voice {
   setRate(v: number): void { this.rate = v; store("jarvis.rate", String(v)); }
   markUserActed(): void { this.userActed = true; }
 
+  /**
+   * Whether a line may be said right now, before any click or tap: in an
+   * installed app, or on a site the browser allows to play sound, and with
+   * a service's voice to say it — the device's own voice never starts
+   * unasked. Asked at opening, while the answer can still be had.
+   */
+  async canSoundNow(): Promise<boolean> {
+    if (!this.enabled || this.neuralNow() === null) return false;
+    const g = this.graph();
+    if (!g) return false;
+    if (g.ac.state === "running") return true;
+    // resume() stays pending for as long as the browser withholds sound
+    await Promise.race([g.ac.resume().catch(() => undefined), new Promise((r) => window.setTimeout(r, 400))]);
+    return (g.ac.state as AudioContextState) === "running"; // resume() may have changed it
+  }
+
   /** Turn on recorded-and-heard input when a connected service can hear. */
   setServerTranscription(on: boolean): void {
     this.hearing.setServerTranscription(on);
