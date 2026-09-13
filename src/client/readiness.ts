@@ -140,41 +140,43 @@ export const readiness = {
   },
 };
 
-/* ---------------- wiring ---------------- */
+/* ---------------- wiring, at boot ---------------- */
 
-// The stage draws this kind of window with the rows instead of messages.
-graph.bodyPainter = (t, body): void => { if (t.kind === "setup") paint(body); };
+export function wireReadiness(): void {
+  // The stage draws this kind of window with the rows instead of messages.
+  graph.bodyPainter = (t, body): void => { if (t.kind === "setup") paint(body); };
 
-// The rows answer: a switch asks the browser, Connect opens Connections, Not needed is remembered.
-const layer = $("windows");
-layer.addEventListener("change", (e) => {
-  const target = e.target as HTMLElement;
-  const body = target.closest<HTMLElement>('.chatwin[data-kind="setup"] .cw-body');
-  if (!body) return;
-  needsChange(target, body);
-  window.setTimeout(refresh, 600); // the browser's answer takes a moment; the rows follow it (and permissionWatchers)
-});
-layer.addEventListener("click", (e) => {
-  const target = e.target as HTMLElement;
-  const b = target.closest<HTMLElement>("[data-ready]");
-  if (!b || !b.closest('.chatwin[data-kind="setup"]')) return;
-  e.preventDefault(); // inside a label: a plain click would flip its switch
-  if (b.dataset.ready === "connect") setDrawer(true, "connections");
-  else if (b.dataset.ready === "skip" && b.dataset.key) {
-    const skip = skipped();
-    skip.add(b.dataset.key as Optional);
-    store(KEY.readinessSkip, [...skip].join(","));
+  // The rows answer: a switch asks the browser, Connect opens Connections, Not needed is remembered.
+  const layer = $("windows");
+  layer.addEventListener("change", (e) => {
+    const target = e.target as HTMLElement;
+    const body = target.closest<HTMLElement>('.chatwin[data-kind="setup"] .cw-body');
+    if (!body) return;
+    needsChange(target, body);
+    window.setTimeout(refresh, 600); // the browser's answer takes a moment; the rows follow it (and permissionWatchers)
+  });
+  layer.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    const b = target.closest<HTMLElement>("[data-ready]");
+    if (!b || !b.closest('.chatwin[data-kind="setup"]')) return;
+    e.preventDefault(); // inside a label: a plain click would flip its switch
+    if (b.dataset.ready === "connect") setDrawer(true, "connections");
+    else if (b.dataset.ready === "skip" && b.dataset.key) {
+      const skip = skipped();
+      skip.add(b.dataset.key as Optional);
+      store(KEY.readinessSkip, [...skip].join(","));
+      refresh();
+    }
+  });
+  permissionWatchers.push(refresh);
+
+  // Closing the guide with something left undone leaves the card behind.
+  setSetupClosed(() => { if (!conn.anyReady || card()) { ensure(); refresh(); } else ensure(); });
+
+  // A service connected: the card follows; gone again after it was once there: the card comes back.
+  conn.onConnectionsChanged.push(() => {
+    if (conn.anyReady) store(KEY.readinessSeenReady, "1");
+    else if (recall(KEY.readinessSeenReady) === "1" && !card()) { ensure(); }
     refresh();
-  }
-});
-permissionWatchers.push(refresh);
-
-// Closing the guide with something left undone leaves the card behind.
-setSetupClosed(() => { if (!conn.anyReady || card()) { ensure(); refresh(); } else ensure(); });
-
-// A service connected: the card follows; gone again after it was once there: the card comes back.
-conn.onConnectionsChanged.push(() => {
-  if (conn.anyReady) store(KEY.readinessSeenReady, "1");
-  else if (recall(KEY.readinessSeenReady) === "1" && !card()) { ensure(); }
-  refresh();
-});
+  });
+}

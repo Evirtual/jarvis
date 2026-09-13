@@ -55,7 +55,7 @@ the web version answers the same API calls in the browser
 | `src/server/index.ts` | The PC's HTTP server: the console's API, the live-readings stream, static files |
 | `src/server/services.ts`, `config.ts` | The console core with its keys in `config.json`; reading and writing that file |
 | `src/server/system.ts`, `scan.ts`, `world.ts`, `exec.ts` | Machine telemetry, the network sweep, the uplink and weather; running the system commands they read |
-| `src/client/main.ts` | Boot only: imports the modules below in order and starts them |
+| `src/client/main.ts` | boot(): wires every module in one explicit order — no module runs anything when imported — then starts the readings and the connections; `migrate-storage.ts` is the one import that runs, first |
 | `src/client/state.ts` | The singletons every module shares (stage, workspace, panels, voice, connections) |
 | `src/client/server.ts` | Which version this is: the PC with its server, or the web page on its own |
 | `src/client/api.ts` | Typed calls to the console's API — to the server, or to `browser-core.ts` |
@@ -72,7 +72,7 @@ the web version answers the same API calls in the browser
 | `src/client/surface.ts` | What every box on the board shares — window, bubble, panel: one pointer gesture at a time (tap or drag), sizing from corners and edges within one set of limits, carry past the edge and put down inside the board. The stage and `panels.ts` build on it; the pure parts are tested |
 | `src/client/board-geometry.ts`, `tidy.ts` | Pure and tested: keeping a window inside the board and clear of JARVIS, a free seat, bubbles nudged apart; the Tidy-up plan |
 | `src/client/message.ts` | One line in a window: links, and pictures and players for image and video results |
-| `src/client/ask.ts` | The command line, the queue, what JARVIS is told, the streamed answer, his housekeeping (naming a thread that has none) |
+| `src/client/ask.ts`, `routing.ts` | The command line, the queue, what JARVIS is told, and the exchange in named pieces — stream, finish, fail, carry out; where a reply goes from the model's word, pure and tested |
 | `src/client/commands.ts` | The console's own commands — the few that must work with nothing connected — the route at the head of a reply, and the directives at its end |
 | `src/client/actions.ts` | Carrying out every action, by you or by JARVIS's directives |
 | `src/client/confirm.ts` | Anything destructive waits for a yes — by button or by word |
@@ -85,8 +85,9 @@ the web version answers the same API calls in the browser
 | `src/client/setup.ts`, `readiness.ts` | The first-run guide: where it's running, connecting a service, what J.A.R.V.I.S. needs (microphone, location, sound), saying hello with the Voice tab's own controls; and the readiness card left on the board when the guide is closed with something undone |
 | `src/client/memory.ts` | The board's room in the browser's storage |
 | `src/client/readings.ts` | Painting the live readings, and receiving them |
-| `src/client/threads.ts`, `links.ts`, `web.ts` | The Threads list; which threads are about the same things; the context web |
-| `src/client/deck.ts`, `panels.ts`, `drawer.ts` | The deck and title row; the instrument panels; the configuration drawer |
+| `src/client/threads.ts`, `threads-panel.ts`, `conversation-panel.ts`, `board-links.ts` | What the stage reports back and the counts; the Threads list; the Conversation panel; the links between threads on the board |
+| `src/client/links.ts`, `web.ts` | Which threads are about the same things (pure, tested); the context web |
+| `src/client/deck.ts`, `layout.ts`, `panels.ts`, `drawer.ts` | The deck and title row; which layout the screen gets; the instrument panels; the configuration drawer |
 | `src/client/say.ts`, `address.ts` | The line under the core (a notice and the reply, one box), lines in a window, his status word; sir or ma'am |
 | `src/client/radar.ts`, `core-draw.ts`, `icons.ts`, `stack.ts`, `motion.ts` | The Perimeter radar, JARVIS drawn, every icon, one stacking order, whether to hold still |
 | `src/client/styles.css` | Ends with the two shared materials, `.glass` (every box) and `.veil` (behind anything modal); use the class rather than restyling an element |

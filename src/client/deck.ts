@@ -1,30 +1,16 @@
 /**
- * The deck and the title row: the readings either side of JARVIS, their More
- * sheets, the phone/desktop layout switch.
+ * The deck and the title row: the readings either side of JARVIS, and their
+ * More sheets.
  */
 
 import { ICON, instrumentIcon as icon } from "./icons.js";
 import { $, esc } from "./dom.js";
 import { type PanelName } from "./panels.js";
-import { graph, radar, panels } from "./state.js";
-import { paintCoreChat, paintThreadList, paintThreadCount } from "./threads.js";
+import { radar, panels } from "./state.js";
+import { paintThreadList } from "./threads-panel.js";
+import { paintCoreChat } from "./conversation-panel.js";
 import { paintTelemetry } from "./readings.js";
-
-// The chips in the top bar are both a glance at the numbers and the way in.
-document.querySelectorAll<HTMLElement>("[data-open]").forEach((b) => {
-  b.addEventListener("click", () => panels.toggle(b.dataset.open as PanelName));
-});
-panels.onChange = (): void => {
-  document.querySelectorAll<HTMLElement>("[data-open]").forEach((b) => b.classList.toggle("on", panels.isOpen(b.dataset.open as PanelName)));
-  if (panels.isOpen("threads")) paintThreadList();
-  if (panels.isOpen("conversation")) paintCoreChat();
-  radar.visible = panels.isOpen("perimeter");
-  // a panel's body is painted only while it is open — fill it the moment it opens
-  paintTelemetry();
-};
-// …and once now: panels left open last time are already open, and nothing has
-// told the radar (or the readings' highlights) yet.
-panels.onChange();
+import { mode } from "./layout.js";
 
 /* ---------------------------------------------------------------------
  * The deck is always one row. The readings are split either side of JARVIS —
@@ -39,11 +25,6 @@ const CHIP_ICONS: Record<string, string> = {
   pillThreads: "threads", pillConversation: "conversation", pillCpu: "compute", pillGpu: "graphics", pillDisk: "storage",
   pillLan: "perimeter", pillNet: "uplink", pillWx: "environment",
 };
-for (const [id, name] of Object.entries(CHIP_ICONS)) $(id).insertAdjacentHTML("afterbegin", icon(name));
-// …and each panel carries its reading's icon in its title bar, as a thread carries its dot.
-for (const h of document.querySelectorAll<HTMLElement>(".panel.float[data-panel] > h2")) {
-  h.insertAdjacentHTML("afterbegin", icon(h.parentElement!.dataset.panel!));
-}
 
 const SIDES = ["l", "r"] as const;
 type Side = (typeof SIDES)[number];
@@ -134,7 +115,7 @@ function fitSide(s: Side): void {
   if (menuOpen(s)) renderDockMenu(s);
 }
 
-function fitDock(): void {
+export function fitDock(): void {
   for (const s of SIDES) fitSide(s);
 }
 
@@ -147,56 +128,42 @@ export function fitDockIfChanged(): void {
   fitDock();
 }
 
-for (const s of SIDES) {
-  moreBtnOf(s).addEventListener("click", (e) => { e.stopPropagation(); setMenu(s, !menuOpen(s)); });
-  menuOf(s).addEventListener("click", (e) => {
-    if ((e.target as HTMLElement).closest("[data-close-menu]")) { setMenu(s, false); return; }
-    const item = (e.target as HTMLElement).closest<HTMLElement>("[data-open]");
-    if (!item) return;
-    panels.toggle(item.dataset.open as PanelName);
-    setMenu(s, false);
+/** The chips open their panels; the panels tell the deck what is open; each side's More folds and unfolds. */
+export function wireDeck(): void {
+  // The chips in the top bar are both a glance at the numbers and the way in.
+  document.querySelectorAll<HTMLElement>("[data-open]").forEach((b) => {
+    b.addEventListener("click", () => panels.toggle(b.dataset.open as PanelName));
   });
-  new ResizeObserver(() => fitSide(s)).observe(dockOf(s));
-}
-document.addEventListener("pointerdown", (e) => {
-  for (const s of SIDES) if (menuOpen(s) && !moreWrapOf(s).contains(e.target as Node)) setMenu(s, false);
-  // On a phone the Threads list and the Conversation are modal sheets: a tap anywhere else closes them.
-  const t = e.target as Element;
-  if (mode !== "compact" || !(t instanceof Element)) return;
-  for (const sheet of ["threads", "conversation"] as const) {
-    if (panels.isOpen(sheet) && !t.closest(`.panel.float[data-panel="${sheet}"], #pillThreads, #pillConversation, #coreSay, .confirm-dialog, .confirm-backdrop`)) panels.hide(sheet);
+  panels.onChange = (): void => {
+    document.querySelectorAll<HTMLElement>("[data-open]").forEach((b) => b.classList.toggle("on", panels.isOpen(b.dataset.open as PanelName)));
+    if (panels.isOpen("threads")) paintThreadList();
+    if (panels.isOpen("conversation")) paintCoreChat();
+    radar.visible = panels.isOpen("perimeter");
+    // a panel's body is painted only while it is open — fill it the moment it opens
+    paintTelemetry();
+  };
+  // …and once now: panels left open last time are already open, and nothing has
+  // told the radar (or the readings' highlights) yet.
+  panels.onChange();
+
+  for (const [id, name] of Object.entries(CHIP_ICONS)) $(id).insertAdjacentHTML("afterbegin", icon(name));
+  // …and each panel carries its reading's icon in its title bar, as a thread carries its dot.
+  for (const h of document.querySelectorAll<HTMLElement>(".panel.float[data-panel] > h2")) {
+    h.insertAdjacentHTML("afterbegin", icon(h.parentElement!.dataset.panel!));
   }
-});
 
-/* ===================================================================== *
- * Layout: the full stage, or — on a phone — the core over a list
- * ===================================================================== */
-
-type Mode = "desk" | "compact";
-export let mode: Mode = "desk";
-
-export function applyMode(): void {
-  const next: Mode = window.innerWidth < 760 ? "compact" : "desk";
-  const changed = next !== mode || !document.body.className;
-  mode = next;
-  document.body.className = `m-${mode}`;
-  graph.compact = mode === "compact";
-  panels.compact = mode === "compact";
-  // On a phone the instruments join the top of the thread list and scroll with
-  // it, rather than covering it; on a wider screen they float over the board.
-  const overlays = $("overlays"), list = $("windows");
-  if (mode === "compact" && overlays.parentElement !== list) list.prepend(overlays);
-  else if (mode !== "compact" && overlays.parentElement === list) list.after(overlays);
-  // …but the Threads list and the Conversation are modal sheets on a phone, not items in the list.
-  for (const name of ["conversation", "threads"]) {
-    const sheet = document.querySelector<HTMLElement>(`.panel.float[data-panel="${name}"]`)!;
-    if (mode === "compact" && sheet.parentElement === overlays) $("stage").append(sheet);
-    else if (mode !== "compact" && sheet.parentElement !== overlays) overlays.prepend(sheet);
+  for (const s of SIDES) {
+    moreBtnOf(s).addEventListener("click", (e) => { e.stopPropagation(); setMenu(s, !menuOpen(s)); });
+    menuOf(s).addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).closest("[data-close-menu]")) { setMenu(s, false); return; }
+      const item = (e.target as HTMLElement).closest<HTMLElement>("[data-open]");
+      if (!item) return;
+      panels.toggle(item.dataset.open as PanelName);
+      setMenu(s, false);
+    });
+    new ResizeObserver(() => fitSide(s)).observe(dockOf(s));
   }
-  if (changed) graph.renderAll();
-  panels.relayout();
-  paintThreadCount();
-  fitDock();
+  document.addEventListener("pointerdown", (e) => {
+    for (const s of SIDES) if (menuOpen(s) && !moreWrapOf(s).contains(e.target as Node)) setMenu(s, false);
+  });
 }
-
-window.addEventListener("resize", applyMode);

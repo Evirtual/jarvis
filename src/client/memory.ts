@@ -25,20 +25,23 @@ const WARN_AT = 0.8 * ROOM;
 let warned = false;
 let refused = false;
 
-graph.onSaved = (kept: boolean, size: number): void => {
-  if (!kept) {
-    if (!refused) {
-      refused = true;
-      notice("This browser's storage is full, sir — the latest changes aren't saved. Everything on screen stays until you close the page; say “clear the put-away threads” to make room.");
+/** Watch every save of the board. */
+export function wireMemory(): void {
+  graph.onSaved = (kept: boolean, size: number): void => {
+    if (!kept) {
+      if (!refused) {
+        refused = true;
+        notice("This browser's storage is full, sir — the latest changes aren't saved. Everything on screen stays until you close the page; say “clear the put-away threads” to make room.");
+      }
+      return;
     }
-    return;
-  }
-  if (refused) {
-    refused = false;
-    notice("There's room again, sir — everything is saved.");
-  }
-  if (size > WARN_AT && !warned) {
-    warned = true;
-    notice("The board has used most of the room this browser gives it, sir. Say “clear the put-away threads” when you'd like to make space.");
-  }
-};
+    if (refused) {
+      refused = false;
+      notice("There's room again, sir — everything is saved.");
+    }
+    if (size > WARN_AT && !warned) {
+      warned = true;
+      notice("The board has used most of the room this browser gives it, sir. Say “clear the put-away threads” when you'd like to make space.");
+    }
+  };
+}

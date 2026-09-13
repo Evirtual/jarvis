@@ -334,7 +334,6 @@ export function paintHosts(): void {
     })
     .join("");
 }
-radar.onHover = paintHosts;
 
 /* ===================================================================== *
  * Receiving the readings: one pushed stream, open only while the tab is
@@ -428,4 +427,8 @@ export function sweep(): void {
   sweepPending = true;
   void pollScan(true);
 }
-$("sweepBtn").addEventListener("click", sweep);
+/** The radar's hover lights the host in the list; the Sweep button sweeps. */
+export function wireReadings(): void {
+  radar.onHover = paintHosts;
+  $("sweepBtn").addEventListener("click", sweep);
+}

@@ -249,9 +249,6 @@ function mountNeeds(root: HTMLElement): void {
   root.innerHTML = needs();
   void paintNeeds(root);
 }
-access.addEventListener("change", (e) => { needsChange(e.target as HTMLElement, access); });
-$("openDrawer").addEventListener("click", () => mountNeeds(access));
-document.querySelector<HTMLElement>('.tab[data-tab="access"]')?.addEventListener("click", () => mountNeeds(access));
 
 function sayHello(): string {
   return (
@@ -295,41 +292,48 @@ async function saveKey(id: ProviderId): Promise<void> {
   }
 }
 
-body.addEventListener("click", (e) => {
-  const target = e.target as HTMLElement;
-  const connectBtn = target.closest<HTMLElement>("[data-setup-connect]");
-  if (connectBtn) { void saveKey(connectBtn.dataset.setupConnect as ProviderId); return; }
-  const copyBtn = target.closest<HTMLElement>("[data-setup-copy]");
-  if (copyBtn) {
-    const key = api.keyOf(copyBtn.dataset.setupCopy as ProviderId);
-    if (key) {
-      void navigator.clipboard.writeText(key).then(() => { copyBtn.innerHTML = TICK_ICON; copyBtn.classList.add("done"); }).catch(() => undefined)
-        .then(() => window.setTimeout(() => { copyBtn.innerHTML = COPY_ICON; copyBtn.classList.remove("done"); }, 1500));
+export function wireSetup(): void {
+  // The same rows in Configuration → Access, drawn afresh each time the drawer or the tab is opened.
+  access.addEventListener("change", (e) => { needsChange(e.target as HTMLElement, access); });
+  $("openDrawer").addEventListener("click", () => mountNeeds(access));
+  document.querySelector<HTMLElement>('.tab[data-tab="access"]')?.addEventListener("click", () => mountNeeds(access));
+
+  body.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    const connectBtn = target.closest<HTMLElement>("[data-setup-connect]");
+    if (connectBtn) { void saveKey(connectBtn.dataset.setupConnect as ProviderId); return; }
+    const copyBtn = target.closest<HTMLElement>("[data-setup-copy]");
+    if (copyBtn) {
+      const key = api.keyOf(copyBtn.dataset.setupCopy as ProviderId);
+      if (key) {
+        void navigator.clipboard.writeText(key).then(() => { copyBtn.innerHTML = TICK_ICON; copyBtn.classList.add("done"); }).catch(() => undefined)
+          .then(() => window.setTimeout(() => { copyBtn.innerHTML = COPY_ICON; copyBtn.classList.remove("done"); }, 1500));
+      }
+      return;
     }
-    return;
-  }
-  const useBtn = target.closest<HTMLElement>("[data-setup-use]");
-  if (useBtn) { void api.setActive(useBtn.dataset.setupUse as ProviderId).then(() => conn.refresh()).then(render); return; }
-});
-body.addEventListener("keydown", (e) => {
-  const field = (e.target as HTMLElement).closest<HTMLInputElement>("input[data-setup-key]");
-  if (!field || e.key !== "Enter") return;
-  e.preventDefault();
-  void saveKey(field.dataset.setupKey as ProviderId);
-});
-body.addEventListener("change", (e) => {
-  needsChange(e.target as HTMLElement, body);
-  const model = (e.target as HTMLElement).closest<HTMLSelectElement>("select[data-setup-model]");
-  if (model) void api.selectModel(model.dataset.setupModel as ProviderId, model.value).then(() => conn.refresh());
-});
+    const useBtn = target.closest<HTMLElement>("[data-setup-use]");
+    if (useBtn) { void api.setActive(useBtn.dataset.setupUse as ProviderId).then(() => conn.refresh()).then(render); return; }
+  });
+  body.addEventListener("keydown", (e) => {
+    const field = (e.target as HTMLElement).closest<HTMLInputElement>("input[data-setup-key]");
+    if (!field || e.key !== "Enter") return;
+    e.preventDefault();
+    void saveKey(field.dataset.setupKey as ProviderId);
+  });
+  body.addEventListener("change", (e) => {
+    needsChange(e.target as HTMLElement, body);
+    const model = (e.target as HTMLElement).closest<HTMLSelectElement>("select[data-setup-model]");
+    if (model) void api.selectModel(model.dataset.setupModel as ProviderId, model.value).then(() => conn.refresh());
+  });
 
-back.addEventListener("click", () => { step = Math.max(0, step - 1); render(); });
-skip.addEventListener("click", closeSetup);
-next.addEventListener("click", () => {
-  if (step === STEPS.length - 1) { closeSetup(); return; }
-  step += 1;
-  render();
-});
+  back.addEventListener("click", () => { step = Math.max(0, step - 1); render(); });
+  skip.addEventListener("click", closeSetup);
+  next.addEventListener("click", () => {
+    if (step === STEPS.length - 1) { closeSetup(); return; }
+    step += 1;
+    render();
+  });
 
-// Brought back from Configuration → Connections.
-$("showSetup").addEventListener("click", () => { setDrawer(false); openSetup(); });
+  // Brought back from Configuration → Connections.
+  $("showSetup").addEventListener("click", () => { setDrawer(false); openSetup(); });
+}

@@ -46,14 +46,16 @@ function cancelConfirm(): void {
   paintConfirm();
 }
 
-$("confirmAccept").addEventListener("click", () => {
-  const note = answerConfirm(true);
-  if (note) notice(note);
-});
-$("confirmCancel").addEventListener("click", () => {
-  const note = answerConfirm(false);
-  if (note) notice(note);
-});
+export function wireConfirm(): void {
+  $("confirmAccept").addEventListener("click", () => {
+    const note = answerConfirm(true);
+    if (note) notice(note);
+  });
+  $("confirmCancel").addEventListener("click", () => {
+    const note = answerConfirm(false);
+    if (note) notice(note);
+  });
+}
 
 /** Delete one thread for good — always after asking. Its subthreads move up a level (workspace.remove). */
 export function deleteThread(t: Thread): string | null {
