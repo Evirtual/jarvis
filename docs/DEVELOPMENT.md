@@ -77,7 +77,8 @@ the web version answers the same API calls in the browser
 | `src/client/actions.ts` | Carrying out every action, by you or by JARVIS's directives |
 | `src/client/confirm.ts` | Anything destructive waits for a yes — by button or by word |
 | `src/client/local.ts` | Questions answered from live readings, never from a model |
-| `src/client/voice.ts` | Which voice speaks, and speech out: sentences as they arrive, streamed and scheduled on the audio clock |
+| `src/client/voice-choice.ts` | Which voice speaks: the service in use's, the one picked for it, or the device's while a refused voice rests |
+| `src/client/voice.ts` | Speech out: sentences as they arrive, streamed and scheduled on the audio clock, with the device's voice as the fallback |
 | `src/client/hearing.ts` | Speech in: the microphone, silence detection, the service's transcription, dictation as the fallback |
 | `src/client/pcm.ts`, `device-voices.ts` | Pure and tested: the samples a service sends and where the speech in them is; ranking the device's own voices |
 | `src/client/voice-ui.ts` | JARVIS as the microphone, the keyboard, Esc, the voice controls |
