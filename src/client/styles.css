@@ -1081,6 +1081,17 @@ body.m-compact .setup-sheet {
 body.m-compact .shell { padding: 0; }
 /* the deck keeps its shape on a phone: readings, JARVIS, controls */
 body.m-compact .deck { padding: 0 var(--edge) calc(4px + env(safe-area-inset-bottom)); gap: 6px; }
+/* The phone's own bars above and below the page — the clock, the gesture bar —
+   are painted by the phone in the app's theme colour (#060e15, the board's
+   edge; index.html and the manifest). The page can't draw on them, so the
+   board meets them in that colour: its top and bottom edges fade to it, and
+   the seam disappears. */
+body.m-compact .stage::after {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; /* under the canvas (1): the core keeps its light */
+  background:
+    linear-gradient(to bottom, #060e15, transparent var(--header-h)),
+    linear-gradient(to top, #060e15, rgba(6,14,21,.7) 40%, transparent calc(var(--deck-h, 96px) - 24px));
+}
 body.m-compact .core-seat { width: 120px; }
 body.m-compact .pill.more { height: 30px; padding: 0 9px; }
 body.m-compact .ic { width: 40px; height: 40px; }
