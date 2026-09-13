@@ -13,6 +13,7 @@ import { submit } from "./ask.js";
 import { closeMenus, menuOpen } from "./deck.js";
 import { setDrawer } from "./drawer.js";
 import { closeSetup, setupOpen } from "./setup.js";
+import { clamp } from "./num.js";
 
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
@@ -80,7 +81,9 @@ voice.onRecognised = (text, final): void => {
  * --------------------------------------------------------------------- */
 
 export let keyboardShown = false;
-export let tapSpeaks = recall("jarvis.tapSpeaks") !== "0";
+/* Every voice setting under one name, jarvis.voice.*; the names before are still read. */
+const KEY = { tapSpeaks: "jarvis.voice.tapSpeaks", on: "jarvis.voice.on", pause: "jarvis.voice.listenPause", manual: "jarvis.voice.manualStop" } as const;
+export let tapSpeaks = recall(KEY.tapSpeaks, "jarvis.tapSpeaks") !== "0";
 
 export function showKeyboard(on: boolean): void {
   keyboardShown = on;
@@ -98,7 +101,7 @@ export function showKeyboard(on: boolean): void {
 
 function setTapSpeaks(on: boolean): void {
   tapSpeaks = on;
-  store("jarvis.tapSpeaks", on ? "1" : "0");
+  store(KEY.tapSpeaks, on ? "1" : "0");
   $<HTMLInputElement>("tapSpeaks").checked = on;
   $("keyBtn").title = on ? "Type instead" : "Typing is the default — tap J.A.R.V.I.S. to type";
 }
@@ -147,10 +150,10 @@ const voiceOut = $<HTMLInputElement>("voiceOut");
 export function setVoiceOut(on: boolean): void {
   voice.enabled = on;
   voiceOut.checked = on;
-  store("jarvis.voiceOn", on ? "1" : "0");
+  store(KEY.on, on ? "1" : "0");
   if (!on) voice.stop();
 }
-setVoiceOut(recall("jarvis.voiceOn") !== "0");
+setVoiceOut(recall(KEY.on, "jarvis.voiceOn") !== "0");
 voiceOut.addEventListener("change", () => setVoiceOut(voiceOut.checked));
 
 /* Listening: how long a pause ends it, or whether only a tap does. Both
@@ -158,17 +161,17 @@ voiceOut.addEventListener("change", () => setVoiceOut(voiceOut.checked));
 const manualStop = $<HTMLInputElement>("manualStop");
 const pauseSl = $<HTMLInputElement>("pauseSl");
 function applyListening(): void {
-  const pause = Math.min(6, Math.max(1, Number(pauseSl.value) || 2));
+  const pause = clamp(Number(pauseSl.value) || 2, 1, 6);
   voice.setListening(pause, manualStop.checked);
   $("pauseN").textContent = `${pause.toFixed(1)} s`;
   $("pauseCtl").hidden = manualStop.checked;
-  store("jarvis.listenPause", String(pause));
-  store("jarvis.manualStop", manualStop.checked ? "1" : "0");
+  store(KEY.pause, String(pause));
+  store(KEY.manual, manualStop.checked ? "1" : "0");
 }
 {
-  const saved = Number.parseFloat(recall("jarvis.listenPause") ?? "");
+  const saved = Number.parseFloat(recall(KEY.pause, "jarvis.listenPause") ?? "");
   if (saved >= 1 && saved <= 6) pauseSl.value = String(saved);
-  manualStop.checked = recall("jarvis.manualStop") === "1";
+  manualStop.checked = recall(KEY.manual, "jarvis.manualStop") === "1";
   applyListening();
 }
 manualStop.addEventListener("change", applyListening);
@@ -236,7 +239,7 @@ pitchSl.addEventListener("input", () => {
 });
 /** The Cadence: a value within the slider's range, shown on it and kept. Returns what was set. */
 export function setRate(value: number): number {
-  const next = Math.max(0.7, Math.min(1.3, value));
+  const next = clamp(value, 0.7, 1.3);
   voice.setRate(next);
   rateSl.value = String(next);
   $("rateN").textContent = next.toFixed(2);

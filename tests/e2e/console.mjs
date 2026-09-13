@@ -161,7 +161,7 @@ await check('conversation: talk stays at the core, is kept, and is not a thread;
   await say('and with no marker'); await untilIdle();
   assert(/Marked nowhere/.test(await coreSaid()), 'a reply without a marker did not land at the core: ' + await coreSaid());
   assert((await board()).windows.length === before, 'a markerless reply opened a thread');
-  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.core') || '[]').map((l) => l.role + ':' + l.content.slice(0, 20)));
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.conversation') || '[]').map((l) => l.role + ':' + l.content.slice(0, 20)));
   assert(kept.some((l) => l.startsWith('user:how are you')) && kept.some((l) => l.startsWith('assistant:Noted')), 'transcript: ' + JSON.stringify(kept));
   // the model hears the recent conversation: the question sent carries what was said before it
   return { said: said.slice(0, 30), kept: kept.length };

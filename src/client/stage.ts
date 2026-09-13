@@ -34,6 +34,7 @@ import { ContextWeb } from "./web.js";
 import { forget, raise, stackKey, track } from "./stack.js";
 import { planTidy, type TidyItem } from "./tidy.js";
 import { averageHues, GENERAL_ID, Workspace, migrate, THREAD_HUES, threadRef, type Group, type Thread, isHexColour } from "./workspace.js";
+import { clamp } from "./num.js";
 
 export type { Thread, Group } from "./workspace.js";
 export type { Activity } from "./core-draw.js";
@@ -1340,7 +1341,7 @@ export class Stage {
         if (!c) return;
         // no smaller than its title bar and a line or two, no taller than the list itself
         const room = this.layer.clientHeight - Stage.PHONE_MIN;
-        t.mh = Math.round(Math.max(110, Math.min(room, h0 + dy)));
+        t.mh = Math.round(clamp(h0 + dy, 110, room));
         c.el.style.minHeight = c.el.style.maxHeight = `${t.mh}px`;
       },
       end: () => { card.classList.remove("sizing"); this.save(); this.scheduleFit(); },
@@ -1424,7 +1425,7 @@ export class Stage {
     ctx.clearRect(0, 0, this.w, this.h);
     const { cx, cy } = this.core();
 
-    const amp = Math.max(0, Math.min(1, this.amplitude));
+    const amp = clamp(this.amplitude, 0, 1);
     const idle = this.activity === "idle";
     const spin = reduceMotion ? 0 : idle ? 0.12 : this.activity === "thinking" ? 1 : 0.55 + amp * 1.6;
 

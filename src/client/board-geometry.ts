@@ -4,6 +4,8 @@
  * bubbles apart. The stage measures and applies; this decides.
  */
 
+import { clamp } from "./num.js";
+
 export interface Rect { x: number; y: number; w: number; h: number }
 
 /** The board's edges, and the column kept clear above JARVIS. */
@@ -25,7 +27,7 @@ export function overlapArea(a: Rect, b: Rect, margin: number): number {
 /** Where a window or bubble is actually shown: inside the board, clear of the deck and of JARVIS. */
 export function shown(r: Rect, room: Room): Rect {
   const B = room.bounds;
-  let x = Math.max(B.left, Math.min(B.right - r.w, r.x));
+  let x = clamp(r.x, B.left, B.right - r.w);
   const inColumn = (px: number): boolean => px < room.cx + room.coreZone && px + r.w > room.cx - room.coreZone;
   // Too tall to fit above him: step out of his column, to whichever side is nearer.
   if (inColumn(x) && r.h > room.coreFloor - B.top) {
@@ -35,7 +37,7 @@ export function shown(r: Rect, room: Room): Rect {
     else if (fitsR) x = right;
   }
   const bottom = inColumn(x) ? Math.min(B.bottom, room.coreFloor) : B.bottom;
-  let y = Math.max(B.top, Math.min(bottom - r.h, r.y));
+  let y = clamp(r.y, B.top, bottom - r.h);
   if (r.h > bottom - B.top) y = B.top;
   return { x: Math.round(x), y: Math.round(y), w: r.w, h: r.h };
 }

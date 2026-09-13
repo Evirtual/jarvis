@@ -17,6 +17,7 @@ import { ICON } from "./icons.js";
 import { raise, stackKey, track } from "./stack.js";
 import { type Room } from "./board-geometry.js";
 import { gestures, putDown, resized, sidesAt, sizeCursor, sizeLimits } from "./surface.js";
+import { clamp } from "./num.js";
 
 export const PANEL_NAMES = ["threads", "conversation", "compute", "graphics", "storage", "perimeter", "uplink", "environment"] as const;
 export type PanelName = (typeof PANEL_NAMES)[number];
@@ -39,6 +40,9 @@ const DEFAULT_SEAT: Record<PanelName, { side: "l" | "r"; top: number }> = {
 // one carry-and-put-down every box has (surface.ts).
 
 interface Seat { x: number; y: number; w?: number; h?: number }
+
+/** What the panels keep between visits, under one name (the names before are still read). */
+const KEY = { open: "jarvis.panels.open", seats: "jarvis.panels.seats" } as const;
 
 export class Panels {
   private root: HTMLElement;
@@ -76,9 +80,9 @@ export class Panels {
     new ResizeObserver(() => this.relayout()).observe(root);
 
     try {
-      this.seats = JSON.parse(recall("jarvis.panelSeats") ?? "{}") as Partial<Record<PanelName, Seat>>;
+      this.seats = JSON.parse(recall(KEY.seats, "jarvis.panelSeats") ?? "{}") as Partial<Record<PanelName, Seat>>;
     } catch { this.seats = {}; }
-    const open = (recall("jarvis.panelsOpen") ?? "").split(",").filter((n): n is PanelName => PANEL_NAMES.includes(n as PanelName));
+    const open = (recall(KEY.open, "jarvis.panelsOpen") ?? "").split(",").filter((n): n is PanelName => PANEL_NAMES.includes(n as PanelName));
     for (const n of open) this.show(n, true);
   }
 
@@ -309,10 +313,10 @@ export class Panels {
       move: (_ev, dx, dy) => {
         const B = room.bounds;
         let { x, y, w, h } = resized(start, sides, dx, dy, lim);
-        x = Math.max(B.left, Math.min(B.right - w, x));
+        x = clamp(x, B.left, B.right - w);
         // growing downwards stops at the floor (above the deck, or above JARVIS in his column)
-        if (sides.ey > 0) h = Math.max(lim.minH, Math.min(h, this.floorAt(x, w) - start.y));
-        y = Math.max(B.top, Math.min(this.floorAt(x, w) - h, y));
+        if (sides.ey > 0) h = clamp(h, lim.minH, this.floorAt(x, w) - start.y);
+        y = clamp(y, B.top, this.floorAt(x, w) - h);
         // only the dimension being dragged is fixed; the other stays as it was
         if (sides.ex) el.style.width = `${Math.round(w)}px`;
         if (sides.ey) el.style.height = `${Math.round(h)}px`;
@@ -338,7 +342,7 @@ export class Panels {
   }
 
   private persist(): void {
-    store("jarvis.panelsOpen", this.openNames.join(","));
-    store("jarvis.panelSeats", JSON.stringify(this.seats));
+    store(KEY.open, this.openNames.join(","));
+    store(KEY.seats, JSON.stringify(this.seats));
   }
 }

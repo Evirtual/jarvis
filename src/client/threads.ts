@@ -15,6 +15,7 @@ import { line } from "./message.js";
 import { deleteGroup, deleteThread } from "./confirm.js";
 import { runAction } from "./actions.js";
 import { mode } from "./deck.js";
+import { colour } from "./palette.js";
 
 /* ===================================================================== *
  * Threads
@@ -38,14 +39,29 @@ export function paintThread(): void {
 
 graph.onFocus = (): void => { paintThreadCount(); paintThreadList(); refreshLinks(); if (mode === "desk") input.focus(); };
 graph.onChange = (): void => { paintThreadCount(); paintThreadList(); refreshLinks(); };
-graph.onArchive = (id): void => {
-  const t = ws.thread(id);
-  if (!t) return;
-  const gone = ws.archive(id);
+/** Put a thread away (recoverable), and say so — the one way, whether by its ×, by a word, or by the model. */
+export function putAway(t: Thread): string {
+  const gone = ws.archive(t.id);
   graph.commit();
   paintThread();
-  if (t.kind === "setup") { announce("The card is put away, sir. Everything on it is in Config — Connections and Access — and “what's missing” brings it back."); return; }
-  announce(`“${t.title}” is put away${gone.length > 1 ? ` with its ${gone.length - 1} subthread${gone.length === 2 ? "" : "s"}` : ""}, not deleted — restore it from the Threads list, sir.`);
+  if (t.kind === "setup") return "The card is put away, sir. Everything on it is in Config — Connections and Access — and “what's missing” brings it back.";
+  const subs = gone.length - 1;
+  const clean = ws.empty ? " The board is clear." : "";
+  return `“${t.title}” is put away${subs ? ` with its ${subs} subthread${subs === 1 ? "" : "s"}` : ""}, not deleted — restore it from the Threads list, sir.${clean}`;
+}
+
+/** Bring a put-away thread back onto the board, in front, and say so. */
+export function bringBack(t: Thread): string {
+  ws.restore(t.id);
+  graph.commit();
+  graph.focus(t.id);
+  paintThread();
+  return `“${t.title}” is restored and open on the board, sir.`;
+}
+
+graph.onArchive = (id): void => {
+  const t = ws.thread(id);
+  if (t) announce(putAway(t));
 };
 graph.onBranch = (id): void => {
   const parent = ws.thread(id);
@@ -168,7 +184,7 @@ paintConversationCount();
 
 export function paintThreadList(): void {
   if (!panels.isOpen("threads")) return;
-  const hue = (g: Group): string => getComputedStyle(document.querySelector<HTMLElement>(`.bubble[data-gid="${g.id}"]`) ?? document.body).getPropertyValue("--hue") || "#6ff0ff";
+  const hue = (g: Group): string => getComputedStyle(document.querySelector<HTMLElement>(`.bubble[data-gid="${g.id}"]`) ?? document.body).getPropertyValue("--hue") || colour("ice");
   const rows: string[] = [];
   for (const g of ws.visibleGroups) {
     const members = ws.treeOrder(g.id);
@@ -186,7 +202,7 @@ export function paintThreadList(): void {
     }
   }
   const away = ws.archived;
-  rows.push(`<div class="tl-g"><i style="background:#2e7f96"></i>Put away<span class="n">${away.length}</span></div>`);
+  rows.push(`<div class="tl-g"><i style="background:${colour("ice-dim")}"></i>Put away<span class="n">${away.length}</span></div>`);
   if (!away.length) rows.push(`<div class="tl-empty">Nothing put away. Closing a thread puts it here, not in the bin.</div>`);
   for (const t of away.slice(0, 40)) {
     rows.push(
@@ -231,7 +247,7 @@ $("threadList").addEventListener("click", (e) => {
   if (!t) return;
   const act = (e.target as HTMLElement).closest<HTMLElement>("button[data-act]")?.dataset.act;
   if (act === "archive") graph.onArchive?.(t.id);
-  else if (act === "restore") { ws.restore(t.id); graph.commit(); graph.focus(t.id); paintThread(); announce(`“${t.title}” is restored and open on the board, sir.`); }
+  else if (act === "restore") announce(bringBack(t));
   else if (act === "delete") deleteThread(t);
   else if (!t.archivedAt) { graph.focus(t.id); paintThread(); }
 });

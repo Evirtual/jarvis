@@ -98,8 +98,8 @@ export class Voice {
   onRecognised: ((text: string, final: boolean) => void) | null = null;
 
   constructor() {
-    const p = Number.parseFloat(recall("jarvis.pitch") ?? "");
-    const r = Number.parseFloat(recall("jarvis.rate") ?? "");
+    const p = Number.parseFloat(recall("jarvis.voice.pitch", "jarvis.pitch") ?? "");
+    const r = Number.parseFloat(recall("jarvis.voice.rate", "jarvis.rate") ?? "");
     if (p >= 0.4 && p <= 1.2) this.pitch = p;
     if (r >= 0.7 && r <= 1.3) this.rate = r;
     this.hearing = new Hearing({ graph: () => this.graph(), level: () => this.amplitude });
@@ -122,8 +122,8 @@ export class Voice {
   get transcribing(): boolean { return this.hearing.transcribing; }
   get micAvailable(): boolean { return this.hearing.available; }
 
-  setPitch(v: number): void { this.pitch = v; store("jarvis.pitch", String(v)); }
-  setRate(v: number): void { this.rate = v; store("jarvis.rate", String(v)); }
+  setPitch(v: number): void { this.pitch = v; store("jarvis.voice.pitch", String(v)); }
+  setRate(v: number): void { this.rate = v; store("jarvis.voice.rate", String(v)); }
   markUserActed(): void { this.userActed = true; }
   /** Whether the user has clicked, tapped or typed on this page — after which the browser lets sound start. */
   get acted(): boolean { return this.userActed; }

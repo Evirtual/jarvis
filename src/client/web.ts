@@ -10,6 +10,7 @@
 
 import { reduceMotion } from "./motion.js";
 import { threadRef, type Thread } from "./workspace.js";
+import { clamp } from "./num.js";
 
 /** What the web shows about another thread. */
 export interface Related { id: string; score: number; why: string[] }
@@ -112,8 +113,8 @@ export class ContextWeb {
     // row), and a list hanging off it on a phone. Nothing overlaps either way.
     const place = (el: HTMLElement, x: number, y: number): { x: number; y: number; hw: number; hh: number } => {
       const hw = el.offsetWidth / 2, hh = el.offsetHeight / 2;
-      const px = Math.round(Math.max(hw + 12, Math.min(W - hw - 12, x)));
-      const py = Math.round(Math.max(board.top + hh, Math.min(board.bottom - hh, y)));
+      const px = Math.round(clamp(x, hw + 12, W - hw - 12));
+      const py = Math.round(clamp(y, board.top + hh, board.bottom - hh));
       el.style.left = `${px}px`;
       el.style.top = `${py}px`;
       return { x: px, y: py, hw, hh };

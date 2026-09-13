@@ -22,11 +22,11 @@ import { paintThread } from "./threads.js";
 import { type Thread } from "./workspace.js";
 
 export const READINESS_TITLE = "What J.A.R.V.I.S. needs";
-const SKIP = "jarvis.readinessSkip";
-const SEEN_READY = "jarvis.readinessSeenReady";
+const SKIP = "jarvis.readiness.skip";
+const SEEN_READY = "jarvis.readiness.seenReady";
 type Optional = "mic" | "geo" | "sound";
 
-const skipped = (): Set<Optional> => new Set((recall(SKIP) ?? "").split(",").filter(Boolean) as Optional[]);
+const skipped = (): Set<Optional> => new Set((recall(SKIP, "jarvis.readinessSkip") ?? "").split(",").filter(Boolean) as Optional[]);
 
 /** The card on the board, if there is one. */
 function card(): Thread | undefined {
@@ -177,6 +177,6 @@ setSetupClosed(() => { if (!conn.anyReady || card()) { ensure(); refresh(); } el
 // A service connected: the card follows; gone again after it was once there: the card comes back.
 conn.onConnectionsChanged.push(() => {
   if (conn.anyReady) store(SEEN_READY, "1");
-  else if (recall(SEEN_READY) === "1" && !card()) { ensure(); }
+  else if (recall(SEEN_READY, "jarvis.readinessSeenReady") === "1" && !card()) { ensure(); }
   refresh();
 });

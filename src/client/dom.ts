@@ -20,9 +20,18 @@ export function store(k: string, v: string): boolean {
   }
 }
 
-export function recall(k: string): string | null {
+/**
+ * A value kept in this browser's storage — under its name, or under a name
+ * it had before (`older`), so a setting saved by an earlier version is not
+ * lost when its key is renamed.
+ */
+export function recall(k: string, ...older: string[]): string | null {
   try {
-    return localStorage.getItem(k);
+    for (const key of [k, ...older]) {
+      const v = localStorage.getItem(key);
+      if (v !== null) return v;
+    }
+    return null;
   } catch {
     return null;
   }

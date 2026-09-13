@@ -8,6 +8,7 @@
 
 import type { ScanHost } from "../shared/types.js";
 import { reduceMotion } from "./motion.js";
+import { colour } from "./palette.js";
 
 export interface Plotted {
   host: ScanHost;
@@ -96,7 +97,7 @@ export class Radar {
     const R = 104;
     ctx.clearRect(0, 0, this.DS, this.DS);
 
-    ctx.strokeStyle = "#12313f";
+    ctx.strokeStyle = colour("line");
     ctx.lineWidth = 1;
     // the rings sit where a host that far away would be plotted, and the rim
     const rings = this.scale.rings.map((ms) => ({ ms, r: radiusFor(ms, R, this.scale.maxMs) }));
@@ -166,7 +167,7 @@ export class Radar {
       }
       if (hover) {
         ctx.font = "9px 'IBM Plex Mono', monospace";
-        ctx.fillStyle = "#d6f2fa";
+        ctx.fillStyle = colour("text-hi");
         const name = /^\d+\.\d+\.\d+\.\d+$/.test(p.host.ip) ? p.host.ip.split(".").pop() : (p.host.hostname ?? p.host.ip);
         ctx.fillText(`${name} · ${Math.round(p.host.rttMs)}ms`, p.x + 7, p.y - 5);
       }
@@ -174,7 +175,7 @@ export class Radar {
 
     ctx.beginPath();
     ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = "#1d5468";
+    ctx.fillStyle = colour("line-hot");
     ctx.fill();
   }
 }

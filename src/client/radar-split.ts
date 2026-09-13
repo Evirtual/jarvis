@@ -5,6 +5,7 @@
  */
 
 import { $, recall, store } from "./dom.js";
+import { clamp } from "./num.js";
 
 const split = $("radarSplit");
 const panel = split.closest<HTMLElement>(".panel")!;
@@ -15,7 +16,8 @@ function apply(h: number | null): void {
   else panel.style.setProperty("--radar-h", `${Math.round(h)}px`);
 }
 
-const saved = Number.parseFloat(recall("jarvis.radarH") ?? "");
+const KEY = "jarvis.panels.radarH";
+const saved = Number.parseFloat(recall(KEY, "jarvis.radarH") ?? "");
 if (saved >= 80) apply(saved);
 
 let drag: { pid: number; y0: number; h0: number } | null = null;
@@ -30,15 +32,15 @@ split.addEventListener("pointermove", (e) => {
   if (!drag || e.pointerId !== drag.pid) return;
   // no smaller than a glance, no wider than the panel (it is square)
   const max = panel.clientWidth - 2 * Number.parseFloat(getComputedStyle(panel).paddingLeft || "0");
-  apply(Math.max(80, Math.min(max, drag.h0 + (e.clientY - drag.y0))));
+  apply(clamp(drag.h0 + (e.clientY - drag.y0), 80, max));
 });
 const end = (e: PointerEvent): void => {
   if (!drag || e.pointerId !== drag.pid) return;
   drag = null;
   split.classList.remove("on");
-  store("jarvis.radarH", panel.style.getPropertyValue("--radar-h").replace("px", ""));
+  store(KEY, panel.style.getPropertyValue("--radar-h").replace("px", ""));
 };
 split.addEventListener("pointerup", end);
 split.addEventListener("pointercancel", end);
 // double-click: back to the full width
-split.addEventListener("dblclick", () => { apply(null); store("jarvis.radarH", ""); });
+split.addEventListener("dblclick", () => { apply(null); store(KEY, ""); });

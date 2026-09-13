@@ -16,13 +16,13 @@ export interface CoreLine {
   at: number;
 }
 
-const KEY = "jarvis.core";
+const KEY = "jarvis.conversation"; // once "jarvis.core", a letter from the keys' "jarvis.cores"
 /** How many lines are kept. Older ones fall off the top. */
 const CAP = 80;
 
 function load(): CoreLine[] {
   try {
-    const raw = JSON.parse(recall(KEY) ?? "[]") as unknown;
+    const raw = JSON.parse(recall(KEY, "jarvis.core") ?? "[]") as unknown;
     if (!Array.isArray(raw)) return [];
     return raw.filter((l): l is CoreLine =>
       !!l && typeof l === "object" && ["user", "assistant", "sys"].includes((l as CoreLine).role) && typeof (l as CoreLine).content === "string",

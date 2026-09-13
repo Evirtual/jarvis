@@ -13,7 +13,7 @@ import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { conn, graph, panels, voice, ws } from "./state.js";
 import { announce } from "./say.js";
 import { answerConfirm, confirmFirst, deleteGroup, deleteThread, lostWords, pendingConfirm } from "./confirm.js";
-import { paintThread, refreshLinks } from "./threads.js";
+import { bringBack, paintThread, putAway, refreshLinks } from "./threads.js";
 import { enqueue } from "./ask.js";
 import { sweep } from "./readings.js";
 import { mode } from "./deck.js";
@@ -114,21 +114,12 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
         if (typeof r === "string") return r;
         t = r;
       }
-      const gone = ws.archive(t.id);
-      graph.commit();
-      paintThread();
-      const subs = gone.length - 1;
-      const clean = ws.empty ? " The board is clear." : "";
-      return `“${t.title}” is put away${subs ? ` with its ${subs} subthread${subs === 1 ? "" : "s"}` : ""}, not deleted — restore it from the Threads list, sir.${clean}`;
+      return putAway(t);
     }
     case "restore_thread": {
       const r = a.last ? (ws.archived[0] ?? "Nothing is put away, sir.") : resolve(a.title, { archived: true });
       if (typeof r === "string") return r;
-      ws.restore(r.id);
-      graph.commit();
-      graph.focus(r.id);
-      paintThread();
-      return `“${r.title}” is restored and open on the board, sir.`;
+      return bringBack(r);
     }
     case "delete_thread": {
       let t: Thread = graph.active!;

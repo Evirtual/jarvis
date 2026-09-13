@@ -5,6 +5,7 @@
  */
 
 import { reduceMotion } from "./motion.js";
+import { colour } from "./palette.js";
 
 /** The core is designed at DESIGN_R and drawn at CORE_R. */
 export const CORE_R = 52;
@@ -76,7 +77,7 @@ export function drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, a
   };
   // outer: six segments; middle: four bright ones; inner: twelve fine ones —
   // each starting where the logo's does, then turning with the machine's load
-  ring(196 * LOGO, deg(-78) + sp / (2600 - s.cpuLoad * 1600), 6, 0.3, "#2e7f96", 14 * LOGO);
+  ring(196 * LOGO, deg(-78) + sp / (2600 - s.cpuLoad * 1600), 6, 0.3, colour("ice-dim"), 14 * LOGO);
   ring(160 * LOGO, deg(-35) - sp / (1700 - s.cpuLoad * 1000), 4, 0.55, "#3fc9dc", 11 * LOGO);
   ring(128 * LOGO, sp / 3400, 12, 0.12, "rgba(46,127,150,.7)", 6 * LOGO);
 
@@ -116,7 +117,7 @@ export function drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, a
     ctx.rotate((t / 320) % (Math.PI * 2));
     ctx.beginPath();
     ctx.arc(0, 0, DESIGN_R - 6, 0, 0.9);
-    ctx.strokeStyle = "#ffb648";
+    ctx.strokeStyle = colour("gold");
     ctx.lineWidth = 2.2;
     ctx.shadowColor = "rgba(255,182,72,.7)";
     ctx.shadowBlur = 10;
@@ -148,7 +149,7 @@ export function drawCore(ctx: CanvasRenderingContext2D, sp: number, t: number, a
   // the outer ring: whole, dim at rest and lit while he is busy
   ctx.beginPath();
   ctx.arc(0, 0, DESIGN_R + 6, 0, Math.PI * 2);
-  ctx.strokeStyle = idle ? "#1d5468" : "#6ff0ff";
+  ctx.strokeStyle = idle ? colour("line-hot") : colour("ice");
   ctx.lineWidth = 2.4;
   ctx.stroke();
 }

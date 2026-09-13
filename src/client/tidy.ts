@@ -12,6 +12,7 @@
  */
 
 import { overlapArea, seat, shown, type Rect, type Room } from "./board-geometry.js";
+import { clamp } from "./num.js";
 
 /** One thing to seat: a folded window or a bubble, as measured. */
 export interface TidyItem {
@@ -70,7 +71,7 @@ export function planTidy(items: TidyItem[], room: Room, gap = 14): TidyPlan {
       const rows = rowsOf(sorted.length, cols);
       if (tall(rows) > roomH) continue;
       for (let sx = 1; sx >= 0.3; sx -= 0.02) {
-        const widths = sorted.map((it) => Math.round(Math.max(it.minW, Math.min(it.w, it.w * sx))));
+        const widths = sorted.map((it) => Math.round(clamp(it.w * sx, it.minW, it.w)));
         if (wide(widths, rows) <= W) return { widths, rows };
         if (widths.every((w, i) => w === sorted[i]!.minW)) break;
       }

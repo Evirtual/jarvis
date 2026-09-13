@@ -9,6 +9,7 @@
  */
 
 import { type Rect, type Room, shown } from "./board-geometry.js";
+import { clamp } from "./num.js";
 
 /* ---------------- sizing ---------------- */
 
@@ -58,7 +59,7 @@ export function sizeLimits(room: Room): Limits {
   const B = room.bounds;
   return {
     minW: SURFACE_MIN_W,
-    maxW: Math.max(SURFACE_MIN_W, Math.min(SURFACE_MAX_W, B.right - B.left)),
+    maxW: clamp(B.right - B.left, SURFACE_MIN_W, SURFACE_MAX_W),
     minH: SURFACE_MIN_H,
     maxH: Math.max(SURFACE_MIN_H, B.bottom - B.top),
   };
@@ -70,8 +71,8 @@ export function sizeLimits(room: Room): Limits {
  * sides stay where they were.
  */
 export function resized(start: Rect, s: Sides, dx: number, dy: number, lim: Limits): Rect {
-  const w = s.ex ? Math.max(lim.minW, Math.min(lim.maxW, start.w + dx * s.ex)) : start.w;
-  const h = s.ey ? Math.max(lim.minH, Math.min(lim.maxH, start.h + dy * s.ey)) : start.h;
+  const w = s.ex ? clamp(start.w + dx * s.ex, lim.minW, lim.maxW) : start.w;
+  const h = s.ey ? clamp(start.h + dy * s.ey, lim.minH, lim.maxH) : start.h;
   return {
     x: s.ex < 0 ? start.x + start.w - w : start.x,
     y: s.ey < 0 ? start.y + start.h - h : start.y,
