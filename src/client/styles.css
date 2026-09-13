@@ -679,8 +679,6 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .setup-body .ctl { margin: 12px 0; }
 .setup-body .btn.wide { margin-bottom: 12px; }
 /* A permission is a switch row, as in Voice; a block is said under it. */
-.switch-row.need { align-items: flex-start; }
-.switch-row.need .switch { margin-top: 2px; }
 .switch-row small.err { color: var(--red); }
 .switch:disabled { cursor: default; opacity: .7; }
 .setup-body .provider .row .blurb.grow { flex: 1; margin: 0; }
@@ -890,9 +888,12 @@ body.m-compact .setup-sheet {
 .cmd[aria-busy="true"] #input { opacity: .55; }
 
 /* ---------- settings switch ---------- */
-.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; cursor: pointer; }
-.switch-row b { display: block; color: var(--text-hi); font-weight: 600; font-size: 12px; }
-.switch-row small { display: block; color: var(--ice-dim); font-size: 10px; margin-top: 2px; }
+/* A setting: its name and switch on one line, the explanation beneath at full width. */
+.switch-row { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 12px; margin-bottom: 12px; cursor: pointer; }
+.switch-row > span { display: contents; }
+.switch-row b { grid-column: 1; grid-row: 1; color: var(--text-hi); font-weight: 600; font-size: 12px; }
+.switch-row .switch { grid-column: 2; grid-row: 1; }
+.switch-row small { grid-column: 1 / -1; display: block; color: var(--ice-dim); font-size: 10px; margin-top: 3px; line-height: 1.5; }
 .switch {
   appearance: none; -webkit-appearance: none; flex: none; cursor: pointer;
   width: 40px; height: 22px; border-radius: 11px; position: relative;
