@@ -989,6 +989,7 @@ body.m-compact .setup-sheet {
 .tabs { display: flex; gap: 4px; }
 .tab { flex: 1; }
 .tab.on { color: var(--void); background: var(--ice); border-color: var(--ice); }
+#showSetup { margin-top: 14px; }
 
 /* ---------- connections ---------- */
 .provider { border: 1px solid var(--line); background: rgba(7,17,25,.7); padding: 11px 12px; margin-bottom: 9px; }

@@ -131,12 +131,21 @@ export class Voice {
    */
   async canSoundNow(): Promise<boolean> {
     if (!this.enabled || this.neuralNow() === null) return false;
+    if (this.soundOnOpen === "unknown") await this.probeSoundOnOpen();
+    return this.soundOnOpen === "yes";
+  }
+
+  /** The browser's answer at opening — shown in the guide and in Configuration → Access. */
+  soundOnOpen: "yes" | "blocked" | "unknown" = "unknown";
+
+  /** Asks the browser, at opening, whether sound may start unasked. */
+  async probeSoundOnOpen(): Promise<void> {
     const g = this.graph();
-    if (!g) return false;
-    if (g.ac.state === "running") return true;
+    if (!g) return;
+    if (g.ac.state === "running") { this.soundOnOpen = "yes"; return; }
     // resume() stays pending for as long as the browser withholds sound
     await Promise.race([g.ac.resume().catch(() => undefined), new Promise((r) => window.setTimeout(r, 400))]);
-    return (g.ac.state as AudioContextState) === "running"; // resume() may have changed it
+    this.soundOnOpen = (g.ac.state as AudioContextState) === "running" ? "yes" : "blocked"; // resume() may have changed it
   }
 
   /** Turn on recorded-and-heard input when a connected service can hear. */

@@ -49,6 +49,9 @@ if (SERVERLESS) {
   for (const el of document.querySelectorAll<HTMLElement>("[data-web-label]")) el.setAttribute("aria-label", el.dataset.webLabel!);
 }
 
+// Asked before anything is clicked, while the answer can still be had.
+void voice.probeSoundOnOpen();
+
 applyMode();
 paintThread();
 // A greeting, but never a thread the user didn't ask for: on a clean screen it

@@ -151,10 +151,17 @@ function needRow(need: Need, name: string, how: string): string {
 }
 
 function needs(): string {
+  const app = matchMedia("(display-mode: standalone)").matches;
+  const sound = app || voice.soundOnOpen === "yes";
   return (
-    `<p class="lead">Two things the browser asks about. Neither is needed to type.</p>` +
+    `<p class="lead">Three things the browser decides. None is needed to type.</p>` +
     needRow("mic", "Microphone", "To talk to JARVIS.") +
-    needRow("geo", "Location", "For the weather where you are.")
+    needRow("geo", "Location", "For the weather where you are.") +
+    // No page can ask for this one: the switch is in the browser's own settings.
+    `<div class="need"><div class="need-h"><b>Voice on opening</b><span class="st${sound ? " ok" : ""}">${sound ? "On opening" : "After first click"}</span></div>` +
+    `<p class="how">${sound
+      ? "JARVIS greets you aloud the moment the console opens."
+      : "To hear the greeting as the console opens: in the browser's site settings for this site, set Sound to Allow, then reload. Installed as an app, it is allowed already."}</p></div>`
   );
 }
 
