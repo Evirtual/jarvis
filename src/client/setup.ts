@@ -12,15 +12,12 @@ import type { ProviderId } from "../shared/types.js";
 import { PROVIDER_IDS } from "../shared/types.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
-import { getAddress } from "./address.js";
 import { $, esc, recall, store } from "./dom.js";
 import { setDrawer } from "./drawer.js";
-import { partOfDay } from "./local.js";
 import { locate } from "./sensors.js";
 import { SERVERLESS } from "./server.js";
 import { conn, voice } from "./state.js";
 import { COPY_ICON, TICK_ICON } from "./connections.js";
-import { applyAddress } from "./voice-ui.js";
 
 const DONE = "jarvis.setupDone";
 const STEPS = ["Where you are", "Connect a service", "What JARVIS needs", "Say hello"] as const;
@@ -59,6 +56,20 @@ export function closeSetup(): void {
   markSetupDone();
   root.classList.remove("in");
   root.hidden = true;
+  placeVoiceControls(false);
+}
+
+/**
+ * The voice settings are one set of controls (#voiceControls, Configuration →
+ * Voice), wired once in voice-ui.ts. The guide's last step borrows the box
+ * itself rather than copying it, and gives it back when the step is left.
+ */
+function placeVoiceControls(intoGuide: boolean): void {
+  const box = document.getElementById("voiceControls");
+  if (!box) return;
+  const slot = body.querySelector<HTMLElement>("[data-setup-voice]");
+  if (intoGuide && slot) slot.append(box);
+  else if (!intoGuide) document.querySelector('.panel[data-pane="voice"]')?.append(box);
 }
 
 /* ---------------- the steps ---------------- */
@@ -234,12 +245,9 @@ $("openDrawer").addEventListener("click", () => mountNeeds(access));
 document.querySelector<HTMLElement>('.tab[data-tab="access"]')?.addEventListener("click", () => mountNeeds(access));
 
 function sayHello(): string {
-  const address = getAddress();
   return (
     `<p class="lead">${conn.anyReady ? "Everything is ready." : "Nothing connected yet: JARVIS answers the built-in questions (status, the weather, the time) in this device's voice until a service is."}</p>` +
-    `<div class="ctl"><span class="ctl-k"><span>Address me as</span></span>` +
-    `<select class="sel" id="setupAddress" aria-label="How JARVIS addresses you"><option value="sir"${address === "sir" ? " selected" : ""}>Sir</option><option value="madam"${address === "madam" ? " selected" : ""}>Ma'am</option></select></div>` +
-    `<button class="btn wide" type="button" id="setupVoice">Hear the voice</button>` +
+    `<div data-setup-voice></div>` + // the voice settings, the same box as Configuration → Voice (placeVoiceControls)
     `<p>Tap <b>JARVIS</b>, the ring at the bottom, and speak; the first tap asks for the microphone. Any letter opens the keyboard. Type <b>help</b> for what is answered directly.</p>`
   );
 }
@@ -247,10 +255,12 @@ function sayHello(): string {
 function render(): void {
   title.textContent = STEPS[step] ?? "";
   dots.innerHTML = STEPS.map((_, i) => `<i${i === step ? ' class="on"' : ""}></i>`).join("");
+  const last = step === STEPS.length - 1;
+  placeVoiceControls(false); // before the step's markup is replaced, or the box would go with it
   body.innerHTML = step === 0 ? whereYouAre() : step === 1 ? connect() : step === NEEDS_STEP ? needs() : sayHello();
   if (step === NEEDS_STEP) void paintNeeds(body);
+  if (last) placeVoiceControls(true);
   back.hidden = step === 0;
-  const last = step === STEPS.length - 1;
   skip.hidden = last;
   next.textContent = last ? "Done" : "Next";
   sheet.focus();
@@ -291,11 +301,6 @@ body.addEventListener("click", (e) => {
   }
   const useBtn = target.closest<HTMLElement>("[data-setup-use]");
   if (useBtn) { void api.setActive(useBtn.dataset.setupUse as ProviderId).then(() => conn.refresh()).then(render); return; }
-  if (target.closest("#setupVoice")) {
-    voice.markUserActed();
-    voice.stop();
-    voice.speak(`Good ${partOfDay()}, sir. All systems are online and at your disposal.`);
-  }
 });
 body.addEventListener("keydown", (e) => {
   const field = (e.target as HTMLElement).closest<HTMLInputElement>("input[data-setup-key]");
@@ -305,8 +310,6 @@ body.addEventListener("keydown", (e) => {
 });
 body.addEventListener("change", (e) => {
   needsChange(e.target as HTMLElement, body);
-  const sel = (e.target as HTMLElement).closest<HTMLSelectElement>("#setupAddress");
-  if (sel) applyAddress(sel.value === "madam" ? "madam" : "sir");
   const model = (e.target as HTMLElement).closest<HTMLSelectElement>("select[data-setup-model]");
   if (model) void api.selectModel(model.dataset.setupModel as ProviderId, model.value).then(() => conn.refresh());
 });

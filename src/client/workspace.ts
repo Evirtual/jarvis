@@ -58,6 +58,8 @@ export interface Thread {
   archivedAt?: number;
   /** A size the reader dragged the window to, when they wanted more room than the default. */
   size?: { w: number; h: number };
+  /** On a phone: a height the reader dragged the window to, instead of its share of the list (stage.ts fitList). */
+  mh?: number;
   /**
    * What Tidy up shrank it to so the board fits on the screen: a width and a
    * cap on the conversation's height (0: no cap). Tidy up clears it before it

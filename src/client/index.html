@@ -281,6 +281,8 @@
 
   <section class="panel" data-pane="voice" hidden>
     <h2>Vocal Processor<span class="tail"></span></h2>
+    <!-- Every voice setting, in one box: the guide's last step borrows it (setup.ts), so both show the same controls. -->
+    <div id="voiceControls">
     <label class="switch-row">
       <span><b>Tap JARVIS to speak</b><small>Off: a tap opens the keyboard instead. Any letter opens it too.</small></span>
       <input type="checkbox" id="tapSpeaks" class="switch" checked>
@@ -317,6 +319,7 @@
     </div>
     <button class="btn wide" id="testVoice" type="button">Test voice</button>
     <p class="hint" id="voiceNote">Scanning installed voices…</p>
+    </div>
   </section>
 
   <section class="panel" data-pane="quick" hidden>

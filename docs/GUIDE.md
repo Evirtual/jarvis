@@ -6,11 +6,11 @@ can say. For where the readings come from and what leaves your machine, see
 
 ## The first visit
 
-With nothing connected, the console opens a three-step guide: where it is
-running and what that means for your keys; connecting Gemini (free) or
-ChatGPT, or not yet; and saying hello — how he addresses you, a line in his
-voice, and how to talk to him. **Not now** closes it; it doesn't come back on
-its own. Bring it back any time from Configuration → Connections → *Open the
+With nothing connected, the console opens a four-step guide: where it is
+running and how to talk to JARVIS; connecting Gemini (free) or ChatGPT, or not
+yet; what the console needs (microphone, location, sound); and saying hello —
+the same voice settings as **Config → Voice**, address, voice, listening and
+all. **Not now** closes it; it doesn't come back on its own. Bring it back any time from Configuration → Connections → *Open the
 setup guide*, or by saying "run setup" or "show me the guide".
 
 ## The deck
@@ -155,6 +155,14 @@ margin as on a desktop.
 scrolls up to it. Drag any thread by its title bar to move it up or down
 (inside a group too); the others make way, and the order is remembered. A tap
 on the title bar still folds or opens it.
+
+**Threads share the screen by what they hold.** Each grows only as far as its
+own conversation: a short exchange keeps its size, the room it doesn't need
+goes to the long ones, two long ones split the space, and one alone may take
+all of it if it has that much to show. Every thread with something in it keeps
+at least a few lines; past that the list scrolls. The thread in front shows a
+small grip — three diagonal lines — at its bottom edge: drag it for a height
+of your own, which is kept; double-tap it to let the thread share again.
 
 ## Images and videos
 

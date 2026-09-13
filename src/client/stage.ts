@@ -148,6 +148,8 @@ export class Stage {
   private raisedFor = "";
   /** Threads already on the board, so a new one can be scrolled to on a phone. */
   private known: Set<string> | null = null;
+  /** Phone: a thread being given a height of its own by the grip at its bottom. */
+  private phoneSize: { id: string; pid: number; sy: number; h0: number } | null = null;
   /** Phone: a thread being dragged up or down the list by its title bar. */
   private phoneDrag: {
     id: string; pid: number; sy: number; scroll0: number; moved: boolean; wasActive: boolean;
@@ -441,7 +443,9 @@ export class Stage {
       `<button class="cw-x" type="button" title="Put away — recoverable from the Threads list" aria-label="Close thread">${ICON.close}</button>` +
       `<button class="cw-del" type="button" title="Delete this thread permanently" aria-label="Delete thread permanently">${ICON.delete}</button>` +
       `</header><div class="cw-body" aria-live="polite"></div>` +
-      ["n", "s", "e", "w", "nw", "ne", "sw", "se"].map((corner) => `<span class="cw-grip" data-corner="${corner}" title="Drag to resize · double-click to reset" aria-hidden="true"></span>`).join("");
+      ["n", "s", "e", "w", "nw", "ne", "sw", "se"].map((corner) => `<span class="cw-grip" data-corner="${corner}" title="Drag to resize · double-click to reset" aria-hidden="true"></span>`).join("") +
+      // phone: the grip at the bottom of the thread in front — drag for a height of your own, double-tap to let it share again
+      `<span class="cw-grip-m" aria-hidden="true"><svg viewBox="0 0 24 10"><path d="M6 9l8-8M11 9l8-8M16 9l8-8"/></svg></span>`;
     c = {
       el,
       body: el.querySelector(".cw-body")!,
@@ -455,6 +459,14 @@ export class Stage {
     el.querySelector(".cw-b")!.addEventListener("click", (e) => { e.stopPropagation(); this.onBranch?.(t.id); });
     el.querySelector(".cw-w")!.addEventListener("click", (e) => { e.stopPropagation(); this.openWeb(t.id); });
     // Every corner resets on a double-click, as each one's tooltip promises.
+    el.querySelector(".cw-grip-m")?.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      const th = this.ws.thread(t.id);
+      if (!th?.mh) return;
+      delete th.mh;
+      this.save();
+      this.scheduleFit();
+    });
     for (const grip of el.querySelectorAll(".cw-grip")) grip.addEventListener("dblclick", (e) => {
       e.stopPropagation();
       const th = this.ws.thread(t.id);
@@ -959,7 +971,9 @@ export class Stage {
 
   private scheduleFit(): void {
     if (this.fitPending) return;
-    this.fitPending = requestAnimationFrame(() => { this.fitPending = 0; this.fitList(); });
+    const run = (): void => { this.fitPending = 0; this.fitList(); };
+    // Animation frames stop while the page is hidden (another app in front on a phone); a timer doesn't.
+    this.fitPending = document.hidden ? window.setTimeout(run, 0) : requestAnimationFrame(run);
   }
 
   /**
@@ -997,8 +1011,10 @@ export class Stage {
       return h + Math.max(0, n - 1) * px(cs.rowGap);
     };
     const cards = new Map<HTMLElement, { max: number; min: number }>();
-    for (const c of this.cards.values()) {
+    for (const [id, c] of this.cards) {
       if (c.el.offsetHeight === 0) continue; // not shown
+      const t = this.ws.thread(id);
+      if (t?.mh && this.ws.isOpen(t)) { cards.set(c.el, { max: t.mh, min: t.mh }); continue; } // a height of the reader's own
       const chrome = c.el.offsetHeight - c.body.offsetHeight; // title bar, borders, padding
       const max = Math.ceil(chrome + held(c.body));
       cards.set(c.el, { max, min: Math.min(Stage.PHONE_MIN, max) });
@@ -1054,6 +1070,12 @@ export class Stage {
             id: t.id, pid: e.pointerId, sy: e.clientY, scroll0: this.layer.scrollTop, moved: false,
             wasActive: t.id === this.ws.activeId, list: card.parentElement, index: 0, target: 0, h: 0,
           };
+          return;
+        }
+        if (target.closest(".cw-grip-m")) {
+          this.phoneSize = { id: t.id, pid: e.pointerId, sy: e.clientY, h0: card.offsetHeight };
+          card.classList.add("sizing");
+          e.preventDefault();
           return;
         }
         if (t.id !== this.ws.activeId) this.focus(t.id);
@@ -1137,6 +1159,17 @@ export class Stage {
 
   private onMove(e: PointerEvent): void {
     if (this.phoneDrag && e.pointerId === this.phoneDrag.pid) { this.movePhoneDrag(e); return; }
+    if (this.phoneSize && e.pointerId === this.phoneSize.pid) {
+      const d = this.phoneSize;
+      const t = this.ws.thread(d.id);
+      const c = this.cards.get(d.id);
+      if (!t || !c) return;
+      // no smaller than its title bar and a line or two, no taller than the list itself
+      const room = this.layer.clientHeight - Stage.PHONE_MIN;
+      t.mh = Math.round(Math.max(110, Math.min(room, d.h0 + (e.clientY - d.sy))));
+      c.el.style.minHeight = c.el.style.maxHeight = `${t.mh}px`;
+      return;
+    }
     const r = this.root.getBoundingClientRect();
     if (this.sizeDrag && e.pointerId === this.sizeDrag.pid) {
       const d = this.sizeDrag;
@@ -1233,6 +1266,13 @@ export class Stage {
 
   private onUp(e: PointerEvent): void {
     if (this.phoneDrag && e.pointerId === this.phoneDrag.pid) { this.endPhoneDrag(); return; }
+    if (this.phoneSize && e.pointerId === this.phoneSize.pid) {
+      this.cards.get(this.phoneSize.id)?.el.classList.remove("sizing");
+      this.phoneSize = null;
+      this.save();
+      this.scheduleFit();
+      return;
+    }
     if (this.sizeDrag && e.pointerId === this.sizeDrag.pid) {
       const d = this.sizeDrag;
       (d.kind === "group" ? this.bubbles.get(d.id)?.el : this.cards.get(d.id)?.el)?.classList.remove("sizing");
