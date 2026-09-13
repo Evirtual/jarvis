@@ -37,7 +37,6 @@ function parseSelection(value: string): Selection | null {
 const AudioCtor = (): typeof AudioContext | undefined =>
   window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
-
 /** A neural voice, and the connected service that makes it. */
 export interface NeuralVoice {
   via: ProviderId;
@@ -123,39 +122,6 @@ export class Voice {
   setPitch(v: number): void { this.pitch = v; store("jarvis.pitch", String(v)); }
   setRate(v: number): void { this.rate = v; store("jarvis.rate", String(v)); }
   markUserActed(): void { this.userActed = true; }
-
-  /**
-   * Whether this browser lets sound start before any click or tap: "yes" in
-   * an installed app, or on a site allowed to play; "blocked" in a fresh
-   * tab, where sound waits for the first gesture. Found once, at opening —
-   * after a gesture the question can no longer be asked — and shown in the
-   * setup guide.
-   */
-  soundOnOpen: "yes" | "blocked" | "unknown" = "unknown";
-
-  /** Asks the browser, at opening, whether sound may start unasked. */
-  async probeSoundOnOpen(): Promise<void> {
-    const g = this.graph();
-    if (!g) return;
-    if (g.ac.state === "running") { this.soundOnOpen = "yes"; return; }
-    // resume() stays pending for as long as the browser withholds sound
-    await Promise.race([g.ac.resume().catch(() => undefined), new Promise((r) => window.setTimeout(r, 400))]);
-    this.soundOnOpen = (g.ac.state as AudioContextState) === "running" ? "yes" : "blocked"; // resume() may have changed it
-  }
-
-  /**
-   * Whether a line may be said right now, before any click or tap: "yes",
-   * the browser's answer above; "blocked" until the first gesture — which is
-   * also the answer with no service connected, since the device's own voice
-   * never starts unasked but speaks after a gesture; "muted" when spoken
-   * replies are off.
-   */
-  async canSoundNow(): Promise<"yes" | "blocked" | "muted"> {
-    if (!this.enabled) return "muted";
-    if (this.neuralNow() === null) return "blocked";
-    if (this.soundOnOpen === "unknown") await this.probeSoundOnOpen();
-    return this.soundOnOpen === "yes" ? "yes" : "blocked";
-  }
 
   /** Turn on recorded-and-heard input when a connected service can hear. */
   setServerTranscription(on: boolean): void {

@@ -29,7 +29,7 @@ import "./confirm.js";
 import "./actions.js";
 import "./ask.js";
 import "./drawer.js";
-import { markSetupDone, noteInstalled, offerInstall, openSetup, setupDone, setupOpen } from "./setup.js";
+import { markSetupDone, openSetup, setupDone } from "./setup.js";
 import { SERVERLESS } from "./server.js";
 
 /* ===================================================================== *
@@ -49,52 +49,12 @@ if (SERVERLESS) {
   for (const el of document.querySelectorAll<HTMLElement>("[data-web-label]")) el.setAttribute("aria-label", el.dataset.webLabel!);
 }
 
-// Asked before anything is clicked, while the answer can still be had.
-void voice.probeSoundOnOpen();
-// The browser's own offer to install the console is kept for the setup guide's button.
-window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); offerInstall(e); });
-window.addEventListener("appinstalled", noteInstalled);
-
 applyMode();
 paintThread();
 // A greeting, but never a thread the user didn't ask for: on a clean screen it
 // is simply said under the core.
 const opening = `Good ${partOfDay()}, sir. Bringing the sensors up now.`;
-const NO_SERVICE = "No service connected — open Config and connect Gemini: it's free, and gives me my voice and hearing.";
-/** Whether the greeting is on the screen — then it, not a separate notice, says what to do next. */
-const greeting = !graph.active?.turns.length;
-/** Says the greeting aloud, once the connections are known and a voice with them. */
-let greetAloud = (): void => undefined;
-if (greeting) {
-  toast(opening);
-  // Said aloud the moment the console opens, where the browser allows sound
-  // unasked (an installed app does). A fresh browser tab lets nothing be said
-  // before the first click or key, so there it is said at that first gesture
-  // — unless the gesture is a tap on the core to talk, which is the user's
-  // turn, not his; and if the guide is open, once the guide is closed.
-  greetAloud = (): void => {
-    // With nothing connected, the greeting carries the one thing worth knowing next, in the same breath.
-    const say = (): void => { voice.markUserActed(); voice.speak(conn.anyReady ? opening : `${opening} ${NO_SERVICE}`); };
-    void voice.canSoundNow().then((now) => {
-      if (now === "muted") return;
-      if (now === "yes") { say(); return; }
-      const shown = Date.now();
-      const off = (): void => {
-        window.removeEventListener("pointerdown", onGesture, true);
-        window.removeEventListener("keydown", onGesture, true);
-      };
-      const onGesture = (e: Event): void => {
-        off();
-        if (Date.now() - shown > 90_000) return; // long gone: a greeting now would be odd
-        if (e instanceof PointerEvent && graph.onCore(e.clientX, e.clientY)) return; // a tap to talk
-        if (setupOpen()) window.addEventListener("setupclosed", say, { once: true });
-        else say();
-      };
-      window.addEventListener("pointerdown", onGesture, true);
-      window.addEventListener("keydown", onGesture, true);
-    });
-  };
-}
+if (!graph.active?.turns.length) toast(opening);
 refreshLinks(false);
 if (mode === "desk") input.focus();
 paintHosts();
@@ -121,11 +81,9 @@ conn.onChange = (c): void => {
 if (!SERVERLESS) void api.status().catch(() => sys("Console server unreachable."));
 startReadings();
 void conn.refresh().then(() => {
-  greetAloud(); // the service's voice is only known from here
   // A first visit with nothing connected gets the guide; someone already
   // connected has no need of it, and someone who closed it isn't nagged.
   if (conn.anyReady) markSetupDone();
   else if (!setupDone()) openSetup();
-  else if (greeting) toast(NO_SERVICE); // spoken as part of the greeting, when the voice is free to
-  else sys(NO_SERVICE);
+  else sys("No service connected — open Config and connect Gemini: it's free, and gives me my voice and hearing.");
 });

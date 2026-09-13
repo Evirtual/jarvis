@@ -2,8 +2,8 @@
  * The first-run guide: four short steps for someone who has never seen the
  * console. Where it is running and what that means for their keys; connecting
  * a service and choosing its model, or not yet; what the browser will ask
- * for — the microphone, a location, sound on opening — each with its state
- * and the way to allow it; and saying hello. Shown once, on a first visit
+ * for — the microphone, a location — each with its state and the way to
+ * allow it; and saying hello. Shown once, on a first visit
  * with nothing connected. Brought back from Configuration → Connections, or
  * by asking ("run setup", "show me the guide").
  */
@@ -25,24 +25,6 @@ const DONE = "jarvis.setupDone";
 const STEPS = ["Where you are", "Connect a service", "What JARVIS needs", "Say hello"] as const;
 const NEEDS_STEP = 2;
 
-/* ---------------- installing ----------------
- * The browser offers to install the console once, early, with an event the
- * page must keep to show its own button; installed, it opens like an app —
- * and an app may play sound the moment it opens.
- */
-type InstallPrompt = Event & { prompt(): Promise<void>; userChoice: Promise<{ outcome: string }> };
-let installPrompt: InstallPrompt | null = null;
-let installed = false;
-export function offerInstall(e: Event): void {
-  installPrompt = e as InstallPrompt;
-  if (setupOpen() && step === NEEDS_STEP) render();
-}
-export function noteInstalled(): void {
-  installed = true;
-  installPrompt = null;
-  if (setupOpen() && step === NEEDS_STEP) render();
-}
-const isApp = (): boolean => installed || matchMedia("(display-mode: standalone)").matches;
 
 const root = $("setup");
 const sheet = $("setupSheet");
@@ -76,7 +58,6 @@ export function closeSetup(): void {
   markSetupDone();
   root.classList.remove("in");
   root.hidden = true;
-  window.dispatchEvent(new Event("setupclosed")); // a greeting held back for the guide is said now
 }
 
 /* ---------------- the steps ---------------- */
@@ -140,7 +121,7 @@ function connect(): string {
   );
 }
 
-/* ---------------- what he needs ---------------- */
+/* ---------------- what JARVIS needs ---------------- */
 
 type Need = "mic" | "geo";
 const NEED_NAMES: Record<Need, PermissionName> = { mic: "microphone" as PermissionName, geo: "geolocation" as PermissionName };
@@ -169,18 +150,10 @@ function needRow(need: Need, name: string, how: string): string {
 }
 
 function needs(): string {
-  const sound = isApp() || voice.soundOnOpen === "yes";
-  const soundHow = sound
-    ? "JARVIS greets you aloud the moment the console opens."
-    : "In a browser tab, JARVIS greets you after your first click. Installed, the moment it opens.";
-  const install = !isApp() && installPrompt ? `<button class="btn sm primary" type="button" data-setup-install>Install</button>` : "";
   return (
-    `<p class="lead">Three things the browser asks about. None is needed to type.</p>` +
+    `<p class="lead">Two things the browser asks about. Neither is needed to type.</p>` +
     needRow("mic", "Microphone", "To talk to JARVIS.") +
-    needRow("geo", "Location", "For the weather where you are.") +
-    `<div class="need"><div class="need-h"><b>Voice on opening</b>` +
-    `<span class="st${sound ? " ok" : ""}">${sound ? "On opening" : "After first click"}</span>${install}</div>` +
-    `<p class="how">${soundHow}</p></div>`
+    needRow("geo", "Location", "For the weather where you are.")
   );
 }
 
@@ -223,20 +196,10 @@ async function allow(need: Need, root: ParentNode): Promise<void> {
   void paintNeeds(root);
 }
 
-/** A click in a set of rows: Allow asks; Install takes the browser's offer. True when it was one of ours. */
+/** A click in a set of rows: Allow asks. True when it was one of ours. */
 function needsClick(target: HTMLElement, root: HTMLElement): boolean {
   const permBtn = target.closest<HTMLElement>("[data-setup-perm]");
   if (permBtn) { void allow(permBtn.dataset.setupPerm as Need, root); return true; }
-  if (target.closest("[data-setup-install]") && installPrompt) {
-    const p = installPrompt;
-    installPrompt = null;
-    void p.prompt().then(() => p.userChoice).then((c) => {
-      if (c.outcome !== "accepted") installPrompt = p;
-      if (setupOpen() && step === NEEDS_STEP) render();
-      if (access.childElementCount) mountNeeds(access);
-    });
-    return true;
-  }
   return false;
 }
 
