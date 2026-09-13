@@ -124,6 +124,23 @@ export class Voice {
   setRate(v: number): void { this.rate = v; store("jarvis.rate", String(v)); }
   markUserActed(): void { this.userActed = true; }
 
+  /**
+   * Whether a line may be said right now, before any click or tap. "yes" in
+   * an installed app, or on a site the browser allows to play sound;
+   * "blocked" in a fresh browser tab, where sound waits for the first
+   * gesture; "no-voice" when there is no service's voice to say it with, or
+   * spoken replies are off — the device's own voice never starts unasked.
+   */
+  async canSoundNow(): Promise<"yes" | "blocked" | "no-voice"> {
+    if (!this.enabled || this.neuralNow() === null) return "no-voice";
+    const g = this.graph();
+    if (!g) return "no-voice";
+    if (g.ac.state === "running") return "yes";
+    // resume() stays pending for as long as the browser withholds sound
+    await Promise.race([g.ac.resume().catch(() => undefined), new Promise((r) => window.setTimeout(r, 400))]);
+    return (g.ac.state as AudioContextState) === "running" ? "yes" : "blocked"; // resume() may have changed it
+  }
+
   /** Turn on recorded-and-heard input when a connected service can hear. */
   setServerTranscription(on: boolean): void {
     this.hearing.setServerTranscription(on);
@@ -278,7 +295,13 @@ export class Voice {
   private graph(): { ac: AudioContext; bus: GainNode } | null {
     const AC = AudioCtor();
     if (!AC) return null;
-    this.actx ??= new AC();
+    // The graph runs at the speech rate itself. Otherwise every quarter-second
+    // slice of a reply is resampled on its own to the device's rate, and the
+    // seams between slices tick — heard as a faint high whine under the voice.
+    if (!this.actx) {
+      try { this.actx = new AC({ sampleRate: SPEECH_RATE }); }
+      catch { this.actx = new AC(); }
+    }
     const ac = this.actx;
     if (ac.state === "suspended") void ac.resume();
     if (!this.bus) {
@@ -338,13 +361,19 @@ export class Voice {
 
   /* ---------------- speaking ----------------
    *
-   * Speech is a stream, not a finished reply. As an answer arrives, each
-   * sentence is sent for synthesis the moment it is complete and scheduled
-   * straight after the previous one on the audio clock — so JARVIS starts
-   * talking while the rest is still being written, with no gaps between
-   * sentences. A whole reply known up front (speak) is just a stream that
-   * begins and ends at once.
+   * Speech is a stream, not a finished reply. As an answer arrives, the first
+   * sentence is sent for synthesis the moment it is complete, so JARVIS
+   * starts talking while the rest is still being written. What follows is
+   * gathered, sentence by sentence, and sent as one piece only when the
+   * voice is about to run dry — or when the reply ends — so a service
+   * speaks whole passages with its own flow, and a reply is a few pieces
+   * rather than a clip per sentence. Each piece is scheduled straight after
+   * the previous one on the audio clock. A whole reply known up front
+   * (speak) is just a stream that begins and ends at once.
    */
+
+  /** How long before the voice would go quiet the next piece is sent: the time a service takes to begin one. */
+  private static readonly LEAD = 2.0;
 
   private run: {
     id: number;
@@ -356,10 +385,14 @@ export class Voice {
     lastUtter: SpeechSynthesisUtterance | null;
     neural: boolean;
     ended: boolean;
+    pending: string;           // complete sentences gathered for the next piece
+    inFlight: number;          // pieces asked for whose samples are still to be played
+    watch: number | null;      // the clock that sends the next piece in time
   } | null = null;
 
   stop(): void {
     this.seq++;
+    if (this.run?.watch) window.clearInterval(this.run.watch);
     this.run = null;
     for (const s of this.sources) {
       try { s.stop(); } catch { /* already finished */ }
@@ -386,7 +419,37 @@ export class Voice {
     this.run = {
       id: this.seq, consumed: 0, chunks: 0, nextAt: 0,
       chain: Promise.resolve(), last: null, lastUtter: null, neural, ended: false,
+      pending: "", inFlight: 0, watch: null,
     };
+    if (neural) this.run.watch = window.setInterval(() => this.sendIfDue(), 200);
+  }
+
+  /**
+   * A complete sentence of the reply. The first goes to be spoken at once;
+   * the rest gather, and go together when the voice is about to need them.
+   * The device's own voice queues lines by itself, so it takes each as it comes.
+   */
+  private offer(piece: string): void {
+    const r = this.run;
+    if (!r) return;
+    if (!r.neural || r.chunks === 0) { this.enqueue(piece); return; }
+    r.pending = r.pending ? `${r.pending} ${piece}` : piece;
+    this.sendIfDue();
+  }
+
+  /**
+   * Send what has gathered when nothing is being made and what is scheduled
+   * runs out within the time a service takes to begin a piece — or whenever
+   * `now` says so: the reply has ended, or the device's voice has taken over.
+   */
+  private sendIfDue(now = false): void {
+    const r = this.run;
+    if (!r || !r.pending) return;
+    const left = this.actx ? r.nextAt - this.actx.currentTime : 0;
+    if (!now && r.neural && (r.inFlight > 0 || left > Voice.LEAD)) return;
+    const text = r.pending;
+    r.pending = "";
+    this.enqueue(text);
   }
 
   /**
@@ -413,7 +476,7 @@ export class Voice {
       }
       if (!m) break;
       r.consumed += m[0].length;
-      this.enqueue(m[1]!);
+      this.offer(m[1]!);
     }
   }
 
@@ -424,8 +487,10 @@ export class Voice {
     this.pushText(finalText);
     const tail = finalText.slice(r.consumed);
     r.consumed = finalText.length;
-    if (tail.trim()) this.enqueue(tail);
+    if (tail.trim()) this.offer(tail);
+    this.sendIfDue(true); // the reply is known in full: the rest goes as one piece
     r.ended = true;
+    if (r.watch) { window.clearInterval(r.watch); r.watch = null; }
     if (r.chunks === 0) { this.run = null; return; }
     const id = r.id;
     void r.chain.then(() => {
@@ -480,6 +545,7 @@ export class Voice {
     // plays; it is played once everything before it has been scheduled.
     const pieces = api.speak({ text, via: n.via, voice: n.voice.id, speed: this.rate });
     pieces.catch(() => undefined);
+    r.inFlight += 1;
 
     r.chain = r.chain.then(async () => {
       if (this.seq !== id) return;
@@ -499,6 +565,11 @@ export class Voice {
       }
       // This line, and every later one in this reply, in the device's voice.
       this.sayOnDevice(r, text);
+    }).finally(() => {
+      if (this.run !== r) return;
+      r.inFlight -= 1;
+      // played, or handed to the device's voice: whatever has gathered may be due now
+      this.sendIfDue(!r.neural);
     });
   }
 
@@ -549,11 +620,18 @@ export class Voice {
       const buf = ac.createBuffer(1, b - a, SPEECH_RATE);
       const slice = new Float32Array(b - a);
       slice.set(samples.subarray(a, b));
+      const when = Math.max(ac.currentTime + 0.03, r.nextAt);
+      // The stream fell behind and the previous slice has already ended: the
+      // silence is unavoidable, but a slice starting mid-wave after it would
+      // click, so its first few milliseconds are eased in.
+      if (r.nextAt > 0 && when > r.nextAt + 0.005) {
+        const ramp = Math.min(slice.length, Math.floor(SPEECH_RATE * 0.004));
+        for (let i = 0; i < ramp; i++) slice[i]! *= i / ramp;
+      }
       buf.copyToChannel(slice, 0);
       const src = ac.createBufferSource();
       src.buffer = buf;
       src.connect(bus);
-      const when = Math.max(ac.currentTime + 0.03, r.nextAt);
       src.start(when);
       r.nextAt = when + buf.duration;
       this.sources.push(src);

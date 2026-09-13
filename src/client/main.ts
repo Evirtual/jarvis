@@ -54,7 +54,29 @@ paintThread();
 // A greeting, but never a thread the user didn't ask for: on a clean screen it
 // is simply said under the core.
 const opening = `Good ${partOfDay()}, sir. Bringing the sensors up now.`;
-if (!graph.active?.turns.length) toast(opening);
+/** Says the greeting aloud, once the connections are known and a voice with them. */
+let greetAloud = (): void => undefined;
+if (!graph.active?.turns.length) {
+  toast(opening);
+  // Said aloud the moment the console opens, where the browser allows sound
+  // unasked (an installed app does). A fresh browser tab lets nothing be said
+  // before the first click or key — and a click means the user is about to
+  // speak, so the greeting is not saved up for it: it stays written.
+  greetAloud = (): void => {
+    void voice.canSoundNow().then((now) => {
+      if (now === "yes") {
+        voice.markUserActed();
+        voice.speak(opening);
+        return;
+      }
+      // Once, the way to hear him on opening — after the written greeting has had its time.
+      if (now === "blocked" && !localStorage.getItem("jarvis.soundHint")) {
+        localStorage.setItem("jarvis.soundHint", "1");
+        window.setTimeout(() => toast("To hear me when you open the console: install it, or allow sound for this site in the browser."), 6500);
+      }
+    });
+  };
+}
 refreshLinks(false);
 if (mode === "desk") input.focus();
 paintHosts();
@@ -81,6 +103,7 @@ conn.onChange = (c): void => {
 if (!SERVERLESS) void api.status().catch(() => sys("Console server unreachable."));
 startReadings();
 void conn.refresh().then(() => {
+  greetAloud(); // the service's voice is only known from here
   // A first visit with nothing connected gets the guide; someone already
   // connected has no need of it, and someone who closed it isn't nagged.
   if (conn.anyReady) markSetupDone();
