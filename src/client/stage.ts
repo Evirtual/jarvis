@@ -532,11 +532,16 @@ export class Stage {
     if (!b) return;
     if (g && (g.size || g.fit) && !this.compact && !b.el.classList.contains("collapsed")) {
       b.el.style.width = `${Math.round(Math.min(g.size?.w ?? Infinity, g.fit?.w ?? Infinity))}px`;
-      const cap = Math.min(g.size?.h ?? Infinity, g.fit?.h || Infinity);
+      // A dragged height is the bubble's own height — its list scrolls inside
+      // it — so it follows the corner up as well as down. Tidy up's fit only
+      // caps the list, and the bubble stays as tall as what it holds.
+      const cap = g.size ? Infinity : g.fit?.h || Infinity;
+      b.el.style.height = g.size ? `${Math.round(Math.min(g.size.h, g.fit?.h || Infinity))}px` : "";
       b.list.style.maxHeight = cap === Infinity ? "" : `${Math.round(cap)}px`;
       b.el.classList.add("sized");
     } else {
       b.el.style.width = "";
+      b.el.style.height = "";
       b.list.style.maxHeight = "";
       b.el.classList.remove("sized");
     }
