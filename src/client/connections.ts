@@ -79,7 +79,7 @@ export class Connections {
     const p = this.data.providers.find((x) => x.id === id);
     if (p?.status.state !== "ready") return null;
     const st = p.status;
-    return `${st.hears ? "Answers and hears" : "Answers"} through this key${st.voices.length ? `, and offers ${st.voices.length} voices in Voice` : ""}.`;
+    return `${st.hears ? "Answers and hears" : "Answers"} through this key.${st.voices.length ? ` ${st.voices.length} voices to choose from in the Voice tab.` : ""}`;
   }
 
   /** A connected service's key, masked, for the guide's key line. */
