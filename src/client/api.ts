@@ -67,6 +67,8 @@ const serverApi = {
     postJson<ConnectionsResponse>(`/api/connections/${id}/model`, { model }),
   setActive: (provider: ProviderId) =>
     postJson<ConnectionsResponse>("/api/connections/active", { provider }),
+  /** The saved key itself, to copy: only where it is kept in this browser (the web version). The PC's server never sends it. */
+  keyOf: (_id: ProviderId): string | null => null,
 
   /** Recorded speech in, text out — heard by the active service. */
   transcribe: async (audio: Blob): Promise<string> => {

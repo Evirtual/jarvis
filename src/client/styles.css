@@ -1005,6 +1005,7 @@ body.m-compact .setup-sheet {
 .provider .blurb { font-size: 10.5px; color: var(--ice-dim); margin: 5px 0 8px; line-height: 1.45; }
 .provider .cost { font-size: 10px; color: var(--gold); margin: 6px 0 2px; line-height: 1.45; }
 .provider .err { font-size: 10.5px; color: var(--red); margin: 0 0 9px; line-height: 1.45; }
+.provider .hint { margin-bottom: 10px; }
 .steps { margin: 0; padding-left: 18px; font-size: 10.5px; color: var(--text); line-height: 1.65; }
 .steps li::marker { color: var(--ice-dim); }
 .steps a { color: var(--ice); }
@@ -1018,9 +1019,14 @@ body.m-compact .setup-sheet {
 }
 .field:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
 .field::placeholder { color: #2a5a6c; }
-.keyline { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; margin-bottom: 8px; }
+.keyline { display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 8px; }
 .keyline .mask { color: var(--text-hi); font-variant-numeric: tabular-nums; }
-.keyline .src { font-size: 9px; color: var(--ice-dim); font-family: var(--f-hud); letter-spacing: .12em; text-transform: uppercase; }
+.keyline .src { margin-left: auto; font-size: 9px; color: var(--ice-dim); font-family: var(--f-hud); letter-spacing: .12em; text-transform: uppercase; }
+/* The copy icon sits right by the key: a small sheet-over-sheet, a tick for a moment once copied. */
+.keyline .copy { flex: none; width: 20px; height: 20px; padding: 0; border: 0; background: transparent; color: var(--ice-dim); cursor: pointer; display: inline-grid; place-items: center; margin-left: -2px; }
+.keyline .copy svg { width: 14px; height: 14px; }
+.keyline .copy:hover, .keyline .copy:focus-visible { color: var(--ice); outline: none; }
+.keyline .copy.done { color: var(--green); }
 
 .ctl { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
 .ctl-k { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); display: flex; justify-content: space-between; }

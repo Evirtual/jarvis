@@ -132,4 +132,9 @@ async function speak(body: SpeakRequest): Promise<AsyncIterable<Uint8Array>> {
   return (await core.speak(body)).pieces;
 }
 
-export const browserCore = { connections, saveKey, removeKey, selectModel, setActive, ask, transcribe, status, speak };
+/** The key saved in this browser, for the Copy button beside it. */
+function keyOf(id: ProviderId): string | null {
+  return saved.providers[id]?.key ?? null;
+}
+
+export const browserCore = { connections, saveKey, removeKey, selectModel, setActive, keyOf, ask, transcribe, status, speak };

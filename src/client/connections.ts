@@ -13,6 +13,10 @@ import { api } from "./api.js";
 import { $, esc } from "./dom.js";
 import { SERVERLESS } from "./server.js";
 
+/** Two sheets, one over the other: copy. And the tick that replaces it for a moment once done. */
+const COPY_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.2"/><path d="M10.5 5.5V3.7A1.2 1.2 0 0 0 9.3 2.5H3.7A1.2 1.2 0 0 0 2.5 3.7v5.6a1.2 1.2 0 0 0 1.2 1.2h1.8"/></svg>`;
+const TICK_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5"/></svg>`;
+
 export class Connections {
   private root: HTMLElement;
   private hint: HTMLElement;
@@ -96,6 +100,21 @@ export class Connections {
     if (!id) return;
 
     if (act === "save") await this.save(id);
+    if (act === "copy") {
+      const key = api.keyOf(id);
+      if (key) {
+        // the icon becomes a tick for a moment: copied
+        try {
+          await navigator.clipboard.writeText(key);
+          el.innerHTML = TICK_ICON;
+          el.classList.add("done");
+          el.setAttribute("title", "Copied");
+        } catch {
+          el.setAttribute("title", "The browser refused the clipboard");
+        }
+        window.setTimeout(() => { el.innerHTML = COPY_ICON; el.classList.remove("done"); el.setAttribute("title", "Copy the key"); }, 1500);
+      }
+    }
     if (act === "use") {
       this.apply(await api.setActive(id));
     }
@@ -220,6 +239,8 @@ export class Connections {
       head +
       `<div class="keyline">` +
       `<span class="mask">${esc(st.maskedKey)}</span>` +
+      // the key can be copied back out only where it is kept in this browser
+      (api.keyOf(p.id) !== null ? `<button class="copy" type="button" data-act="copy" data-id="${p.id}" title="Copy the key" aria-label="Copy the key">${COPY_ICON}</button>` : "") +
       `<span class="src"${st.source === "environment" ? ` title="Disconnect makes JARVIS stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${p.envVar}` : "saved here"}</span>` +
       `</div>` +
       (st.problem ? `<p class="err">${esc(st.problem)}</p>` : "") +
