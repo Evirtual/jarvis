@@ -56,6 +56,11 @@ voice.onState = (): void => {
   note.className = d.warn ? "hint warn" : "hint";
   note.textContent = d.text;
   renderVoiceSelect();
+  // Timbre shapes the device's own voice only; with a service's voice chosen the slider rests.
+  const neural = voice.selection?.kind === "neural";
+  const pitch = $<HTMLInputElement>("pitchSl");
+  pitch.disabled = neural;
+  pitch.closest(".ctl")?.classList.toggle("off", neural);
 };
 // Painted once on the next frame, when every module has loaded: a browser with
 // no voices of its own and nothing connected would otherwise never say so.

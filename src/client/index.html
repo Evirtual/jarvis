@@ -296,11 +296,11 @@
     </div>
     <div class="ctl-row">
       <div class="ctl">
-        <span class="ctl-k"><span data-tip="How deep the voice is. Lower is darker.">Timbre</span><span class="n" id="pitchN">0.78</span></span>
+        <span class="ctl-k"><span id="pitchTip" data-tip="How deep the voice is. Lower is darker. Shapes the device's own voice; a service's voice has a timbre of its own.">Timbre</span><span class="n" id="pitchN">0.78</span></span>
         <input class="sl" id="pitchSl" type="range" min="0.4" max="1.2" step="0.02" value="0.78" aria-label="Voice pitch">
       </div>
       <div class="ctl">
-        <span class="ctl-k"><span data-tip="How fast the voice speaks. 1.0 is its own pace.">Cadence</span><span class="n" id="rateN">0.96</span></span>
+        <span class="ctl-k"><span data-tip="How fast the voice speaks. 1.0 is its own pace. A service's voice takes it in three steps: slow below 0.85, brisk above 1.15, its own pace between.">Cadence</span><span class="n" id="rateN">0.96</span></span>
         <input class="sl" id="rateSl" type="range" min="0.7" max="1.3" step="0.02" value="0.96" aria-label="Speech rate">
       </div>
     </div>
