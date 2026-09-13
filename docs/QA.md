@@ -984,3 +984,50 @@ Found and fixed, later the same day:
     away". The Threads sheet now stacks above the deck. And the Threads list
     and the More menus keep the same 16 px gap at the bottom as at the sides;
     the guide and a confirmation run to the edge, full width.
+
+### 2026-09-13 — conversation first, the readiness card, one surface behaviour
+
+Sizes: 800×563 (desktop pane), 414×896, 360×740. Typecheck clean, 93 unit
+tests, 20 end-to-end scenarios (`npm run test:e2e`), build clean. Checked
+against the real ChatGPT model: a greeting and a factual question stay at
+the core; "find the latest news about …" opens a thread with findings and
+sources; "look up …, just tell me" answers at the core.
+
+By hand, desktop: a window carried past the edge glides back and keeps its
+seat; a tap on the title bar folds and opens it; corner resize; a window
+dropped on another makes a group of its own (a second pair makes a second
+group); a bubble carried past the edge glides back; a bubble's corner grows
+and shrinks it from its own height; a panel carried past the edge glides
+back; a panel's corner resizes it and the seat is kept; folding one group
+never opens another, by tap or by command; the readiness card appears on
+"Not now", its Connect opens Connections, it survives a reload, "what's
+missing" brings it back, "Not needed" on the rest sends it away.
+
+By hand, phone: full-width windows, groups indented; reorder by title bar;
+the grip on the thread in front; the Conversation, Threads, Systems and
+confirm sheets each 16 px from the sides and the bottom, a tap outside
+closes them; the drawer full width; no horizontal overflow at 360.
+
+Found and fixed on the way:
+
+102. Dropping two "New thread" windows together joined the first group ever
+     made: the new group was looked up by name. A drop makes a group that is
+     certainly new (numbered if the name is taken); so does connecting two
+     threads in words unless a reason names a subject.
+103. Folding the group you were in moved you into a folded group and opened
+     it — on the board and by command. You are moved only to a thread in the
+     open, or nowhere.
+104. A bubble's corner only shrank it: the height was a cap on its list, and
+     the drag began from the list's height and jumped. It sets the bubble's
+     own height now, from its own height.
+105. A bubble could not be carried past the edge; a window and a panel could.
+     All three are carried wherever the pointer goes and glide back.
+106. A window and a panel jumped back to their seat where a bubble eased; all
+     three ease now, with one time and curve.
+107. Everything beside a title — dot, icon, count, tag, buttons — sat a pixel
+     below the title's capitals, each header by its own amount. One rule
+     lifts them all onto the capitals, measured against the cap height.
+108. A group folded only by its arrow; a tap on its name bar folds it now,
+     as a window's title bar does.
+109. Threads, groups and panels each had their own drag, resize and edge
+     code. One shared surface behaviour (surface.ts) carries all three.
