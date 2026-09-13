@@ -90,6 +90,16 @@ body {
     radial-gradient(ellipse 72% 58% at 50% 45%, transparent 32%, rgba(2,5,9,.85) 100%),
     repeating-linear-gradient(180deg, rgba(111,240,255,.03) 0 1px, transparent 1px 3px);
 }
+/* ---------- one rule for everything beside a title ----------
+   A title's dot, icon, count, tag and buttons centre on the title's CAPITALS,
+   not on its line box: with this face the line box sits about a pixel below
+   the capitals, so flex centring leaves everything beside a title a pixel
+   low. Measured against the cap height (see the QA notes), applied once here
+   for every header — thread, group, instrument panel, the Threads list — so
+   they all read as one line. */
+.cw-head > :not(.cw-title), .bb-head > :not(.bb-title) { position: relative; top: -.5px; }
+.panel.float > h2 > *, .tl-g > * { position: relative; top: -1px; }
+
 /* ---------- shell ---------- */
 .shell {
   position: relative; z-index: 2;
@@ -410,7 +420,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
   cursor: grab; user-select: none; touch-action: none;
 }
 .bubble.dragging .bb-head { cursor: grabbing; }
-.bb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hue); box-shadow: 0 0 8px var(--hue); flex: none; transform: translateY(-.5px); }
+.bb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hue); box-shadow: 0 0 8px var(--hue); flex: none; }
 .bb-title {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--f-hud); font-weight: 700; font-size: 9.5px; letter-spacing: .24em; text-transform: uppercase;
@@ -741,8 +751,7 @@ body.m-compact .setup-sheet {
   opacity: 1; border-color: var(--gold);
   box-shadow: 0 0 0 2px rgba(255,182,72,.3), 0 0 34px rgba(255,182,72,.26);
 }
-/* Centred on the title's capitals — measured against the cap height, not the line box, which sits half a pixel lower. */
-.cw-dot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--hue) 65%, var(--line-hot)); flex: none; transform: translateY(-.5px); }
+.cw-dot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--hue) 65%, var(--line-hot)); flex: none; }
 .chatwin.on .cw-dot { background: var(--hue); box-shadow: 0 0 8px var(--hue); }
 .cw-title {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
