@@ -69,10 +69,17 @@ if (!graph.active?.turns.length) {
         voice.speak(opening);
         return;
       }
-      // Once, the way to hear him on opening — after the written greeting has had its time.
-      if (now === "blocked" && !localStorage.getItem("jarvis.soundHint")) {
-        localStorage.setItem("jarvis.soundHint", "1");
-        window.setTimeout(() => toast("To hear me when you open the console: install it, or allow sound for this site in the browser."), 6500);
+      // The way to hear him on opening, said once a day at most, after the
+      // written greeting has had its time — and counted as said only when it
+      // has actually been shown, not when a reload got there first.
+      const last = Number(localStorage.getItem("jarvis.soundHint") ?? 0);
+      if (now === "blocked" && Date.now() - last > 24 * 3600_000) {
+        window.setTimeout(() => {
+          if (!graph.active?.turns.length) {
+            localStorage.setItem("jarvis.soundHint", String(Date.now()));
+            toast("To hear me when the console opens: install it, or allow sound for this site — the lock icon by the address, Site settings, Sound.");
+          }
+        }, 6500);
       }
     });
   };
