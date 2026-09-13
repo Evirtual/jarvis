@@ -153,6 +153,27 @@ export function setVoiceOut(on: boolean): void {
 setVoiceOut(recall("jarvis.voiceOn") !== "0");
 voiceOut.addEventListener("change", () => setVoiceOut(voiceOut.checked));
 
+/* Listening: how long a pause ends it, or whether only a tap does. Both
+   remembered; the pause slider is put away while stopping is by hand. */
+const manualStop = $<HTMLInputElement>("manualStop");
+const pauseSl = $<HTMLInputElement>("pauseSl");
+function applyListening(): void {
+  const pause = Math.min(6, Math.max(1, Number(pauseSl.value) || 2));
+  voice.setListening(pause, manualStop.checked);
+  $("pauseN").textContent = `${pause.toFixed(1)} s`;
+  $("pauseCtl").hidden = manualStop.checked;
+  store("jarvis.listenPause", String(pause));
+  store("jarvis.manualStop", manualStop.checked ? "1" : "0");
+}
+{
+  const saved = Number.parseFloat(recall("jarvis.listenPause") ?? "");
+  if (saved >= 1 && saved <= 6) pauseSl.value = String(saved);
+  manualStop.checked = recall("jarvis.manualStop") === "1";
+  applyListening();
+}
+manualStop.addEventListener("change", applyListening);
+pauseSl.addEventListener("input", applyListening);
+
 /* ---------------------------------------------------------------------
  * The voice list: the AI voices of the service in use, then the device's
  * own — always on offer, since a phone's voices answer at once and some

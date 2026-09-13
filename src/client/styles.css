@@ -1140,8 +1140,15 @@ body.m-compact .windows {
   /* one list under the sheets: a tapped thread never rises over an open sheet */
   z-index: 3;
 }
+/* Threads share the screen by what they hold: each starts from nothing and
+   grows equally, but never past its own content — so a short exchange keeps
+   its size and the room it doesn't need goes to the long ones; two long ones
+   split the space; one alone may use all of it, but only if it has that much
+   to show. A thread with anything in it keeps at least a few lines; past that
+   the list scrolls. (Flex: basis 0, grow 1; the limits — each thread's own
+   natural height — are measured and set by stage.ts fitList.) */
 body.m-compact .bubble {
-  position: static; max-height: none; animation: none; flex: none;
+  position: static; animation: none; flex: 1 1 0; min-height: 0; max-height: none;
   width: auto !important; transform: none !important; padding: 0 8px 8px;
 }
 body.m-compact .bubble.collapsed { width: auto !important; height: auto; border-radius: 0; padding: 0 8px; animation: none; }
@@ -1149,16 +1156,16 @@ body.m-compact .bubble.collapsed .bb-head { display: flex; }
 body.m-compact .bubble.collapsed .bb-node { display: none; }
 body.m-compact .bubble .bb-grip { display: none; }
 body.m-compact .bb-head { cursor: pointer; padding: 10px 4px; }
-body.m-compact .bb-list { flex-direction: column; flex-wrap: nowrap; overflow: visible; gap: 8px; max-height: none !important; }
+body.m-compact .bb-list { flex: 1 1 auto; min-height: 0; flex-direction: column; flex-wrap: nowrap; overflow: visible; gap: 8px; max-height: none !important; }
 /* Loose windows are placed freely on the desktop board; on a phone they are
    simply part of the list. */
 body.m-compact .bubble.loose > .bb-list { position: static; inset: auto; display: flex; }
 body.m-compact .chatwin {
   position: static !important; left: auto !important; top: auto !important;
-  width: 100% !important; max-width: none; max-height: none; flex: none;
+  width: 100% !important; max-width: none; max-height: none; flex: 1 1 0; min-height: 0;
   opacity: 1; animation: none; margin: 0;
 }
-body.m-compact .chatwin .cw-body { font-size: 13.5px; height: auto !important; max-height: 42vh !important; }
+body.m-compact .chatwin .cw-body { font-size: 13.5px; height: auto !important; max-height: none !important; flex: 1 1 auto; min-height: 0; }
 body.m-compact .chatwin .cw-grip { display: none; }
 body.m-compact .cw-head { cursor: pointer; padding: 10px 12px; }
 

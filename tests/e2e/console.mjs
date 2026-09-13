@@ -294,6 +294,10 @@ await check('phone: list layout, ask, no horizontal overflow', async () => {
   await say('a phone question'); await untilIdle();
   const m = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth > window.innerWidth, windows: document.querySelectorAll('section.chatwin').length, compact: document.body.className }));
   assert(!m.overflow, 'horizontal overflow on a phone');
+  // Threads share the list's height by what they hold (stage.ts fitList): every one is limited to its own
+  // content and keeps at least a few lines, so none is stretched past what it has to show.
+  const fit = await page.evaluate(() => [...document.querySelectorAll('section.chatwin')].map((w) => ({ max: parseFloat(w.style.maxHeight), min: parseFloat(w.style.minHeight), h: w.getBoundingClientRect().height })));
+  assert(fit.length && fit.every((f) => f.max > 0 && f.h <= f.max + 2 && f.h >= Math.min(150, f.max) - 2), 'phone threads not sized to their content: ' + JSON.stringify(fit));
   await snap('phone');
   await page.setViewport({ width: 1200, height: 800 }); await page.reload({ waitUntil: 'networkidle2' }); await wait(1000);
   return m;

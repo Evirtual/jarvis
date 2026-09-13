@@ -289,6 +289,14 @@
       <span><b>Spoken replies</b><small>Say “mute” or “unmute” any time.</small></span>
       <input type="checkbox" id="voiceOut" class="switch" checked>
     </label>
+    <label class="switch-row">
+      <span><b>Stop listening myself</b><small>On: the microphone stays open until you tap JARVIS again. Off: it closes after a pause in your speech. Applies when a service hears; a browser's own dictation stops by itself.</small></span>
+      <input type="checkbox" id="manualStop" class="switch">
+    </label>
+    <div class="ctl" id="pauseCtl">
+      <span class="ctl-k"><span>Pause before listening stops</span><span class="n" id="pauseN">2.0 s</span></span>
+      <input class="sl" id="pauseSl" type="range" min="1" max="6" step="0.5" value="2" aria-label="Pause before listening stops, in seconds">
+    </div>
     <div class="ctl">
       <span class="ctl-k"><span>Address me as</span></span>
       <select class="sel" id="addressSel" aria-label="How JARVIS addresses you"><option value="sir">Sir</option><option value="madam">Ma'am</option></select>

@@ -157,6 +157,11 @@ export class Voice {
   setServerTranscription(on: boolean): void {
     this.hearing.setServerTranscription(on);
   }
+  /** How long a pause ends a recording, in seconds — and whether one ends only by hand. */
+  setListening(pauseS: number, manual: boolean): void {
+    this.hearing.pauseMs = Math.round(pauseS * 1000);
+    this.hearing.manualStop = manual;
+  }
 
   /* ---------------- which voice ----------------
    *

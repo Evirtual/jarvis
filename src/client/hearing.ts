@@ -36,6 +36,11 @@ export class Hearing {
   private chunks: Blob[] = [];
   private vadTimer: number | null = null;
 
+  /** How long a pause in your speech ends a recording, in milliseconds (Configuration → Voice). */
+  pauseMs = 2000;
+  /** Whether a recording runs until you tap again, instead of ending on a pause. */
+  manualStop = false;
+
   onState: (() => void) | null = null;
   onNotice: ((msg: string) => void) | null = null;
   /** Nothing could hear a tap to talk: the console shows where to connect a service. */
@@ -115,8 +120,12 @@ export class Hearing {
     this.onState?.();
 
     // Voice-activity detection on the real mic level: stop after a pause once
-    // you've said something, give up if nothing is said at all.
+    // you've said something (as long a pause as you asked for), give up if
+    // nothing is said at all. Stopping by hand: only a tap ends it, within a
+    // ceiling no service would take in one piece anyway.
     const started = Date.now();
+    const manual = this.manualStop;
+    const ceiling = manual ? 120_000 : 60_000;
     let heard = false;
     let quietSince = 0;
     const check = (): void => {
@@ -124,12 +133,12 @@ export class Hearing {
       const lvl = this.host.level();
       const now = Date.now();
       if (lvl > 0.1) { heard = true; quietSince = 0; }
-      else if (heard) {
+      else if (heard && !manual) {
         quietSince ||= now;
-        if (now - quietSince > 1300) { rec.stop(); return; }
+        if (now - quietSince > this.pauseMs) { rec.stop(); return; }
       }
-      if (!heard && now - started > 7000) { rec.stop(); return; }
-      if (now - started > 30000) { rec.stop(); return; }
+      if (!manual && !heard && now - started > 7000) { rec.stop(); return; }
+      if (now - started > ceiling) { rec.stop(); return; }
       this.vadTimer = window.setTimeout(check, 80);
     };
     this.vadTimer = window.setTimeout(check, 250);

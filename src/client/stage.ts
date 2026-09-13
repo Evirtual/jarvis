@@ -189,6 +189,10 @@ export class Stage {
     this.anchorToCorner();
     this.save();
     new ResizeObserver(() => { this.resize(); this.place(); }).observe(root);
+    // A phone's list shares its height by what each thread holds (fitList):
+    // measured again whenever anything in the list changes or finishes loading.
+    new MutationObserver(() => this.scheduleFit()).observe(layer, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "hidden"] });
+    layer.addEventListener("load", () => this.scheduleFit(), true);
 
     root.addEventListener("pointerdown", (e) => this.onDown(e));
     window.addEventListener("pointermove", (e) => this.onMove(e));
@@ -819,8 +823,10 @@ export class Stage {
     if (this.compact) {
       for (const b of this.bubbles.values()) { b.el.style.transform = ""; b.el.classList.remove("unplaced"); }
       this.boxes.clear();
+      this.scheduleFit();
       return;
     }
+    if (this.fitted) this.fitList(); // back on a wide screen: the phone's limits come off
     const placed: { id: string; b: Bubble; r: Rect; here: boolean }[] = [];
     const unseated: Group[] = [];
     for (const g of this.ws.visibleGroups) {
@@ -943,6 +949,73 @@ export class Stage {
   closeWeb(): boolean { return this.web.close(); }
   get webOpen(): boolean { return this.web.isOpen; }
 
+
+  /* ---------------- phone: threads share the list's height ---------------- */
+
+  /** A thread with anything in it keeps at least this much of the list (its title bar and a few lines). */
+  private static readonly PHONE_MIN = 150;
+  private fitPending = 0;
+  private fitted = false;
+
+  private scheduleFit(): void {
+    if (this.fitPending) return;
+    this.fitPending = requestAnimationFrame(() => { this.fitPending = 0; this.fitList(); });
+  }
+
+  /**
+   * On a phone every thread is a flex item that starts from nothing and grows
+   * equally with the others (styles.css, .m-compact .chatwin) — up to a limit,
+   * which is its own natural height, measured here: a short exchange keeps its
+   * size and the room it doesn't need goes to the long ones; two long ones
+   * split the space; one alone may take all of it, if it has that much to
+   * show. The limits are set in pixels because a browser sizes a nested flex
+   * column from its items' minimums, not from what they hold. Past the
+   * minimums the list scrolls.
+   */
+  private fitList(): void {
+    if (!this.compact) {
+      if (!this.fitted) return;
+      for (const c of this.cards.values()) { c.el.style.maxHeight = ""; c.el.style.minHeight = ""; }
+      for (const b of this.bubbles.values()) { b.el.style.maxHeight = ""; b.el.style.minHeight = ""; }
+      this.fitted = false;
+      return;
+    }
+    this.fitted = true;
+    // Everything is measured first and set after, so the layout is read once.
+    const px = (v: string): number => Number.parseFloat(v) || 0;
+    /** What a window's body holds, however the body is stretched or squeezed right now: its lines, their margins, the gaps, its own padding. */
+    const held = (body: HTMLElement): number => {
+      const cs = getComputedStyle(body);
+      let h = px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+      let n = 0;
+      for (const k of body.children) {
+        if (!(k instanceof HTMLElement) || k.hidden) continue;
+        const ks = getComputedStyle(k);
+        h += k.getBoundingClientRect().height + px(ks.marginTop) + px(ks.marginBottom);
+        n += 1;
+      }
+      return h + Math.max(0, n - 1) * px(cs.rowGap);
+    };
+    const cards = new Map<HTMLElement, { max: number; min: number }>();
+    for (const c of this.cards.values()) {
+      if (c.el.offsetHeight === 0) continue; // not shown
+      const chrome = c.el.offsetHeight - c.body.offsetHeight; // title bar, borders, padding
+      const max = Math.ceil(chrome + held(c.body));
+      cards.set(c.el, { max, min: Math.min(Stage.PHONE_MIN, max) });
+    }
+    const groups = new Map<HTMLElement, { max: number; min: number } | null>();
+    for (const b of this.bubbles.values()) {
+      if (b.el.offsetHeight === 0 || b.el.classList.contains("collapsed") || b.list.offsetHeight === 0) { groups.set(b.el, null); continue; }
+      const kids = [...b.list.children].filter((k): k is HTMLElement => k instanceof HTMLElement && k.offsetHeight > 0);
+      const gaps = Math.max(0, kids.length - 1) * px(getComputedStyle(b.list).rowGap);
+      const chrome = b.el.offsetHeight - kids.reduce((sum, k) => sum + k.offsetHeight, 0) - gaps; // the group's name and frame
+      let max = chrome + gaps, min = chrome + gaps;
+      for (const k of kids) { const n = cards.get(k); max += n?.max ?? k.offsetHeight; min += n?.min ?? k.offsetHeight; }
+      groups.set(b.el, { max: Math.ceil(max), min: Math.ceil(min) });
+    }
+    for (const [el, n] of cards) { el.style.maxHeight = `${n.max}px`; el.style.minHeight = `${n.min}px`; }
+    for (const [el, n] of groups) { el.style.maxHeight = n ? `${n.max}px` : ""; el.style.minHeight = n ? `${n.min}px` : ""; }
+  }
 
   /** On a phone, bring the window in front into view in the list. */
   reveal(id = this.ws.activeId): void {
