@@ -178,9 +178,13 @@ export class Hearing {
     let heard = "";
     let settled = false;
     let failed = false;
-    r.onstart = (): void => { heard = ""; settled = false; failed = false; this.listening = true; void this.openMic(); this.onState?.(); };
+    // The microphone is the recogniser's alone while it dictates: opening it a
+    // second time for the ring's waveform gave one of the two silence on a
+    // phone — listening, then "I didn't hear anything". The ring shows
+    // listening without the waveform meanwhile.
+    r.onstart = (): void => { heard = ""; settled = false; failed = false; this.listening = true; this.onState?.(); };
     r.onend = (): void => {
-      this.listening = false; this.closeMic(); this.onState?.();
+      this.listening = false; this.onState?.();
       if (!settled && !failed) {
         if (heard) this.onRecognised?.(heard, true);
         else this.onNotice?.("I didn't hear anything, sir.");
