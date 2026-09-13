@@ -6,3 +6,6 @@ config.json
 *.log
 .claude/
 test-results/
+
+# end-to-end run output (screenshots, report)
+tests/e2e/out/
