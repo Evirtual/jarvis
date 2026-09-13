@@ -48,6 +48,7 @@ graph.onArchive = (id): void => {
   const gone = ws.archive(id);
   graph.commit();
   paintThread();
+  if (t.kind === "setup") { announce("The card is put away, sir. Everything on it is in Config — Connections and Access — and “what's missing” brings it back."); return; }
   announce(`“${t.title}” is put away${gone.length > 1 ? ` with its ${gone.length - 1} subthread${gone.length === 2 ? "" : "s"}` : ""}, not deleted — restore it from the Threads list, sir.`);
 };
 graph.onBranch = (id): void => {
@@ -144,7 +145,7 @@ export function paintCoreChat(): void {
   if (!rows.length) {
     const e = document.createElement("div");
     e.className = "tl-empty";
-    e.textContent = "Nothing said yet. What you and JARVIS say outside a thread is kept here.";
+    e.textContent = "Nothing said yet. What you and J.A.R.V.I.S. say outside a thread is kept here.";
     box.append(e);
     return;
   }

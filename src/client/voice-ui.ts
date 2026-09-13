@@ -100,7 +100,7 @@ function setTapSpeaks(on: boolean): void {
   tapSpeaks = on;
   store("jarvis.tapSpeaks", on ? "1" : "0");
   $<HTMLInputElement>("tapSpeaks").checked = on;
-  $("keyBtn").title = on ? "Type instead" : "Typing is the default — tap JARVIS to type";
+  $("keyBtn").title = on ? "Type instead" : "Typing is the default — tap J.A.R.V.I.S. to type";
 }
 
 // Tap JARVIS: listen (or open the keyboard, if that's your default). A tap

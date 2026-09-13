@@ -1,6 +1,6 @@
 {
   "name": "J.A.R.V.I.S. Console",
-  "short_name": "JARVIS",
+  "short_name": "J.A.R.V.I.S.",
   "description": "An Iron Man–style console that talks back: real machine and network readings, a voice, and threads you run by talking.",
   "id": "/",
   "start_url": "/",

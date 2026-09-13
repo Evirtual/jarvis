@@ -259,7 +259,7 @@ export class Connections {
       `<span class="mask">${esc(st.maskedKey)}</span>` +
       // the key can be copied back out only where it is kept in this browser
       (api.keyOf(p.id) !== null ? `<button class="copy" type="button" data-act="copy" data-id="${p.id}" title="Copy the key" aria-label="Copy the key">${COPY_ICON}</button>` : "") +
-      `<span class="src"${st.source === "environment" ? ` title="Disconnect makes JARVIS stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${p.envVar}` : ""}</span>` +
+      `<span class="src"${st.source === "environment" ? ` title="Disconnect makes J.A.R.V.I.S. stop using it; the variable itself is left alone for other programs"` : ""}>${st.source === "environment" ? `from ${p.envVar}` : ""}</span>` +
       `</div>` +
       (st.problem ? `<p class="err">${esc(st.problem)}</p>` : "") +
       `<p class="hint">${esc(this.hintOf(p.id) ?? "")}</p>` +

@@ -21,7 +21,7 @@ import { announce } from "./say.js";
 import { paintThread } from "./threads.js";
 import { type Thread } from "./workspace.js";
 
-export const READINESS_TITLE = "What JARVIS needs";
+export const READINESS_TITLE = "What J.A.R.V.I.S. needs";
 const SKIP = "jarvis.readinessSkip";
 const SEEN_READY = "jarvis.readinessSeenReady";
 type Optional = "mic" | "geo" | "sound";
@@ -53,8 +53,8 @@ function paint(body: HTMLElement): void {
   const skip = skipped();
   const ready = conn.anyReady;
   body.replaceChildren(line("sys", ready
-    ? "Nearly there. What is switched on is done; the rest has a way in, or can be marked not needed."
-    : "JARVIS is limited until these are set: without a service there are no answers, no hearing and no AI voice. What is switched on is done; the rest has a way in."));
+    ? "Nearly there. What is switched on is done; the rest has a way in, or can be marked not needed. All of it is also in Config → Connections and Access."
+    : "J.A.R.V.I.S. is limited until these are set: without a service there are no answers, no hearing and no AI voice. What is switched on is done; the rest has a way in. All of it is also in Config → Connections and Access."));
   const box = document.createElement("div");
   box.className = "ready";
   box.innerHTML =

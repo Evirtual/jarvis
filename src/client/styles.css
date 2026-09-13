@@ -741,7 +741,7 @@ body.m-compact .setup-sheet {
   opacity: 1; border-color: var(--gold);
   box-shadow: 0 0 0 2px rgba(255,182,72,.3), 0 0 34px rgba(255,182,72,.26);
 }
-.cw-dot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--hue) 65%, var(--line-hot)); flex: none; }
+.cw-dot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--hue) 65%, var(--line-hot)); flex: none; margin-top: 1px; /* level with the title's x-height */ }
 .chatwin.on .cw-dot { background: var(--hue); box-shadow: 0 0 8px var(--hue); }
 .cw-title {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -973,7 +973,9 @@ body.m-compact .setup-sheet {
 .ready .switch-row { margin-bottom: 8px; }
 .ready .switch-row .btn.sm { margin-top: 8px; justify-self: start; }
 .ready .switch-row.skipped .switch { opacity: .35; }
-.ready .switch-row .btn.sm[data-ready="connect"] { margin-top: 0; }
+/* hovering a row points at its switch — the thing to set — not at the way out beside it */
+.ready .switch-row:hover .switch:not(:disabled) { box-shadow: 0 0 0 2px rgba(111,240,255,.28); }
+.ready .switch-row:hover .btn:not(:hover) { color: var(--ice-dim); border-color: var(--line); background: transparent; }
 .btn:hover:not(:disabled) { color: var(--ice); border-color: var(--ice); background: rgba(111,240,255,.07); }
 .btn:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
 .btn:disabled { opacity: .32; cursor: not-allowed; }

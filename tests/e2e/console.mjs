@@ -128,7 +128,7 @@ await check('guide: connect a key from the card, model picker, spare/use, permis
   const b = await board(); assert(!b.guideOpen, 'guide still open'); assert(b.title.includes('ChatGPT'), 'title: ' + b.title);
   // Location and sound were left undone: the readiness card stays on the board, drawn like a thread,
   // counted as no thread; marking the two not needed sends it away by itself.
-  assert(b.windows.length === 1 && /what jarvis needs/i.test(b.windows[0].title), 'no readiness card: ' + JSON.stringify(b.windows));
+  assert(b.windows.length === 1 && /what j.a.r.v.i.s. needs/i.test(b.windows[0].title), 'no readiness card: ' + JSON.stringify(b.windows));
   const count = await page.evaluate(() => document.getElementById('pThreads').textContent);
   assert(count === '0', 'the card counted as a thread: ' + count);
   const cardRows = await page.$$eval('.chatwin[data-kind="setup"] .switch-row b', (r) => r.map((x) => x.textContent));

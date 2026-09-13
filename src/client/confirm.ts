@@ -57,6 +57,14 @@ $("confirmCancel").addEventListener("click", () => {
 
 /** Delete one thread for good — always after asking. Its subthreads move up a level (workspace.remove). */
 export function deleteThread(t: Thread): string | null {
+  // The readiness card holds settings, not a conversation: nothing is lost with it.
+  if (t.kind === "setup") {
+    return confirmFirst(
+      "Delete the card? Everything on it stays in Config → Connections and Access, and “what's missing” brings it back.",
+      "Delete",
+      () => { ws.remove(t.id); graph.commit(); paintThread(); return "The card is gone, sir. Its settings are in Config."; },
+    );
+  }
   return confirmFirst(
     `Delete “${t.title}” for good? ${lostWords(t.turns.length)}`,
     "Delete forever",

@@ -282,8 +282,11 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       if (!targets.length) return `I've no group called ${a.group}, sir.`;
       const hereGroup = graph.active?.groupId;
       for (const g of targets) if (!fold || g.id !== hereGroup || a.group !== "all") ws.setCollapsed(g.id, fold);
+      // Folding the group you're in moves you only to a thread in the open — never
+      // into a folded group, which focusing would open (as on the board: stage.setFolded).
       if (fold && targets.some((g) => g.id === hereGroup) && a.group !== "all") {
-        const elsewhere = ws.live.find((t) => !targets.some((g) => g.id === t.groupId));
+        const open = new Set(ws.visibleGroups.filter((g) => g.id === GENERAL_ID || !g.collapsed).map((g) => g.id));
+        const elsewhere = ws.live.filter((t) => !targets.some((g) => g.id === t.groupId) && open.has(t.groupId)).sort((x, y) => y.createdAt - x.createdAt)[0];
         if (elsewhere) ws.focus(elsewhere.id);
       }
       graph.commit();

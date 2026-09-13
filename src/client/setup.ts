@@ -20,7 +20,7 @@ import { conn, voice } from "./state.js";
 import { COPY_ICON, TICK_ICON } from "./connections.js";
 
 const DONE = "jarvis.setupDone";
-const STEPS = ["Where you are", "Connect a service", "What JARVIS needs", "Say hello"] as const;
+const STEPS = ["Where you are", "Connect a service", "What J.A.R.V.I.S. needs", "Say hello"] as const;
 const NEEDS_STEP = 2;
 
 
@@ -83,7 +83,7 @@ function placeVoiceControls(intoGuide: boolean): void {
 /* ---------------- the steps ---------------- */
 
 function whereYouAre(): string {
-  const who = `<p class="lead">JARVIS is a console that talks back: ask anything, by voice or by typing, and it answers, hears and speaks through a service you connect with your own key.</p>
+  const who = `<p class="lead">J.A.R.V.I.S. is a console that talks back: ask anything, by voice or by typing, and it answers, hears and speaks through a service you connect with your own key.</p>
        <p>Tap the ring at the bottom to talk. To type, press any letter: the keyboard opens.</p>`;
   return SERVERLESS
     ? who + `<p>This is the web version: it runs entirely in your browser, and a key you connect stays here on this device.</p>
@@ -144,7 +144,7 @@ function providerCard(id: ProviderId): string {
 function connect(): string {
   const any = conn.anyReady;
   return (
-    `<p class="lead">One key gives JARVIS everything: answers, hearing and a voice.</p>` +
+    `<p class="lead">One key gives J.A.R.V.I.S. everything: answers, hearing and a voice.</p>` +
     `<p>${any ? "Connected. A second service is a spare for when the first is at its limit." : "Gemini's free tier is the quickest way in: no card, and it takes a minute."}</p>` +
     PROVIDER_IDS.map(providerCard).join("") +
     `<p class="hint">You can do this later in Configuration → Connections, or paste a key straight into the chat; it's kept, never sent to a model.</p>`
@@ -193,7 +193,7 @@ export function needs(): string {
       ? "On since your first click. A browser tab starts with sound off until the first click or key, so on a reload the greeting is written and speech begins with your first click. To have it on from the moment the console opens: set Sound to Allow for this site in the browser's site settings, or install the console as an app."
       : "Off until your first click or key, which is the browser's rule for a tab. After that, everything is spoken.";
   return (
-    needRow("mic", "Microphone", "To talk to JARVIS.") +
+    needRow("mic", "Microphone", "To talk to J.A.R.V.I.S..") +
     needRow("geo", "Location", "For the weather where you are.") +
     `<label class="switch-row need"><span><b>Sound</b><small>${how}</small></span>` +
     `<input type="checkbox" class="switch" disabled${on ? " checked" : ""} aria-label="Sound"></label>`
@@ -255,9 +255,9 @@ document.querySelector<HTMLElement>('.tab[data-tab="access"]')?.addEventListener
 
 function sayHello(): string {
   return (
-    `<p class="lead">${conn.anyReady ? "Everything is ready." : "Nothing connected yet: JARVIS answers the built-in questions (status, the weather, the time) in this device's voice until a service is."}</p>` +
+    `<p class="lead">${conn.anyReady ? "Everything is ready." : "Nothing connected yet: J.A.R.V.I.S. answers the built-in questions (status, the weather, the time) in this device's voice until a service is."}</p>` +
     `<div data-setup-voice></div>` + // the voice settings, the same box as Configuration → Voice (placeVoiceControls)
-    `<p>Tap <b>JARVIS</b>, the ring at the bottom, and speak; the first tap asks for the microphone. Any letter opens the keyboard. Type <b>help</b> for what is answered directly.</p>`
+    `<p>Tap <b>J.A.R.V.I.S.</b>, the ring at the bottom, and speak; the first tap asks for the microphone. Any letter opens the keyboard. Type <b>help</b> for what is answered directly.</p>`
   );
 }
 
