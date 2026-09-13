@@ -19,12 +19,6 @@ import { S } from "./readings.js";
 const logState = $("logState");
 /** Whether an answer is on its way — the queue waits on it. */
 export let busy = false;
-let typing: number | null = null;
-
-/** Stop a reply being typed out (a new question interrupts it). */
-export function stopTyping(): void {
-  if (typing) { clearTimeout(typing); typing = null; }
-}
 
 /**
  * With nothing on the board there is no window to write in, so notices appear
@@ -66,9 +60,6 @@ export function addMsg(kind: "user" | "jarvis" | "sys", text: string, threadId =
 }
 
 export function noteIn(threadId: string, text: string): void { addMsg("sys", text, threadId); }
-// System activity belongs to JARVIS, rather than whichever thread happened to
-// have focus when it occurred. Thread-local notices use noteIn explicitly.
-export function sys(t: string): void { announce(t); }
 
 /* ---------- what JARVIS says at the core ---------- */
 

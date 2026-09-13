@@ -13,6 +13,8 @@ import { api } from "./api.js";
  * enough for a phone's one-line notice; the Connections screen, opened at the
  * same time (onCannotHear), carries the rest.
  */
+const NOTHING_HEARD = "I didn't hear anything, sir.";
+const NOT_CAUGHT = "I didn't catch that, sir.";
 const NO_DICTATION = "I can't hear you yet, sir — connect Gemini or ChatGPT, or type.";
 
 /** What the voice lends its ear: the audio graph, and the live level it measures. */
@@ -154,7 +156,7 @@ export class Hearing {
 
     if (blob.size < 2000) {
       this.onState?.();
-      this.onNotice?.("I didn't hear anything, sir.");
+      this.onNotice?.(NOTHING_HEARD);
       return;
     }
 
@@ -163,7 +165,7 @@ export class Hearing {
     try {
       const text = await api.transcribe(blob);
       if (text) this.onRecognised?.(text, true);
-      else this.onNotice?.("I didn't catch that, sir.");
+      else this.onNotice?.(NOT_CAUGHT);
     } catch (err) {
       this.onNotice?.(err instanceof Error ? err.message : String(err));
     } finally {
@@ -196,7 +198,7 @@ export class Hearing {
       this.listening = false; this.onState?.();
       if (!settled && !failed) {
         if (heard) this.onRecognised?.(heard, true);
-        else this.onNotice?.("I didn't hear anything, sir.");
+        else this.onNotice?.(NOTHING_HEARD);
       }
     };
     r.onresult = (e: SpeechRecognitionEvent): void => {
@@ -213,7 +215,7 @@ export class Hearing {
       if (c === "not-allowed" || c === "service-not-allowed") {
         this.onNotice?.("Microphone refused — the command line still works.");
       } else if (c === "no-speech") {
-        this.onNotice?.("I didn't catch that, sir.");
+        this.onNotice?.(NOT_CAUGHT);
       } else if (c === "network") {
         // Deliberately no automatic retry: restarting the mic unasked is what
         // made it flick on and off.

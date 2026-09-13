@@ -398,7 +398,7 @@ await check('configuration: quick queries run, voice choice persists, the guide 
   const options = await page.evaluate(() => [...document.querySelectorAll('#voiceSel option')].map((x) => x.value).filter((v) => v.includes(':')));
   const pick = options.find((v) => v.startsWith('openai:') && !v.endsWith('fable')) ?? options[0];
   await page.select('#voiceSel', pick); await wait(500);
-  const remembered = await page.evaluate(() => localStorage.getItem('jarvis.voice') || Object.keys(localStorage).filter((k) => /voice/i.test(k)).join(','));
+  const remembered = await page.evaluate(() => localStorage.getItem('jarvis.voice.openai'));
   // The device's own voices stay on offer beside the service's, and the choice survives a reload.
   const device = options.find((v) => v.startsWith('device:'));
   assert(device !== undefined, 'no device voice listed while connected: ' + options.join(' '));

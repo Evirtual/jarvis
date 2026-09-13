@@ -406,7 +406,7 @@ function directiveToAction(n: string, args: Record<string, string>): Action | nu
     case "mute": return { name: "mute" };
     case "unmute": return { name: "unmute" };
     case "open_config": {
-      const tab = (["connections", "voice", "quick"] as const).find((t) => t === args.tab) ?? "connections";
+      const tab = (["connections", "voice", "access", "quick"] as const).find((t) => t === args.tab) ?? "connections";
       return { name: "open_config", tab };
     }
     case "open_setup": return { name: "open_setup" };

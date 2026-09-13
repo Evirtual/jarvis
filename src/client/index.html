@@ -85,7 +85,6 @@
 
         <div class="core-label">
           <span class="core-state" id="logState" hidden></span>
-          <span class="core-thread" id="threadName" hidden>—</span>
         </div>
         <div class="toast glass" id="toast" role="status" aria-live="polite"></div>
         <!-- What JARVIS says at the core: conversation, drawn as a reply and kept in the transcript. -->
@@ -324,7 +323,7 @@
     </div>
     <div class="ctl-row">
       <div class="ctl">
-        <span class="ctl-k"><span id="pitchTip" data-tip="How deep the voice is. Lower is darker. Shapes the device's own voice; a service's voice has a timbre of its own.">Timbre</span><span class="n" id="pitchN">0.78</span></span>
+        <span class="ctl-k"><span data-tip="How deep the voice is. Lower is darker. Shapes the device's own voice; a service's voice has a timbre of its own.">Timbre</span><span class="n" id="pitchN">0.78</span></span>
         <input class="sl" id="pitchSl" type="range" min="0.4" max="1.2" step="0.02" value="0.78" aria-label="Voice pitch">
       </div>
       <div class="ctl">

@@ -12,7 +12,7 @@
  * the model never sees it, and it counts as no thread.
  */
 
-import { $, recall, store } from "./dom.js";
+import { $, esc, recall, store } from "./dom.js";
 import { line } from "./message.js";
 import { conn, graph, voice, ws } from "./state.js";
 import { setDrawer } from "./drawer.js";
@@ -59,7 +59,7 @@ function paint(body: HTMLElement): void {
   box.className = "ready";
   box.innerHTML =
     `<label class="switch-row need" data-need="service"><span><b>A service</b><small>${ready
-      ? `Connected: ${conn.readyNames().join(", ")}. Answers, hearing and the AI voice come through it.`
+      ? `Connected: ${esc(conn.readyNames().join(", "))}. Answers, hearing and the AI voice come through it.`
       : "Gemini is free and takes a minute; ChatGPT needs a key with credit. Answers, hearing and the AI voice come through it."}</small></span>` +
     (ready ? `<input type="checkbox" class="switch" disabled checked aria-label="A service">` : `<button type="button" class="btn sm" data-ready="connect">Connect</button>`) +
     `</label>` +
@@ -67,7 +67,7 @@ function paint(body: HTMLElement): void {
   body.append(box);
   // a "not needed" for each optional row not yet granted, and the word on those already marked so
   for (const key of ["mic", "geo", "sound"] as Optional[]) {
-    const row = key === "sound" ? box.querySelectorAll<HTMLElement>(".switch-row.need")[3] : box.querySelector<HTMLElement>(`.need[data-need="${key}"]`);
+    const row = box.querySelector<HTMLElement>(`.need[data-need="${key}"]`);
     const text = row?.querySelector("span");
     if (!row || !text) continue;
     if (skip.has(key)) {
@@ -101,8 +101,7 @@ function checkDone(box: HTMLElement): void {
   const skip = skipped();
   const on = (key: Optional): boolean => {
     if (skip.has(key)) return true;
-    const row = key === "sound" ? box.querySelectorAll<HTMLInputElement>(".switch-row.need input")[3] : box.querySelector<HTMLInputElement>(`.need[data-need="${key}"] input`);
-    return !!row?.checked;
+    return !!box.querySelector<HTMLInputElement>(`.need[data-need="${key}"] input`)?.checked;
   };
   if (!on("mic") || !on("geo") || !on("sound")) return;
   ws.remove(t.id);
@@ -127,12 +126,18 @@ export const readiness = {
     const t = ensure();
     graph.focus(t.id);
   },
-  /** What the card would list as missing, in words — for "what's missing". */
-  missing(): string[] {
+  /** What the card lists as missing, in words — the same four things, from the same sources — for "what's missing". */
+  async missing(): Promise<string[]> {
     const out: string[] = [];
     if (!conn.anyReady) out.push("a service");
     const skip = skipped();
-    if (!skip.has("mic") && !voice.micAvailable) out.push("the microphone");
+    const granted = async (name: PermissionName): Promise<boolean> => {
+      try { return (await navigator.permissions.query({ name })).state === "granted"; } catch { return false; }
+    };
+    if (!skip.has("mic") && !(await granted("microphone" as PermissionName))) out.push("the microphone");
+    if (!skip.has("geo") && !(await granted("geolocation" as PermissionName))) out.push("location");
+    const soundOn = matchMedia("(display-mode: standalone)").matches || voice.soundOnOpen === "yes" || (navigator.userActivation?.hasBeenActive ?? false) || voice.acted;
+    if (!skip.has("sound") && !soundOn) out.push("sound on opening");
     return out;
   },
 };

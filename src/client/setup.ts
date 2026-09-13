@@ -102,7 +102,7 @@ function providerCard(id: ProviderId): string {
   const head =
     `<div class="provider-head"><span class="dot"></span><span class="nm">${esc(meta.name)}</span>` +
     (meta.free ? `<span class="badge">Free tier</span>` : "") +
-    (ready ? `<span class="spacer" style="flex:1"></span><span class="ok">Connected</span>` : "") +
+    (ready ? `<span class="spacer"></span><span class="ok">Connected</span>` : "") +
     `</div>`;
   if (ready) {
     const active = conn.active === id;
@@ -195,7 +195,7 @@ export function needs(): string {
   return (
     needRow("mic", "Microphone", "To talk to J.A.R.V.I.S..") +
     needRow("geo", "Location", "For the weather where you are.") +
-    `<label class="switch-row need"><span><b>Sound</b><small>${how}</small></span>` +
+    `<label class="switch-row need" data-need="sound"><span><b>Sound</b><small>${how}</small></span>` +
     `<input type="checkbox" class="switch" disabled${on ? " checked" : ""} aria-label="Sound"></label>`
   );
 }

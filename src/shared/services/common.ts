@@ -81,7 +81,7 @@ export const MANNER = "A calm, precise British butler: Received Pronunciation, u
  * "Louis" for Lewis — given to the hearing as a hint.
  */
 export const HEARING_HINT =
-  "JARVIS, sir. Services: Gemini, ChatGPT. Commands: new thread, close thread, sweep the network, status, uplink, locate me, drive mode, desktop mode, tidy up.";
+  "JARVIS, sir. Services: Gemini, ChatGPT. Commands: new thread, close thread, sweep the network, status, uplink, locate me, tidy up.";
 
 /** The Cadence slider, in words: both voices take instructions rather than a figure. */
 export function pace(speed: number): string {

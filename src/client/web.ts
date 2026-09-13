@@ -78,7 +78,6 @@ export class ContextWeb {
     (this.el.querySelector(".web-head b") as HTMLElement).textContent = me.title;
     // shown (still transparent) before anything is placed, so cards can be measured
     this.el.hidden = false;
-    this.el.classList.toggle("empty", related.length === 0);
     this.el.classList.toggle("narrow", narrow);
 
     const top = Math.max(...related.map((r) => r.score), 1);

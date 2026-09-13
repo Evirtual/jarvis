@@ -16,13 +16,13 @@ import { type Thread } from "./stage.js";
 import { clip } from "./text.js";
 import { threadRef } from "./workspace.js";
 import { conn, graph, input, panels, voice, ws } from "./state.js";
-import { addMsg, announce, busy, hideSay, jarvis, noteIn, say, setBusy, stopTyping, sys, toast } from "./say.js";
+import { addMsg, announce, busy, hideSay, jarvis, noteIn, say, setBusy, toast } from "./say.js";
 import { interceptKey, KEY_PATTERNS, parseCtx, resolve, runAction } from "./actions.js";
 import { S, T, W } from "./readings.js";
-import { boardLinks, paintThread, paintThreadName, refreshLinks, relatedContext } from "./threads.js";
+import { boardLinks, paintThread, paintThreadCount, refreshLinks, relatedContext } from "./threads.js";
 import { localCommand } from "./local.js";
 import { mode } from "./deck.js";
-import { showKeyboard, tapSpeaks, typing_ } from "./voice-ui.js";
+import { showKeyboard, tapSpeaks, keyboardShown } from "./voice-ui.js";
 import { setDrawer } from "./drawer.js";
 import { SERVERLESS } from "./server.js";
 
@@ -202,7 +202,7 @@ async function askCore(question: string): Promise<void> {
 
   try {
     const ctx = [appSnapshot(), contextBlock(), front ? frontContext(front) : "", front ? relatedContext(front) : ""].filter(Boolean).join("\n");
-    // The recent conversation, then the question — which is already the transcript's last line (ask_), so not twice.
+    // The recent conversation, then the question — which is already the transcript's last line (answer), so not twice.
     const recent = coreChat.recent(11);
     if (recent[recent.length - 1]?.role === "user" && recent[recent.length - 1]?.content === question) recent.pop();
     const turns = [...recent.slice(-10), { role: "user" as const, content: question }];
@@ -236,7 +236,7 @@ async function askCore(question: string): Promise<void> {
       const spare = conn.readyIds().find((p) => p !== conn.active);
       if (streamed || !spare || !/limit|out of credit|needs credit|busy|rate-limiting|quota/i.test(why)) throw err;
       // the service's own reason ("…busy at the moment…"), then what happens instead
-      sys(`${why} Meanwhile I'm answering through ${conn.nameOf(spare)}.`);
+      announce(`${why} Meanwhile I'm answering through ${conn.nameOf(spare)}.`);
       raw = await askVia(spare);
     }
     const routed = parseRoute(raw);
@@ -336,12 +336,12 @@ function housekeep(thread: Thread, actions: Action[]): void {
       } else if (thread.provisional) {
         // nothing to leave behind: it is this thread's own subject, so it's the name
         ws.rename(thread.id, a.title);
-        paintThreadName();
+        paintThreadCount();
       }
     } else if (a.name === "title_thread" && thread.provisional) {
       ws.rename(thread.id, a.title);
       graph.commit();
-      paintThreadName();
+      paintThreadCount();
     }
   }
 }
@@ -385,7 +385,7 @@ export function drainQueue(): void {
   if (job.threadId && ws.thread(job.threadId) && !ws.thread(job.threadId)!.archivedAt) {
     graph.focus(job.threadId);
   }
-  if (job.fromCore) { voice.markUserActed(); void ask_(job.text); }
+  if (job.fromCore) { voice.markUserActed(); void answer(job.text); }
   else void handleSubmit(job.text, true);
 }
 
@@ -394,10 +394,9 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
   const t = text.trim();
   if (!t) return;
   voice.markUserActed();
-  stopTyping();
   input.value = "";
   // The keyboard was asked for, not the default; it goes away once it's used.
-  if (typing_ && tapSpeaks) showKeyboard(false);
+  if (keyboardShown && tapSpeaks) showKeyboard(false);
 
   // A pasted API key is stored on this machine and never becomes chat history.
   if (KEY_PATTERNS.some(([, rx]) => rx.test(t))) {
@@ -417,7 +416,7 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
     // Asked in the thread you were looking at when you asked, even if JARVIS
     // has moved on to another window by the time he gets to it.
     queued.push({ text: t, ...(graph.activeId ? { threadId: graph.activeId } : {}) });
-    if (busy) sys(`Queued — I'll take “${clip(t, 60)}” next.`);
+    if (busy) announce(`Queued — I'll take “${clip(t, 60)}” next.`);
     else setTimeout(drainQueue, 0);
     return;
   }
@@ -433,11 +432,11 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
       return;
     }
     if (notes.length) announce(notes.join(" "));
-    await ask_(ask);
+    await answer(ask);
     return;
   }
 
-  await ask_(t);
+  await answer(t);
 }
 
 /**
@@ -445,9 +444,9 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
  * it answers directly, otherwise by the connected service — which says where
  * the reply belongs (askCore). The console makes no thread of its own accord.
  */
-async function ask_(t: string): Promise<void> {
+async function answer(t: string): Promise<void> {
   // The server keeps 4,000 characters of a question; say so rather than cut quietly.
-  if (t.length > 4000) { sys("That's over 4,000 characters, sir — I'll take the first 4,000."); t = t.slice(0, 4000); }
+  if (t.length > 4000) { announce("That's over 4,000 characters, sir — I'll take the first 4,000."); t = t.slice(0, 4000); }
   // What you said goes in the conversation first; a reply that turns out to
   // belong in a thread takes it back out (askCore).
   coreChat.add("user", t);

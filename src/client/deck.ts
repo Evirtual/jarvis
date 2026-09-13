@@ -7,7 +7,7 @@ import { ICON, instrumentIcon as icon } from "./icons.js";
 import { $, esc } from "./dom.js";
 import { type PanelName } from "./panels.js";
 import { graph, radar, panels } from "./state.js";
-import { paintCoreChat, paintThreadList, paintThreadName } from "./threads.js";
+import { paintCoreChat, paintThreadList, paintThreadCount } from "./threads.js";
 import { paintTelemetry } from "./readings.js";
 
 // The chips in the top bar are both a glance at the numbers and the way in.
@@ -195,7 +195,7 @@ export function applyMode(): void {
   }
   if (changed) graph.renderAll();
   panels.relayout();
-  paintThreadName();
+  paintThreadCount();
   fitDock();
 }
 

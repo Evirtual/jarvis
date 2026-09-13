@@ -208,9 +208,9 @@ export class Connections {
       `<div class="provider-head">` +
       `<span class="dot"></span><span class="nm">${esc(p.name)}</span>` +
       (p.free ? `<span class="badge">Free tier</span>` : "") +
-      `<span class="spacer" style="flex:1"></span>` +
+      `<span class="spacer"></span>` +
       (isActive
-        ? `<span class="src" style="color:var(--ice);font-family:var(--f-hud);font-size:9px;letter-spacing:.12em;text-transform:uppercase">In use</span>`
+        ? `<span class="src on">In use</span>`
         : st.state === "ready"
           ? `<button class="btn sm" data-act="use" data-id="${p.id}">Use</button>`
           : "") +

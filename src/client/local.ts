@@ -49,6 +49,8 @@ const HELP = [
   "Anything else goes to the connected service, with live readings and web search.",
 ].join("\n");
 
+const NO_READINGS_YET = "Telemetry hasn't attached yet, sir. Give me a moment.";
+
 export function localCommand(raw: string): boolean {
   const q = raw.toLowerCase().trim().replace(/[?!.]+$/, "");
   const words = q.split(/\s+/).filter(Boolean).length;
@@ -85,7 +87,7 @@ export function localCommand(raw: string): boolean {
       jarvis(`${bits.join(", ")}. ${(w.load ?? 0) > 80 ? "Rather busy, sir." : "All well within tolerance, sir."}`);
       return true;
     }
-    if (!T?.cpu || !T.mem) { jarvis("Telemetry hasn't attached yet, sir. Give me a moment."); return true; }
+    if (!T?.cpu || !T.mem) { jarvis(NO_READINGS_YET); return true; }
     const bits = [
       `Processor is at ${T.cpu.avg} percent across ${T.cpu.cores.length} cores`,
       `memory ${gib(T.mem.usedBytes)} of ${gib(T.mem.totalBytes)} gigabytes`,
@@ -98,7 +100,7 @@ export function localCommand(raw: string): boolean {
   }
   if (short && /\b(?:power|battery|thermals?|temps?|gpu temp(?:erature)?)\b/.test(q)) {
     // no readings yet is not the same as no battery
-    if (!T) { jarvis("Telemetry hasn't attached yet, sir. Give me a moment."); return true; }
+    if (!T) { jarvis(NO_READINGS_YET); return true; }
     let l = T.battery
       ? `Battery is at ${T.battery.pct} percent, ${T.battery.onAc ? "running on mains" : "on the cell"}`
       : T.web ? "This browser doesn't share the battery with me, sir" : "No battery here, sir — running on mains";
@@ -167,9 +169,10 @@ export function localCommand(raw: string): boolean {
   }
   if (words <= 4 && /\b(?:thank|thanks|cheers)\b/.test(q)) { jarvis("Always a pleasure, sir."); return true; }
   if (/\b(?:what(?:'s| is) missing|what do you need|what(?:'s| is) (?:not |un)set|readiness|what do i (?:still )?need to set)\b/.test(q)) {
-    const missing = readiness.missing();
     readiness.show();
-    jarvis(missing.length ? `Still missing, sir: ${missing.join(" and ")}. The card on the board has the way in.` : "Nothing that stops me, sir. The card shows what's optional.");
+    void readiness.missing().then((missing) => {
+      jarvis(missing.length ? `Still missing, sir: ${missing.join(", ")}. The card on the board has the way in.` : "Nothing, sir — everything on the card is set or marked not needed.");
+    });
     return true;
   }
   return false;

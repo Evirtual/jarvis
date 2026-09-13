@@ -127,7 +127,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 
 /* The title row: threads in the top-left corner, configuration in the
    top-right, level with the JARVIS title. The board never reaches up here
-   (see HEADER_H in stage.ts and BOARD_TOP in panels.ts). */
+   (see HEADER_H in stage.ts; panels sit by the same room, surface.ts). */
 .topbar {
   position: absolute; top: calc(8px + env(safe-area-inset-top, 0px)); left: var(--edge); right: var(--edge); z-index: 200; height: 38px;
   display: flex; align-items: center; justify-content: space-between;
@@ -135,7 +135,6 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 }
 .topbar > * { pointer-events: auto; }
 .topbar-l { display: flex; gap: 8px; }
-.ic { position: relative; }
 .ic-count {
   position: absolute; top: 1px; right: -2px; min-width: 16px; height: 16px; padding: 0 4px;
   display: grid; place-items: center; border-radius: 8px;
@@ -164,7 +163,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .spacer { flex: 1 1 auto; }
 
 /* The dock takes whatever room the header has left; chips that don't fit fold
-   into the More menu (see fitDock in main.ts). Overflow stays visible so the
+   into the More menu (see fitDock in deck.ts). Overflow stays visible so the
    menu can drop below the header. */
 .dock { display: flex; gap: 6px; flex: 1 1 auto; min-width: 0; justify-content: flex-end; flex-wrap: nowrap; }
 .dock .pill { flex: none; white-space: nowrap; }
@@ -218,14 +217,10 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 }
 .menu-head { display: none; }
 .menu-close { display: none; }
-.menu-item {
-  display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
-  padding: 10px 11px; min-height: 40px; width: 100%; text-align: left; cursor: pointer;
-  background: transparent; border: 1px solid transparent; color: var(--text); font: inherit;
-}
+/* what a row is; how it is laid out is with the other dropdown rules (.menu-item, further down) */
+.menu-item { min-height: 40px; width: 100%; text-align: left; cursor: pointer; background: transparent; color: var(--text); font: inherit; }
 .menu-item .k { font-family: var(--f-hud); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); }
 .menu-item .v { font-size: 12.5px; color: var(--text-hi); font-variant-numeric: tabular-nums; }
-.menu-item:hover, .menu-item:focus-visible { border-color: var(--line-hot); background: rgba(111,240,255,.07); outline: none; }
 .menu-item.on { border-color: var(--ice); }
 .menu-item.on .k { color: var(--ice); }
 .menu-item.warn .v { color: var(--gold); } .menu-item.crit .v { color: var(--red); }
@@ -246,15 +241,12 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 .pill:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
 .pill.on { border-color: var(--ice); background: rgba(111,240,255,.1); box-shadow: 0 0 12px rgba(111,240,255,.18); }
 .pill.on .k { color: var(--ice); }
-.pill.static { cursor: default; }
-.pill.static:hover { border-color: var(--line); background: var(--panel); }
 
 /* Every reading in the deck is one height, whatever is inside it. */
 .dock > .pill, .pill.more { height: 30px; align-items: center; padding-top: 0; padding-bottom: 0; }
 
 /* ---------- grid ---------- */
 .hud { display: grid; grid-template-columns: minmax(0, 1fr); min-height: 0; }
-.centre { min-height: 0; overflow: hidden; }
 
 .panel {
   border: 1px solid var(--line);
@@ -295,13 +287,13 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 /* =====================================================================
    THE STAGE — the core in the middle, conversations floating around it
    ===================================================================== */
-.centre { display: flex; flex-direction: column; }
+.centre { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
 /* The core is the source of a single wash of light that flows through the board. */
 /* The tallest any box may be: from the title row down to the space kept clear
-   above JARVIS (--core-clear is published by stage.ts; 44px is his status line
+   above JARVIS (--core-clear is published by stage.ts; --status-room is his status line
    and notices). Every box fits above him, so none can cover him even on a
    screen too narrow to step aside. */
-.stage { --board-h: calc(100% - var(--header-h) - var(--core-clear, 140px) - 44px); }
+.stage { --board-h: calc(100% - var(--header-h) - var(--core-clear, 140px) - var(--status-room)); }
 .stage {
   position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden;
   background:
@@ -348,10 +340,6 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
   display: block; font-family: var(--f-hud); font-size: 10px; font-weight: 700;
   letter-spacing: .32em; text-transform: uppercase; color: var(--ice);
   text-shadow: 0 0 12px rgba(111,240,255,.45);
-}
-.core-thread {
-  display: block; margin-top: 3px; font-size: 10px; color: var(--ice-dim);
-  max-width: 34ch; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* No stacking context of its own (no z-index), so each window and group
@@ -449,7 +437,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
    height — each grows with it until its whole conversation shows, and shrinks
    with it, scrolling inside itself, down to its title and a line. */
 .bubble.sized:not(.loose) .chatwin { width: auto; max-width: none; }
-.bubble.sized:not(.loose) .chatwin:not(.shut) { flex: 0 1 auto; min-height: var(--cw-min-h, 82px); }
+.bubble.sized:not(.loose) .chatwin:not(.shut) { flex: 0 1 auto; min-height: 82px; }
 .bubble.sized:not(.loose) .chatwin:not(.shut) .cw-body { flex: 1 1 auto; min-height: 0; max-height: none; }
 .bb-list {
   display: flex; flex-direction: column; gap: 6px; min-height: 0;
@@ -660,7 +648,7 @@ body.m-desk .deck .dock-r .menu { left: auto; right: 0; }
 /* ---------- what JARVIS says at the core ---------- */
 /* Conversation lives here, not in a window: the reply, drawn as it would be in
    a thread, on the status line above JARVIS. It stays while spoken and a while
-   after; a tap puts it away; the transcript keeps it (Threads → Conversation).
+   after; a tap puts it away; the Conversation panel keeps it.
    A passing notice (the toast) rises above it while it shows. */
 .core-say {
   position: absolute; left: var(--core-x, 50%); top: var(--status-y, 70%); z-index: 214;
@@ -909,7 +897,6 @@ body.m-compact .setup-sheet {
 .panel.float .host .ms, .panel.float .host .tag { font-size: clamp(8px, 2.7cqw, 12px); }
 .panel.float .meter { margin-block: clamp(4px, 1.8cqw, 10px); }
 .panel.float .track { height: clamp(2px, .9cqw, 6px); }
-.panel.float[data-panel="perimeter"] { width: 312px; }
 @keyframes panelIn { from { opacity: 0; transform: translateY(8px) scale(.98); } }
 .panel.float > h2.drag { cursor: grab; user-select: none; touch-action: none; margin: -10px -12px 9px; padding: 9px 8px 8px 12px; border-bottom: 1px solid rgba(111,240,255,.1); }
 .panel.float.dragging > h2.drag { cursor: grabbing; }
@@ -964,8 +951,6 @@ body.m-compact .setup-sheet {
 .chatwin.shut .cw-w, .chatwin.shut .cw-b, .chatwin.shut .cw-del { display: none; }
 
 /* the caret that trails a reply while it is still being written */
-.caret { display: inline-block; width: 7px; height: 12px; background: var(--ice); vertical-align: -2px; animation: blink 1s steps(2) infinite; }
-@keyframes blink { 50% { opacity: .15; } }
 
 /* ---------- command bar ---------- */
 .cmd { display: flex; align-items: center; gap: 9px; border: 1px solid var(--line-hot); background: var(--panel); clip-path: var(--chamfer); padding: 8px 10px; }
@@ -997,7 +982,6 @@ body.m-compact .setup-sheet {
 .btn:focus-visible { outline: 2px solid var(--ice); outline-offset: 2px; }
 .btn:disabled { opacity: .32; cursor: not-allowed; }
 .btn.on { color: var(--void); background: var(--ice); border-color: var(--ice); }
-.btn.rec { color: var(--void); background: var(--red); border-color: var(--red); }
 .btn.wide { width: 100%; }
 .btn.primary { color: var(--void); background: var(--ice); border-color: var(--ice); font-weight: 700; }
 .btn.danger:hover:not(:disabled) { color: var(--red); border-color: var(--red); background: rgba(255,79,95,.08); }
@@ -1021,7 +1005,7 @@ body.m-compact .setup-sheet {
 /* Resized taller or shorter, Perimeter gives the difference to its host list:
    the radar and its footer keep their size, the list takes what's left (116px
    when the panel is its own size). */
-.panel.float[data-panel="perimeter"] { display: flex; flex-direction: column; }
+.panel.float[data-panel="perimeter"] { width: 312px; display: flex; flex-direction: column; }
 .panel.float[data-panel="perimeter"] > * { flex-shrink: 0; }
 .panel.float[data-panel="perimeter"] > .hosts { flex: 1 1 116px; min-height: 48px; max-height: none; }
 .host { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: baseline; padding: 5px 2px; border-bottom: 1px dashed rgba(18,49,63,.6); font-size: 11px; }
@@ -1059,7 +1043,6 @@ body.m-compact .setup-sheet {
 .drawer-head h2 { margin: 0; font-family: var(--f-hud); font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--text-hi); }
 .tabs { display: flex; gap: 4px; }
 .tab { flex: 1; }
-.tab.on { color: var(--void); background: var(--ice); border-color: var(--ice); }
 #showSetup { margin-top: 14px; }
 
 /* ---------- connections ---------- */
@@ -1093,6 +1076,7 @@ body.m-compact .setup-sheet {
 .keyline { display: flex; align-items: center; gap: 8px; font-size: 11px; margin-bottom: 8px; }
 .keyline .mask { color: var(--text-hi); font-variant-numeric: tabular-nums; }
 .keyline .src { margin-left: auto; font-size: 9px; color: var(--ice-dim); font-family: var(--f-hud); letter-spacing: .12em; text-transform: uppercase; }
+.keyline .src.on { color: var(--ice); } /* the service in use */
 /* The copy icon sits right by the key: a small sheet-over-sheet, a tick for a moment once copied. */
 .keyline .copy { flex: none; width: 20px; height: 20px; padding: 0; border: 0; background: transparent; color: var(--ice-dim); cursor: pointer; display: inline-grid; place-items: center; margin-left: -2px; }
 .keyline .copy svg { width: 14px; height: 14px; }
@@ -1103,7 +1087,6 @@ body.m-compact .setup-sheet {
 .ctl-k { font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--ice-dim); display: flex; justify-content: space-between; }
 .ctl-k .n { color: var(--text-hi); font-variant-numeric: tabular-nums; }
 .ctl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
-.ctl.off .ctl-k, .ctl.off .ctl-k .n { opacity: .4; }
 .sel {
   width: 100%; background: #071119; color: var(--text-hi); border: 1px solid var(--line-hot);
   font-family: var(--f-mono); font-size: 11.5px; padding: 8px 24px 8px 8px; cursor: pointer;
@@ -1117,8 +1100,6 @@ body.m-compact .setup-sheet {
 .sl { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; background: #071119; border: 1px solid var(--line); outline: 0; cursor: pointer; }
 .sl::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 18px; background: var(--ice); box-shadow: 0 0 8px rgba(111,240,255,.6); cursor: pointer; }
 .sl::-moz-range-thumb { width: 11px; height: 18px; border: 0; border-radius: 0; background: var(--ice); }
-.sl:disabled { opacity: .3; cursor: not-allowed; }
-.sl:disabled::-webkit-slider-thumb { background: var(--line-hot); box-shadow: none; }
 
 .hint { margin: 8px 0 0; font-size: 10px; color: var(--ice-dim); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 7px; }
 .hint.warn { color: var(--gold); }
@@ -1252,7 +1233,7 @@ body.m-compact .cw-head { cursor: pointer; padding: 10px 12px; }
 body.m-compact .stage .cmd { width: calc(100% - 2 * var(--edge)); bottom: calc(var(--deck-h, 96px) - 2px); }
 body.m-compact #input { font-size: 16px; } /* 16px stops iOS zooming on focus */
 
-/* Instruments on a phone are part of the thread list (main.ts moves the
+/* Instruments on a phone are part of the thread list (applyMode in deck.ts moves the
    panels' container to the top of it): they scroll with the threads instead of
    covering them, and as many can be open as you like. */
 body.m-compact .overlays {
@@ -1368,7 +1349,7 @@ body.m-compact .tl-foot [data-all="tidy"] { display: none; }
 /* On a phone an open sheet — either More, or the Threads list — sits over the
    same blurred veil as every other modal. The deck and the title row stay
    above it, so the button that opened the sheet can close it; a tap on the
-   veil closes it too (main.ts). */
+   veil closes it too (deck.ts). */
 .sheet-veil { position: absolute; inset: 0; z-index: 70; display: none; }
 body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden]), .panel.float[data-panel="conversation"]:not([hidden])) .sheet-veil {
   display: block; animation: veilIn .2s var(--ease-soft);

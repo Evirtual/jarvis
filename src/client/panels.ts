@@ -233,7 +233,7 @@ export class Panels {
     const height = saved?.h ? Math.min(lim.maxH, saved.h) : undefined;
     el.style.width = width ? `${width}px` : "";
     el.style.height = height ? `${height}px` : "";
-    const w = el.offsetWidth || 290;
+    const w = el.offsetWidth || 292;
     const h = el.offsetHeight || 200;
     let x: number;
     let y: number;

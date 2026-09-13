@@ -6,7 +6,7 @@ import type { ScanResponse, TelemetryResponse, WorldResponse } from "../shared/t
 import { api } from "./api.js";
 import { $, esc, fmtRate, gib, gib0, hhmm, setMeter, setPill } from "./dom.js";
 import { radar, panels } from "./state.js";
-import { paintCoreState, sys } from "./say.js";
+import { announce, paintCoreState } from "./say.js";
 import { fitDockIfChanged } from "./deck.js";
 import { SERVERLESS } from "./server.js";
 import { locate, startSensors, sweepServices } from "./sensors.js";
@@ -370,7 +370,7 @@ function applyScan(next: ScanResponse): void {
   paintScanAge();
   if (sweepPending && wasRunning && !S.running) {
     sweepPending = false;
-    sys(SERVERLESS ? `Sweep complete — ${S.hosts.length} services answering.` : `Sweep complete — ${S.hosts.length} hosts responding.`);
+    announce(SERVERLESS ? `Sweep complete — ${S.hosts.length} services answering.` : `Sweep complete — ${S.hosts.length} hosts responding.`);
   }
 }
 

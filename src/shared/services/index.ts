@@ -14,10 +14,7 @@ import { gemini } from "./gemini.js";
 import { openai } from "./openai.js";
 import type { Service } from "./common.js";
 
-export {
-  MANNER, PERSONA, SPEECH_RATE, bytesOf, maskKey, personaFor, prepareTurns, rankModels,
-  type Service,
-} from "./common.js";
+export { SPEECH_RATE, bytesOf, type Service } from "./common.js";
 
 export const SERVICES: Record<ProviderId, Service> = { gemini, openai };
 

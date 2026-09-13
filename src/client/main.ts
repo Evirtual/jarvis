@@ -19,7 +19,7 @@ import { api } from "./api.js";
 import { $ } from "./dom.js";
 import { conn, graph, input, voice } from "./state.js";
 import { applyMode, mode } from "./deck.js";
-import { sys, toast } from "./say.js";
+import { announce, toast } from "./say.js";
 import { paintHosts, startReadings } from "./readings.js";
 import { partOfDay } from "./local.js";
 import { paintThread, refreshLinks } from "./threads.js";
@@ -97,7 +97,7 @@ conn.onChange = (c): void => {
 };
 
 // On the PC the page is served by the console's own server: say so if it has gone.
-if (!SERVERLESS) void api.status().catch(() => sys("Console server unreachable."));
+if (!SERVERLESS) void api.status().catch(() => announce("Console server unreachable."));
 startReadings();
 void conn.refresh().then(() => {
   greetAloud(); // the service's voice is only known from here
@@ -105,5 +105,5 @@ void conn.refresh().then(() => {
   // connected has no need of it, and someone who closed it isn't nagged.
   if (conn.anyReady) markSetupDone();
   else if (!setupDone()) openSetup();
-  else sys("No service connected — open Config and connect Gemini: it's free, and gives me my voice and hearing.");
+  else announce("No service connected — open Config and connect Gemini: it's free, and gives me my voice and hearing.");
 });

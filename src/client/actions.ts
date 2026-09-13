@@ -11,7 +11,7 @@ import { type Thread } from "./stage.js";
 import { editDistance } from "./text.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
 import { conn, graph, panels, voice, ws } from "./state.js";
-import { announce, sys } from "./say.js";
+import { announce } from "./say.js";
 import { answerConfirm, confirmFirst, deleteGroup, deleteThread, lostWords, pendingConfirm } from "./confirm.js";
 import { paintThread, refreshLinks } from "./threads.js";
 import { enqueue } from "./ask.js";
@@ -216,14 +216,14 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
     }
     case "rename_group": {
       const g = ws.findGroup(a.group);
-      if (!g) return `I've no group called ${a.group}, sir.`;
+      if (!g) return `I've no group called “${a.group}”, sir.`;
       ws.renameGroup(g.id, a.title);
       graph.commit();
       return `The group is now ${g.title}, sir.`;
     }
     case "delete_group": {
       const g = ws.findGroup(a.group);
-      if (!g) return `I've no group called ${a.group}, sir.`;
+      if (!g) return `I've no group called “${a.group}”, sir.`;
       return deleteGroup(g);
     }
     case "tidy_board": {
@@ -279,7 +279,7 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
     case "expand_group": {
       const fold = a.name === "collapse_group";
       const targets: Group[] = a.group === "all" ? ws.visibleGroups : [ws.findGroup(a.group)].filter((g): g is Group => !!g);
-      if (!targets.length) return `I've no group called ${a.group}, sir.`;
+      if (!targets.length) return `I've no group called “${a.group}”, sir.`;
       const hereGroup = graph.active?.groupId;
       for (const g of targets) if (!fold || g.id !== hereGroup || a.group !== "all") ws.setCollapsed(g.id, fold);
       // Folding the group you're in moves you only to a thread in the open — never
@@ -379,7 +379,7 @@ export async function interceptKey(text: string): Promise<boolean> {
   for (const [id, rx] of KEY_PATTERNS) {
     const m = rx.exec(text);
     if (!m) continue;
-    sys(`${coreLabel(id)} key received — checking it. It stays on this machine and is not sent to any model.`);
+    announce(`${coreLabel(id)} key received — checking it. It stays on this machine and is not sent to any model.`);
     try {
       await api.saveKey(id, m[0]);
       await conn.refresh();

@@ -20,12 +20,8 @@ import { mode } from "./deck.js";
  * Threads
  * ===================================================================== */
 
-export function paintThreadName(): void {
-  // The line under the core stays out of the way: a thread's window carries
-  // its name, and how to talk or type is told once, in the guide's first step.
-  const line = $("threadName");
-  line.hidden = true;
-  line.textContent = "";
+/** The count on the Threads button and the prompt's address — whenever the board or the address changes. */
+export function paintThreadCount(): void {
   // The deck reports retained work, not only what happens to be open. A
   // thread put away is still there until the person explicitly deletes it.
   $("pThreads").textContent = String(ws.all.filter((t) => !t.kind).length);
@@ -35,13 +31,13 @@ export function paintThreadName(): void {
 /** Redraw the board and everything that describes it. */
 export function paintThread(): void {
   graph.renderAll();
-  paintThreadName();
+  paintThreadCount();
   paintThreadList();
   refreshLinks();
 }
 
-graph.onFocus = (): void => { paintThreadName(); paintThreadList(); refreshLinks(); if (mode === "desk") input.focus(); };
-graph.onChange = (): void => { paintThreadName(); paintThreadList(); refreshLinks(); };
+graph.onFocus = (): void => { paintThreadCount(); paintThreadList(); refreshLinks(); if (mode === "desk") input.focus(); };
+graph.onChange = (): void => { paintThreadCount(); paintThreadList(); refreshLinks(); };
 graph.onArchive = (id): void => {
   const t = ws.thread(id);
   if (!t) return;

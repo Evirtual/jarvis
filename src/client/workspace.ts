@@ -30,12 +30,15 @@ export function threadRef(thread: Pick<Thread, "id">): string {
 
 export function averageHues(colors: readonly string[]): string {
   const rgb = colors
-    .map((color) => /^#[0-9a-f]{6}$/i.test(color) ? Number.parseInt(color.slice(1), 16) : null)
+    .map((color) => isHexColour(color) ? Number.parseInt(color.slice(1), 16) : null)
     .filter((color): color is number => color !== null);
   if (!rgb.length) return THREAD_HUES[0];
   const mean = (shift: number): number => Math.round(rgb.reduce((sum, color) => sum + ((color >> shift) & 255), 0) / rgb.length);
   return `#${[16, 8, 0].map((shift) => mean(shift).toString(16).padStart(2, "0")).join("")}`;
 }
+
+/** A colour the console will draw with: six hex digits, nothing else. */
+export const isHexColour = (c: string | undefined): c is string => /^#[0-9a-f]{6}$/i.test(c ?? "");
 
 export interface Thread {
   id: string;
@@ -268,7 +271,7 @@ function repair(d: WorkspaceData): WorkspaceData {
       title: _kind === "code" && plain.title === "Claude Code" ? "Previous conversation" : plain.title,
       turns: asTurns(t.turns),
       groupId: gids.has(t.groupId) ? t.groupId : GENERAL_ID,
-      color: /^#[0-9a-f]{6}$/i.test(t.color ?? "") ? t.color : THREAD_HUES[index % THREAD_HUES.length],
+      color: isHexColour(t.color ?? "") ? t.color : THREAD_HUES[index % THREAD_HUES.length],
       };
     });
   const tids = new Set(threads.map((t) => t.id));
@@ -317,9 +320,6 @@ export class Workspace {
   parentOf(t: Thread): Thread | undefined {
     const p = this.thread(t.parentId);
     return p && !p.archivedAt ? p : undefined;
-  }
-  childrenOf(id: string): Thread[] {
-    return this.live.filter((t) => t.parentId === id).sort((a, b) => a.createdAt - b.createdAt);
   }
   /** Everything that hangs below a thread, however deep. */
   descendants(id: string, includeArchived = false): Thread[] {
@@ -582,7 +582,6 @@ export class Workspace {
 
   /* ---------------- groups ---------------- */
 
-  /** A group by that name, made if it doesn't exist yet. */
   /** A group that is certainly new: the name gets a number if one has it already. */
   newGroup(title: string, origin: Group["origin"] = "user"): Group {
     const base = capitalise(title.trim().slice(0, 26)) || "Group";
@@ -593,6 +592,7 @@ export class Workspace {
     return g;
   }
 
+  /** A group by that name, made if it doesn't exist yet. */
   ensureGroup(title: string, origin: Group["origin"] = "user"): Group {
     const clean = capitalise(title.trim().slice(0, 28)) || "Group";
     const found = this.data.groups.find((g) => norm(g.title) === norm(clean));

@@ -33,7 +33,7 @@ import { line } from "./message.js";
 import { ContextWeb } from "./web.js";
 import { forget, raise, stackKey, track } from "./stack.js";
 import { planTidy, type TidyItem } from "./tidy.js";
-import { averageHues, GENERAL_ID, Workspace, migrate, THREAD_HUES, threadRef, type Group, type Thread } from "./workspace.js";
+import { averageHues, GENERAL_ID, Workspace, migrate, THREAD_HUES, threadRef, type Group, type Thread, isHexColour } from "./workspace.js";
 
 export type { Thread, Group } from "./workspace.js";
 export type { Activity } from "./core-draw.js";
@@ -43,7 +43,7 @@ const CORE_BOTTOM_GAP = 20;
 /** The deck at the bottom: readings, JARVIS, controls. */
 const DECK_H = 96;
 /** The title row across the top (threads, the JARVIS title, configuration): the board starts below it. Matches --header-h. */
-export const HEADER_H = 56;
+const HEADER_H = 56;
 /** Half the width of the column kept clear above JARVIS (his ring, status line and notices). */
 const CORE_ZONE = 150;
 /** Room above his ring for the status line and a notice. */
@@ -172,7 +172,7 @@ export class Stage {
     this.web = new ContextWeb({
       root,
       thread: (id) => this.ws.thread(id),
-      hueOf: (t) => { const c = t.color ?? this.hueOf(this.ws.groupOf(t)); return /^#[0-9a-f]{6}$/i.test(c) ? c : THREAD_HUES[0]; },
+      hueOf: (t) => { const c = t.color ?? this.hueOf(this.ws.groupOf(t)); return isHexColour(c) ? c : THREAD_HUES[0]; },
       related: (id) => this.relatedFor?.(id) ?? [],
       board: () => ({ top: HEADER_H + this.inset.top + 8, bottom: this.floor - DECK_H - 24 }),
       pick: (id) => { this.focus(id); this.reveal(id); },
@@ -234,12 +234,6 @@ export class Stage {
   save(): void {
     const json = JSON.stringify(this.ws.data);
     this.onSaved?.(store(STORE_KEY, json), json.length);
-    this.paintRoom();
-  }
-
-  /** Whether the board is clear (styles.css draws the clean screen). Kept current on every save. */
-  private paintRoom(): void {
-    this.root.classList.toggle("clear", this.ws.empty);
   }
 
   /**
@@ -664,7 +658,6 @@ export class Stage {
       this.raisedFor = this.ws.activeId;
       this.raise(this.ws.activeId);
     }
-    this.paintRoom();
     if (this.web.openFor && !this.ws.thread(this.web.openFor)) this.closeWeb();
     this.place();
 
@@ -819,7 +812,6 @@ export class Stage {
     return cy - (CORE_R * (DESIGN_R + 8)) / DESIGN_R - CORE_STATUS_ROOM;
   }
 
-  /** The board as the geometry sees it: its edges, and the column kept clear above JARVIS. */
   /** The board as it is right now: its edges, and the column kept clear above JARVIS. Panels sit by it too. */
   get room(): Room {
     return { bounds: this.bounds, cx: this.core().cx, coreZone: CORE_ZONE, coreFloor: this.coreFloor };
@@ -952,7 +944,6 @@ export class Stage {
     // His outermost ring.
     const coreTop = cy - (CORE_R * (DESIGN_R + 8)) / DESIGN_R;
     s.setProperty("--core-x", `${cx}px`);
-    s.setProperty("--core-y", `${cy}px`);
     s.setProperty("--deck-h", `${DECK_H + this.inset.bottom}px`); // the deck grows by the inset, so its buttons keep their place beside the core
     s.setProperty("--status-y", `${Math.round(coreTop - 10)}px`);
     s.setProperty("--core-clear", `${Math.round(this.h - coreTop + 8)}px`);

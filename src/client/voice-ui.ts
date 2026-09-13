@@ -6,7 +6,7 @@
 import { addressed, getAddress, setAddress, type Address } from "./address.js";
 import { $, recall, store } from "./dom.js";
 import { graph, input, panels, voice } from "./state.js";
-import { announce, busy, paintCoreState, sys } from "./say.js";
+import { announce, busy, paintCoreState } from "./say.js";
 import { answerConfirm, pendingConfirm } from "./confirm.js";
 import { T } from "./readings.js";
 import { submit } from "./ask.js";
@@ -24,7 +24,7 @@ document.addEventListener("keydown", (e) => {
   if ($("drawer").classList.contains("open")) { setDrawer(false); return; }
   if (menuOpen()) { closeMenus(); return; }
   if (graph.closeWeb()) return;
-  if (typing_) { showKeyboard(false); return; }
+  if (keyboardShown) { showKeyboard(false); return; }
   if (panels.closeTop()) return;
   voice.stop();
 });
@@ -48,7 +48,7 @@ requestAnimationFrame(function pumpGlobe(): void {
   requestAnimationFrame(pumpGlobe);
 });
 
-voice.onNotice = sys;
+voice.onNotice = announce;
 // A tap to talk with nothing connected and no dictation in this browser would
 // otherwise be a six-second line and nothing more. The way to fix it opens.
 voice.onCannotHear = (): void => setDrawer(true, "connections");
@@ -70,7 +70,7 @@ voice.onState = (): void => {
 // no voices of its own and nothing connected would otherwise never say so.
 requestAnimationFrame(() => voice.onState?.());
 voice.onRecognised = (text, final): void => {
-  if (typing_) { input.value = text; return; }
+  if (keyboardShown) { input.value = text; return; }
   if (final && text) setTimeout(() => submit(text), 120);
 };
 
@@ -79,11 +79,11 @@ voice.onRecognised = (text, final): void => {
  * is always a keystroke away, and can be made the default tap instead.
  * --------------------------------------------------------------------- */
 
-export let typing_ = false;
+export let keyboardShown = false;
 export let tapSpeaks = recall("jarvis.tapSpeaks") !== "0";
 
 export function showKeyboard(on: boolean): void {
-  typing_ = on;
+  keyboardShown = on;
   $("cmdForm").hidden = !on;
   $("keyBtn").classList.toggle("on", on);
   if (on) {
@@ -108,18 +108,18 @@ function setTapSpeaks(on: boolean): void {
 graph.onCoreTap = (): void => {
   voice.markUserActed();
   if (voice.speaking && !voice.listening) { voice.stop(); return; }
-  if (!tapSpeaks) { showKeyboard(!typing_); return; }
-  if (typing_ && !input.value) showKeyboard(false);
+  if (!tapSpeaks) { showKeyboard(!keyboardShown); return; }
+  if (keyboardShown && !input.value) showKeyboard(false);
   voice.toggleListen();
 };
 
-$("keyBtn").addEventListener("click", () => showKeyboard(!typing_));
+$("keyBtn").addEventListener("click", () => showKeyboard(!keyboardShown));
 $<HTMLInputElement>("tapSpeaks").addEventListener("change", (e) => setTapSpeaks((e.target as HTMLInputElement).checked));
 setTapSpeaks(tapSpeaks);
 
 // Any letter opens the keyboard and goes into it, so typing never needs a target.
 document.addEventListener("keydown", (e) => {
-  if (typing_ || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (keyboardShown || e.metaKey || e.ctrlKey || e.altKey) return;
   const el = document.activeElement as HTMLElement | null;
   if (el && /^(input|textarea|select)$/i.test(el.tagName)) return;
   if (e.key.length !== 1 || e.key === " ") return;
