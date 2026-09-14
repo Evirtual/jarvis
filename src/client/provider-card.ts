@@ -42,11 +42,36 @@ function effortControl(p: ProviderView, effort: Effort): string {
   return (
     `<div class="ctl effort">` +
     `<span class="ctl-k"><span>Thinking</span></span>` +
-    `<input class="sl" type="range" min="0" max="${EFFORTS.length - 1}" step="1" value="${at}" data-effort="${p.id}" aria-label="${esc(p.name)} thinking" aria-valuetext="${EFFORT_NOTE[effort].name}">` +
+    // the lane draws the line edge to edge; the input inside it is inset so its thumb stops over each word (alignEffortSliders)
+    `<div class="sl-lane"><input class="sl" type="range" min="0" max="${EFFORTS.length - 1}" step="1" value="${at}" data-effort="${p.id}" aria-label="${esc(p.name)} thinking" aria-valuetext="${EFFORT_NOTE[effort].name}"></div>` +
     `<div class="sl-marks">${marks}</div>` +
     `<p class="hint">${EFFORT_NOTE[effort].name}: ${EFFORT_NOTE[effort].note} Say “think hard about…” for one question.</p>` +
     `</div>`
   );
+}
+
+/** Half the slider's thumb (.sl, controls.css), in px. */
+const HALF_THUMB = 5.5;
+
+/**
+ * Put the thinking slider's thumb over the middle of each word: the track is
+ * inset by half of each end word, and the middle word is centred between the
+ * two end centres. Word widths depend on the font, so this is measured after
+ * the card is painted (and again once the fonts are in).
+ */
+export function alignEffortSliders(root: ParentNode): void {
+  for (const ctl of root.querySelectorAll<HTMLElement>(".ctl.effort")) {
+    const slider = ctl.querySelector<HTMLElement>(".sl");
+    const [first, middle, last] = ctl.querySelectorAll<HTMLElement>(".sl-marks span");
+    if (!slider || !first || !middle || !last) continue;
+    const a = first.offsetWidth, b = last.offsetWidth;
+    if (!a || !b) continue; // not laid out (hidden): nothing to measure
+    // the track starts under the first word's middle and ends under the last's (a range input keeps
+    // its own width, so it is narrowed rather than given a right margin)
+    slider.style.marginLeft = `${a / 2 - HALF_THUMB}px`;
+    slider.style.width = `calc(100% - ${(a + b) / 2 - 2 * HALF_THUMB}px)`;
+    middle.style.transform = `translateX(${(a - b) / 4}px)`;
+  }
 }
 
 export function providerCard(p: ProviderView, s: CardState): string {

@@ -498,6 +498,15 @@ await check('thinking: the slider on the card sets how long the model thinks, ke
   await until(() => document.querySelector('#providers input[data-effort="openai"]'), 'the thinking slider on the card');
   const rest = await page.evaluate(() => ({ value: document.querySelector('#providers input[data-effort="openai"]').value, lit: document.querySelector('#providers .sl-marks .on')?.textContent }));
   assert(rest.value === '0' && rest.lit === 'Quick', 'at rest: ' + JSON.stringify(rest));
+  // the thumb sits over the middle of a word at every stop, the track ends inside the card, and the slider has the same room above and below it
+  const fit = await page.evaluate(() => {
+    const ctl = document.querySelector('#providers .ctl.effort'); const s = ctl.querySelector('.sl').getBoundingClientRect(); const c = ctl.getBoundingClientRect();
+    const words = [...ctl.querySelectorAll('.sl-marks span')].map((w) => { const r = w.getBoundingClientRect(); return r.left + r.width / 2; });
+    const thumbs = [0, 1, 2].map((v) => s.left + 5.5 + v * (s.width - 11) / 2);
+    const k = ctl.querySelector('.ctl-k').getBoundingClientRect(), m = ctl.querySelector('.sl-marks').getBoundingClientRect();
+    return { off: words.map((w, i) => Math.abs(w - thumbs[i])), inside: s.right <= c.right + 0.5 && s.left >= c.left - 0.5, above: s.top - k.bottom, below: m.top - s.bottom };
+  });
+  assert(fit.off.every((d) => d < 1) && fit.inside && Math.abs(fit.above - fit.below) < 1, 'slider not over its words, or uneven: ' + JSON.stringify(fit));
   const slide = (to) => page.evaluate((v) => { const s = document.querySelector('#providers input[data-effort="openai"]'); s.value = String(v); s.dispatchEvent(new Event('change', { bubbles: true })); }, to);
   await slide(2);
   await until(() => document.querySelector('#providers .sl-marks .on')?.textContent === 'Thorough' && document.querySelector('#providers input[data-effort="openai"]').value === '2', 'the card to show Thorough');

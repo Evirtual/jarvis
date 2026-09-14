@@ -13,7 +13,7 @@ import { DEFAULT_EFFORT, EFFORTS } from "../shared/types.js";
 import { api } from "./api.js";
 import { $, esc } from "./dom.js";
 import { COPY_ICON, TICK_ICON } from "./icons.js";
-import { providerCard } from "./provider-card.js";
+import { alignEffortSliders, providerCard } from "./provider-card.js";
 import { SERVERLESS } from "./server.js";
 
 export class Connections {
@@ -31,6 +31,8 @@ export class Connections {
     this.root = $("providers");
     this.hint = $("connHint");
     this.root.addEventListener("click", (e) => void this.onClick(e));
+    // the words the slider is aligned to are measured; the HUD font may arrive after the first paint
+    void document.fonts?.ready.then(() => alignEffortSliders(this.root));
     this.root.addEventListener("change", (e) => void this.onSelect(e));
     this.root.addEventListener("keydown", (e) => {
       if ((e as KeyboardEvent).key !== "Enter") return;
@@ -184,6 +186,7 @@ export class Connections {
 
   private render(): void {
     this.root.innerHTML = this.data.providers.map((p) => this.card(p)).join("");
+    alignEffortSliders(this.root);
 
     const ready = this.data.providers.filter((p) => p.status.state === "ready");
     if (!ready.length) {

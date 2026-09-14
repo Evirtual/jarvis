@@ -19,7 +19,7 @@ import { locate } from "./sensors.js";
 import { SERVERLESS } from "./server.js";
 import { conn, voice } from "./state.js";
 import { COPY_ICON, TICK_ICON } from "./icons.js";
-import { providerCard as card } from "./provider-card.js";
+import { alignEffortSliders, providerCard as card } from "./provider-card.js";
 
 const STEPS = ["Where you are", "Connect a service", "What J.A.R.V.I.S. needs", "Say hello"] as const;
 const NEEDS_STEP = 2;
@@ -224,6 +224,7 @@ function render(): void {
   const last = step === STEPS.length - 1;
   placeVoiceControls(false); // before the step's markup is replaced, or the box would go with it
   body.innerHTML = step === 0 ? whereYouAre() : step === 1 ? connect() : step === NEEDS_STEP ? needs() : sayHello();
+  alignEffortSliders(body);
   if (step === NEEDS_STEP) void paintNeeds(body);
   if (last) placeVoiceControls(true);
   back.hidden = step === 0;
