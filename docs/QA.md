@@ -1162,3 +1162,10 @@ build clean.
      used to hold only research. Threads hold talk too now, so search is
      offered when the question asks for the world, or when the thread's
      earlier answers came from the web.
+125. "Open a new thread about owls" opened an empty thread: the whole clause
+     was taken as the command, and "about owls" was lost. What follows a
+     new-thread request and names its subject ("about …", "on …",
+     "regarding …", "to …") is its first question now; "based on this" or
+     "about this" still only opens the thread. And "open a new thread about
+     the weather" opened the Environment panel, because the panel words were
+     read first; a request for a thread is read before the other commands.

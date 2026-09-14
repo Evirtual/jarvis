@@ -223,7 +223,9 @@ Connections, and typing always works.
 
 Anything you can click, you can say, on its own or mid-sentence. An utterance
 is split into instructions and a question: *"start a new chat and find today's
-news in Cambodia"* opens a window and asks that question in it.
+news in Cambodia"* opens a window and asks that question in it, and so does
+*"open a new thread about owls"*: what a new thread is about, said in the
+same breath, is its first question.
 
 - **Threads:** "open a new chat and…", "branch off and…", "close this chat",
   "restore Cambodia", "go back to Lithuania", "open the Cambodia thread",

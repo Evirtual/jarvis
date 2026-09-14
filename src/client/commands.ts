@@ -35,7 +35,7 @@ export interface ParseContext {
 const NO_CONTEXT: ParseContext = { knowsThread: () => false, knowsGroup: () => false, pendingApproval: false };
 
 const NEW_THREAD =
-  /\b(?:new|another|fresh|separate|second|different)\s+(?:chat|thread|conversation|window|session|tab)\b|\b(?:create|start|open|make|begin|spin up)\s+(?:up\s+)?(?:a\s+)?(?:new\s+)?(?:one|chat|thread|conversation|window)\b|\bbranch(?:\s+(?:off|out))?\b|\bsub-?thread\b/;
+  /\b(?:new|another|fresh|separate|second|different)\s+(?:chat|thread|conversation|window|session|tab)\b|\b(?:create|start|open|make|begin|spin up)\s+(?:up\s+)?(?:a\s+)?(?:new\s+)?(?:one|chat|thread|conversation|window)\b|\bbranch(?:\s+(?:off|out))?\b|\bsub-?thread\b/i;
 const BRANCH = /\bbranch|\bsub-?thread\b|\b(?:based on|continu\w* (?:this|that|it)|carry (?:this|that) over|from (?:this|here|that))\b/;
 
 /** One clause in, one console command out — or null: it is part of the question, or something for JARVIS. */
@@ -49,6 +49,13 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
     if (/^(?:yes|yeah|yep|sure|approve(?:d)?|allow(?: it)?|go ahead|do it|proceed|ok(?:ay)?|fine)(?:,? (?:please|jarvis|sir))?$/.test(q)) return { name: "approve" };
     if (/^(?:no|nope|deny|denied|don'?t|reject|refuse|cancel that|not that)(?:,? (?:please|jarvis|sir|thanks))?$/.test(q)) return { name: "deny" };
   }
+
+  // A new thread — named, plain, or branched off the one in front. Before the
+  // rest, since what it is about may sound like another command: "open a new
+  // thread about the weather" is a thread, not the weather panel.
+  const namedThread = /^\s*(?:please\s+)?(?:new|another|fresh|separate|second|different|create|start|open|make|begin)\s+(?:up\s+)?(?:a\s+)?(?:new\s+)?(?:chat|thread|conversation|window|session|tab)\s+(?:called|named)\s+["“]?(.+?)["”]?\s*$/i.exec(clause);
+  if (namedThread?.[1]) return { name: "new_thread", branch: false, title: namedThread[1].trim() };
+  if (NEW_THREAD.test(q)) return { name: "new_thread", branch: BRANCH.test(q) };
 
   // The service — local, so it works when the one in use has stopped answering.
   const core = /\b(?:switch|change|use|talk|go|move)\b(?:\s+\w+){0,3}?\s+(?:to|with|via|over to)?\s*(chatgpt|open ?ai|gpt|gemini|google)\b(?!\s+code)|\buse\s+(chatgpt|gemini)\b(?!\s+code)/.exec(q);
@@ -151,11 +158,6 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   const sw = /\b(?:switch|go|jump|get|focus|select)\s+(?:(?:back\s+)?to\s+)?(?:the\s+)?(.+?)(?:\s+(?:thread|chat|window|conversation))?$/.exec(q);
   if (sw?.[1] && ctx.knowsThread(sw[1])) return { name: "switch_thread", title: sw[1] };
 
-  // A new thread — named, plain, or branched off the one in front.
-  const namedThread = /^\s*(?:please\s+)?(?:new|another|fresh|separate|second|different|create|start|open|make|begin)\s+(?:up\s+)?(?:a\s+)?(?:new\s+)?(?:chat|thread|conversation|window|session|tab)\s+(?:called|named)\s+["“]?(.+?)["”]?\s*$/i.exec(clause);
-  if (namedThread?.[1]) return { name: "new_thread", branch: false, title: namedThread[1].trim() };
-  if (NEW_THREAD.test(q)) return { name: "new_thread", branch: BRANCH.test(q) };
-
   return null;
 }
 
@@ -164,6 +166,19 @@ function orig(clause: string, q: string, s: string): string {
   const raw = clause.trim().replace(/[?!.]+$/, "").trim();
   const at = q.lastIndexOf(s);
   return (at < 0 ? s : raw.slice(at, at + s.length)).replace(/["”]$/, "");
+}
+
+/**
+ * What a new thread is for, said in the same breath: "open a new thread about
+ * owls" → "about owls", which becomes its first question. Only words that
+ * introduce a subject count — "branch off based on this" names no subject,
+ * and "about this" points at the thread in front rather than saying one.
+ */
+const SUBJECT = /^(?:about|on|regarding|to)\s+(?!(?:it|this|that|here|there|now|me|us)[?!.]*$)\S/i;
+function threadSubject(clause: string): string {
+  const m = NEW_THREAD.exec(clause);
+  const rest = m ? clause.slice(m.index + m[0].length).trim() : "";
+  return SUBJECT.test(rest) ? rest : "";
 }
 
 /** Leftover words that are about the window juggling, not the question. */
@@ -183,12 +198,13 @@ export function parseUtterance(text: string, ctx: ParseContext = NO_CONTEXT): Pa
     const sep = parts[i - 1] ?? " ";
     if (!clause) continue;
     const act = intentOf(clause, ctx);
-    if (act) {
-      actions.push(act);
+    if (act) actions.push(act);
+    // A command is not part of the question — except a new thread's subject, which is its first question.
+    let c = !act ? clause : act.name === "new_thread" && !act.title ? threadSubject(clause) : "";
+    if (!c) {
       lastWasAsk = false;
       continue;
     }
-    let c = clause;
     while (FILLER.test(c)) c = c.replace(FILLER, "");
     // Only discard a fragment when it is entirely interface filler. A normal
     // note can mention a thread, chat, or window — especially research and QA

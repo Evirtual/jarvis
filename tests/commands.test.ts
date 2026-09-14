@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type ParseContext } from "../src/client/commands.ts";
+import { NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type ParseContext, type Parsed } from "../src/client/commands.ts";
 import { DIRECTIVES, directiveCatalogue } from "../src/shared/directives.ts";
 import { effortAsked, rankModels, wantsSearch } from "../src/shared/services/common.ts";
 
@@ -20,6 +20,20 @@ test("an instruction and a question are separated", () => {
   const p = parseUtterance("start a new chat and find today's news in Cambodia", ctx());
   assert.deepEqual(p.actions, [{ name: "new_thread", branch: false }]);
   assert.equal(p.ask, "find today's news in Cambodia");
+});
+
+test("a new thread's subject, said in the same breath, is its first question", () => {
+  const asked = (s: string): Parsed => parseUtterance(s, ctx());
+  assert.deepEqual(asked("open a new thread about owls"), { actions: [{ name: "new_thread", branch: false }], ask: "about owls" });
+  assert.equal(asked("Jarvis, start another chat on the Roman empire").ask, "on the Roman empire", "capitals kept, the address dropped");
+  assert.equal(asked("open a new thread about owls and find pictures").ask, "about owls and find pictures", "the rest of the question follows it");
+  assert.deepEqual(asked("branch off about the costs"), { actions: [{ name: "new_thread", branch: true }], ask: "about the costs" });
+  assert.equal(asked("open a new thread about the weather in Lisbon").ask, "about the weather in Lisbon", "a subject that names a panel is still the subject");
+  for (const s of ["open a new thread", "open a new thread please", "start a new thread based on this", "open a new thread about this", "new thread for now"]) {
+    assert.equal(asked(s).ask, "", s);
+  }
+  assert.deepEqual(asked("new thread called Owls").actions, [{ name: "new_thread", branch: false, title: "Owls" }], "a name is not a question");
+  assert.equal(asked("new thread called Owls").ask, "");
 });
 
 test("branching and subthreads are recognised", () => {

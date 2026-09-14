@@ -283,7 +283,13 @@ await check('everything is a thread: nothing in front opens one; the next questi
   await say('play a video of owls'); await untilIdle();
   await until((id) => document.querySelector(`section.chatwin[data-id="${id}"] iframe[src*="youtube-nocookie.com/embed/dQw4w9WgXcQ"]`), 'the video player in the thread in front', 10000, owls.id);
   assert(await page.evaluate(() => document.getElementById('coreReply').hidden), 'the video reply was said under the core');
-  const gone = await page.evaluate(() => !document.getElementById('pillConversation') && !document.querySelector('.panel.float[data-panel="conversation"]'));
+  // Said in one breath, a new thread's subject is its first question — even a subject that names a panel.
+  await say('open a new thread about the weather in Lisbon'); await untilIdle();
+  w = await ws();
+  const lisbon = w.threads.find((t) => t.id === w.activeId);
+  assert(w.threads.length === 3 && lisbon.turns[0]?.content === 'about the weather in Lisbon' && /21°/.test(lisbon.turns[1]?.content || ''), 'the subject was not asked in the new thread: ' + JSON.stringify(lisbon?.turns));
+  assert(!(await board()).panels.includes('environment'), 'the weather panel opened instead of a thread');
+  const gone =await page.evaluate(() => !document.getElementById('pillConversation') && !document.querySelector('.panel.float[data-panel="conversation"]'));
   assert(gone, 'the Conversation button or panel is still there');
   return { threads: w.threads.length, owls: turns(owls) };
 });
