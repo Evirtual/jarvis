@@ -10,9 +10,8 @@
  */
 
 import type {
-  AskEvent, AskRequest, Catalogue, ConnectionsResponse, KeySource, ProviderId, ProviderStatus, ProviderView, SpeakRequest, StatusResponse, Turn,
-} from "../types.js";
-import { PROVIDER_IDS, isProviderId } from "../types.js";
+  AskEvent, AskRequest, Catalogue, ConnectionsResponse, KeySource, ProviderId, ProviderStatus, ProviderView, SpeakRequest, StatusResponse, Turn, Effort } from "../types.js";
+import { PROVIDER_IDS, isProviderId, DEFAULT_EFFORT } from "../types.js";
 import { hearWith, humanise, PROVIDERS, SERVICES, speakWith } from "./index.js";
 import { maskKey, personaFor, prepareTurns, type Service, wantsSearch } from "./common.js";
 
@@ -22,6 +21,8 @@ export interface KeyStore {
   key(id: ProviderId): { key: string; source: KeySource } | null;
   /** The chat model chosen for a service, if one was chosen. */
   model(id: ProviderId): string | null;
+  /** How long the service's model thinks, if it was chosen. */
+  effort(id: ProviderId): Effort | null;
   /** The service chosen to answer, if one was chosen. */
   active(): ProviderId | null;
 }
@@ -57,6 +58,8 @@ export interface Prepared {
   persona: string;
   /** Whether the service is offered its web search tool for this question (wantsSearch). */
   search: boolean;
+  /** How long the model thinks about it: asked for in words, else the service's setting, else quick. */
+  effort: Effort;
 }
 
 /**
@@ -158,6 +161,8 @@ export class ConsoleCore {
           model: this.modelFor(id, v.catalogue),
           voices: v.catalogue.voices,
           hears: v.catalogue.hearing.length > 0,
+          thinks: this.services[id].thinks(this.modelFor(id, v.catalogue)),
+          effort: this.store.effort(id) ?? DEFAULT_EFFORT,
           ...(problem ? { problem } : {}),
         }
       : { state: "error", maskedKey: maskKey(resolved.key), message: v.message ?? "Unknown error", source: resolved.source };
@@ -205,7 +210,7 @@ export class ConsoleCore {
     // Live readings ride along with the newest question only, never the history.
     const turns = prepareTurns(body.turns, body.context);
     if (!turns) throw new CoreError("no_turns", "There's nothing to answer.");
-    return { id, key: c.key, model: c.model, turns, persona: personaFor(body.address === "madam" ? "madam" : "sir"), search: body.search === true || wantsSearch(turns) };
+    return { id, key: c.key, model: c.model, turns, persona: personaFor(body.address === "madam" ? "madam" : "sir"), search: body.search === true || wantsSearch(turns), effort: body.effort ?? this.store.effort(id) ?? DEFAULT_EFFORT };
   }
 
   /**
@@ -215,7 +220,7 @@ export class ConsoleCore {
    */
   async answer(q: Prepared, emit: (ev: AskEvent) => void, signal: AbortSignal): Promise<void> {
     try {
-      await this.services[q.id].chat(q.key, q.model, q.turns, emit, signal, q.persona, q.search);
+      await this.services[q.id].chat(q.key, q.model, q.turns, emit, signal, q.persona, { search: q.search, effort: q.effort });
       this.problems.delete(q.id);
     } catch (err) {
       if (signal.aborted) throw err;

@@ -4,7 +4,8 @@
  * the answers as a server-sent-event stream, as Gemini's are.
  */
 
-import type { VoiceOption } from "../types.js";
+import type { VoiceOption, Effort } from "../types.js";
+import { DEFAULT_EFFORT } from "../types.js";
 import { HEARING_HINT, MANNER, PERSONA, bytesOf, eventsOf, httpError, pace, rankModels, type Service } from "./common.js";
 
 const API = "https://api.openai.com/v1";
@@ -32,6 +33,9 @@ const VOICES: VoiceOption[] = [
  * API refuses ("does not exist or you do not have access"), and the live
  * speech models.
  */
+/** The Responses API's word for each of ours. */
+const EFFORT_WORD: Record<Effort, "low" | "medium" | "high"> = { quick: "low", balanced: "medium", thorough: "high" };
+
 const NOT_CHAT = /audio|realtime|live|image|tts|transcribe|embed|moderation|search|codex|dall|whisper|sora|veo|imagen|guard|instruct|chat-latest/i;
 
 /**
@@ -96,12 +100,19 @@ export const openai: Service = {
     };
   },
 
-  async chat(key, model, turns, emit, signal, persona = PERSONA, search = true) {
-    // The gpt-5 and o-series models think before they answer, at a medium
-    // effort unless told otherwise — several seconds before the first word of
-    // a greeting. A talking console wants the low setting, and short replies
-    // when nothing is being looked up. Older models refuse these fields.
-    const reasons = /^(?:gpt-5|o\d)/.test(model);
+  /** The gpt-5 family and the o-series think before they answer; older models refuse the reasoning fields. */
+  thinks(model) {
+    return /^(?:gpt-5|o\d)/.test(model);
+  },
+
+  async chat(key, model, turns, emit, signal, persona = PERSONA, how = {}) {
+    const search = how.search ?? true;
+    // A thinking model deliberates at a medium effort unless told otherwise —
+    // several seconds before the first word of a greeting. The effort is the
+    // user's choice (quick by default), and a quick answer with nothing looked
+    // up is asked to be brief as well.
+    const reasons = this.thinks(model);
+    const effort = EFFORT_WORD[how.effort ?? DEFAULT_EFFORT];
     const call = (withSearch: boolean, tuned: boolean): Promise<Response> =>
       fetch(`${API}/responses`, {
         method: "POST",
@@ -112,7 +123,7 @@ export const openai: Service = {
           instructions: persona,
           input: turns.map((t) => ({ role: t.role, content: t.content })),
           ...(withSearch ? { tools: [{ type: "web_search" }] } : {}),
-          ...(tuned ? { reasoning: { effort: "low" }, ...(withSearch ? {} : { text: { verbosity: "low" } }) } : {}),
+          ...(tuned ? { reasoning: { effort }, ...(!withSearch && effort === "low" ? { text: { verbosity: "low" } } : {}) } : {}),
         }),
         signal,
       });

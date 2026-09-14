@@ -6,10 +6,11 @@
  * and what it costs. Drawn once, here, so the two screens never differ.
  *
  * What is pressed is read by the screen that holds the card:
- *   input[data-key=ID], [data-act="save|copy|use|remove|recheck"][data-id=ID], select[data-model=ID]
+ *   input[data-key=ID], [data-act="save|copy|use|remove|recheck"][data-id=ID], select[data-model=ID], input[data-effort=ID]
  */
 
-import type { ProviderView } from "../shared/types.js";
+import type { Effort, ProviderView } from "../shared/types.js";
+import { EFFORTS } from "../shared/types.js";
 import { api } from "./api.js";
 import { esc } from "./dom.js";
 import { COPY_ICON } from "./icons.js";
@@ -25,6 +26,27 @@ export interface CardState {
   hint: string | null;
   /** In the guide: a connected service says so, a spare offers Use, and there is no re-check or disconnect. */
   inGuide: boolean;
+}
+
+/** The three stops, and what each costs in time and money — measured, not promised: a model and a question vary. */
+const EFFORT_NOTE: Record<Effort, { name: string; note: string }> = {
+  quick: { name: "Quick", note: "answers in a second or two; the sensible everyday setting." },
+  balanced: { name: "Balanced", note: "thinks for a few seconds first; a little more careful, a little dearer." },
+  thorough: { name: "Thorough", note: "thinks hard — often ten seconds or more before the first word, and the dearest answer." },
+};
+
+/** The thinking slider: three stops, quick on the left, thorough on the right. */
+function effortControl(p: ProviderView, effort: Effort): string {
+  const at = EFFORTS.indexOf(effort);
+  const marks = EFFORTS.map((e, i) => `<span${i === at ? ' class="on"' : ""}>${EFFORT_NOTE[e].name}</span>`).join("");
+  return (
+    `<div class="ctl effort">` +
+    `<span class="ctl-k"><span>Thinking</span><span class="n">${EFFORT_NOTE[effort].name}</span></span>` +
+    `<input class="sl" type="range" min="0" max="${EFFORTS.length - 1}" step="1" value="${at}" data-effort="${p.id}" aria-label="${esc(p.name)} thinking" aria-valuetext="${EFFORT_NOTE[effort].name}">` +
+    `<div class="sl-marks">${marks}</div>` +
+    `<p class="hint">${EFFORT_NOTE[effort].name}: ${EFFORT_NOTE[effort].note} Say “think hard about…” for one question.</p>` +
+    `</div>`
+  );
 }
 
 export function providerCard(p: ProviderView, s: CardState): string {
@@ -84,6 +106,7 @@ export function providerCard(p: ProviderView, s: CardState): string {
       : "") +
     `<div class="ctl"><span class="ctl-k"><span>Model</span><span class="n">${st.models.length} available</span></span>` +
     `<select class="sel" data-model="${p.id}" aria-label="${esc(p.name)} model">${models}</select></div>` +
+    (st.thinks ? effortControl(p, st.effort) : "") +
     (s.inGuide ? "" :
       `<div class="row">` +
       `<button class="btn" type="button" data-act="recheck" data-id="${p.id}"${s.busy ? " disabled" : ""}>${s.busy ? "Checking" : "Re-check"}</button>` +

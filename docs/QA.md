@@ -1114,3 +1114,10 @@ Typecheck clean, 118 unit tests, 21 end-to-end scenarios, build clean.
      of the console's notices sit between them ("4 messages · 18 notices"),
      so the button's number is explained the moment it opens — "messages",
      since one is often more than a line.
+119. How long the model thinks was fixed at low. It is a choice per service
+     now — a three-stop slider under the model on its card, in Configuration
+     and in the guide, shown only for models that think — kept with the key
+     (this browser's storage, or the PC's config.json), and carried with each
+     question to both services (ChatGPT's low/medium/high, Gemini's thinking
+     budget). "Think hard about…" asks for thorough for one question, with
+     "Thinking hard" under him meanwhile.

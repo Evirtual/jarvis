@@ -8,8 +8,8 @@
  * belong to.
  */
 
-import type { AskRequest, AskStatus, ConnectionsResponse, ProviderId, SpeakRequest, StatusResponse } from "../shared/types.js";
-import { PROVIDER_IDS, isProviderId } from "../shared/types.js";
+import type { AskRequest, AskStatus, ConnectionsResponse, ProviderId, SpeakRequest, StatusResponse, Effort } from "../shared/types.js";
+import { PROVIDER_IDS, isProviderId, isEffort } from "../shared/types.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { ConsoleCore, type Validation } from "../shared/services/console.js";
 import { KEY, recall, store } from "./storage.js";
@@ -17,7 +17,7 @@ import { KEY, recall, store } from "./storage.js";
 /* ---------------- the keys, on this device ---------------- */
 
 interface Saved {
-  providers: Partial<Record<ProviderId, { key: string; model?: string }>>;
+  providers: Partial<Record<ProviderId, { key: string; model?: string; effort?: Effort }>>;
   active: ProviderId | null;
 }
 
@@ -27,7 +27,7 @@ function load(): Saved {
     const providers: Saved["providers"] = {};
     for (const id of PROVIDER_IDS) {
       const p = s.providers?.[id];
-      if (p && typeof p.key === "string" && p.key) providers[id] = { key: p.key, ...(typeof p.model === "string" ? { model: p.model } : {}) };
+      if (p && typeof p.key === "string" && p.key) providers[id] = { key: p.key, ...(typeof p.model === "string" ? { model: p.model } : {}), ...(isEffort(p.effort) ? { effort: p.effort } : {}) };
     }
     return { providers, active: isProviderId(s.active) ? s.active : null };
   } catch {
@@ -47,6 +47,7 @@ const core = new ConsoleCore(
   {
     key: (id) => (saved.providers[id] ? { key: saved.providers[id]!.key, source: "saved" } : null),
     model: (id) => saved.providers[id]?.model ?? null,
+    effort: (id) => saved.providers[id]?.effort ?? null,
     active: () => saved.active,
   },
   {
@@ -67,8 +68,8 @@ async function saveKey(id: ProviderId, apiKey: string): Promise<ConnectionsRespo
   if (!key) throw new Error("Paste the key first.");
   const v = await core.validate(id, key, true);
   if (!v.ok) throw new Error(v.message ?? "That key didn't work.");
-  const model = saved.providers[id]?.model;
-  saved.providers[id] = { key, ...(model ? { model } : {}) };
+  const { model, effort } = saved.providers[id] ?? {};
+  saved.providers[id] = { key, ...(model ? { model } : {}), ...(effort ? { effort } : {}) };
   if (!saved.active) saved.active = id;
   // a key that looks connected but is gone on the next visit would be worse than saying so now
   if (!persist()) throw new Error("The key works, but this browser wouldn't keep it — its storage is full, or blocked in a private window.");
@@ -87,6 +88,12 @@ async function selectModel(id: ProviderId, model: string): Promise<ConnectionsRe
   const p = saved.providers[id];
   if (p) { p.model = model; persist(); }
   core.modelChanged(id);
+  return connections();
+}
+
+async function selectEffort(id: ProviderId, effort: Effort): Promise<ConnectionsResponse> {
+  const p = saved.providers[id];
+  if (p) { p.effort = effort; persist(); }
   return connections();
 }
 
@@ -137,4 +144,4 @@ function keyOf(id: ProviderId): string | null {
   return saved.providers[id]?.key ?? null;
 }
 
-export const browserCore = { connections, saveKey, removeKey, selectModel, setActive, keyOf, ask, transcribe, status, speak };
+export const browserCore = { connections, saveKey, removeKey, selectModel, selectEffort, setActive, keyOf, ask, transcribe, status, speak };

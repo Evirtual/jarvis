@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { NEEDS_CONFIRMATION, extractDirectives, intentOf, parseRoute, parseUtterance, type ParseContext } from "../src/client/commands.ts";
 import { DIRECTIVES, directiveCatalogue } from "../src/shared/directives.ts";
-import { rankModels, wantsSearch } from "../src/shared/services/common.ts";
+import { effortAsked, rankModels, wantsSearch } from "../src/shared/services/common.ts";
 
 const threads = ["General", "Lithuania", "Trip planning", "Cambodia news"];
 const groups = ["Research", "Travel"];
@@ -130,6 +130,15 @@ test("the small model of a generation is the default; a newer generation still o
   assert.deepEqual(rankModels(["gpt-5.5", "gpt-5.5-nano", "gpt-5.5-mini"]), ["gpt-5.5-mini", "gpt-5.5", "gpt-5.5-nano"]);
   assert.equal(rankModels(["gpt-5.5-mini", "gpt-6"])[0], "gpt-6");
   assert.equal(rankModels(["gemini-3.5-pro", "gemini-3.5-flash", "gemini-3.5-flash-lite"])[0], "gemini-3.5-flash");
+});
+
+test("depth asked for in words — think hard, take your time — is the thorough setting for that question; the words stay", () => {
+  assert.equal(effortAsked("think hard about this: which of the three mortgages is cheapest over ten years?"), "thorough");
+  assert.equal(effortAsked("Take your time, what would you do with the spare room?"), "thorough");
+  assert.equal(effortAsked("is Lisbon nice in October, think carefully"), "thorough");
+  assert.equal(effortAsked("hello there"), null);
+  assert.equal(effortAsked("I think it is raining"), null, "'I think' is not a request");
+  assert.equal(effortAsked("a hard think about nothing"), null);
 });
 
 test("the web is offered for a question that wants it, or a follow-up in a thread that came from it — not for talk", () => {

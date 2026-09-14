@@ -17,12 +17,13 @@ import type {
   SaveKeyRequest,
   SelectModelRequest,
   SetActiveRequest,
+  SelectEffortRequest,
   SpeakRequest,
   TelemetryResponse,
 } from "../shared/types.js";
-import { isProviderId } from "../shared/types.js";
+import { isEffort, isProviderId } from "../shared/types.js";
 
-import { clearKey, loadConfig, resolveKey, setActive, setKey, setModel } from "./config.js";
+import { clearKey, loadConfig, resolveKey, setActive, setEffort, setKey, setModel } from "./config.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { CoreError, SPEECH_RATE, core } from "./services.js";
 import { gateway, snapshot, startSampler } from "./system.js";
@@ -216,6 +217,23 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
     }
     await setModel(id, body.model);
     core.modelChanged(id);
+    json(res, 200, await core.connections());
+    return;
+  }
+
+  const effortMatch = p.match(/^\/api\/connections\/([a-z]+)\/effort$/);
+  if (effortMatch && req.method === "POST") {
+    const id = effortMatch[1];
+    if (!isProviderId(id)) {
+      json(res, 404, { error: "unknown_provider" });
+      return;
+    }
+    const body = await readJson<SelectEffortRequest>(req);
+    if (!isEffort(body?.effort)) {
+      json(res, 400, { error: "unknown_effort" });
+      return;
+    }
+    await setEffort(id, body.effort);
     json(res, 200, await core.connections());
     return;
   }

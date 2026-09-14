@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import type { AskEvent, Catalogue, KeySource, ProviderId } from "../src/shared/types.ts";
+import type { AskEvent, Catalogue, Effort, KeySource, ProviderId } from "../src/shared/types.ts";
+import type { AskHow } from "../src/shared/services/common.ts";
 import { ConsoleCore, CoreError, type KeyStore } from "../src/shared/services/console.ts";
 import { PROVIDERS, type Service } from "../src/shared/services/index.ts";
 
@@ -16,10 +17,10 @@ const CATALOGUE: Catalogue = {
 
 const refusal = (status: number, body: string): Error => Object.assign(new Error(`Gemini returned ${status}: ${body}`), { status });
 
-interface Fake extends Service { calls: { catalogue: number; chat: number; speak: string[]; hear: number } }
+interface Fake extends Service { calls: { catalogue: number; chat: number; speak: string[]; hear: number; how: AskHow } }
 
 function fakeGemini(over: Partial<Service> = {}): Fake {
-  const calls = { catalogue: 0, chat: 0, speak: [] as string[], hear: 0 };
+  const calls = { catalogue: 0, chat: 0, speak: [] as string[], hear: 0, how: {} as AskHow };
   const service: Fake = {
     calls,
     meta: PROVIDERS.gemini,
@@ -28,10 +29,12 @@ function fakeGemini(over: Partial<Service> = {}): Fake {
       if (key !== "good") throw refusal(401, "API key not valid");
       return CATALOGUE;
     },
-    async chat(_key, _model, turns, emit) {
+    async chat(_key, _model, turns, emit, _signal, _persona, how) {
       calls.chat++;
+      calls.how = how ?? {};
       emit({ t: "text", delta: `Answering “${turns[turns.length - 1]!.content}”, sir.` });
     },
+    thinks: (model) => model === "g-3",
     async *speak(_key, model) {
       calls.speak.push(model);
       yield new Uint8Array([1, 2]);
@@ -45,10 +48,11 @@ function fakeGemini(over: Partial<Service> = {}): Fake {
   return service;
 }
 
-function storeWith(keys: Partial<Record<ProviderId, string>>, model: string | null = null, active: ProviderId | null = null): KeyStore {
+function storeWith(keys: Partial<Record<ProviderId, string>>, model: string | null = null, active: ProviderId | null = null, effort: Effort | null = null): KeyStore {
   return {
     key: (id) => (keys[id] ? { key: keys[id]!, source: "saved" as KeySource } : null),
     model: () => model,
+    effort: () => effort,
     active: () => active,
   };
 }
@@ -113,6 +117,23 @@ test("a question is answered through the connected service, with the persona for
   await core.answer(q, (ev) => events.push(ev), new AbortController().signal);
   assert.deepEqual(events, [{ t: "text", delta: "Answering “Is it raining?”, sir." }]);
   assert.equal(gemini.calls.chat, 1);
+});
+
+test("how long the model thinks: the service's setting, quick unless chosen; asked for in words for one question; on the card for a model that thinks", async () => {
+  const plain = coreWith(storeWith({ gemini: "good" }));
+  assert.equal((await plain.core.prepare(question("hello"))).effort, "quick");
+  const chosen = coreWith(storeWith({ gemini: "good" }, null, null, "balanced"));
+  const q = await chosen.core.prepare(question("hello"));
+  assert.equal(q.effort, "balanced");
+  await chosen.core.answer(q, () => {}, new AbortController().signal);
+  assert.deepEqual(chosen.gemini.calls.how, { search: false, effort: "balanced" }, "the service is told both");
+  assert.equal((await chosen.core.prepare({ ...question("think hard about this"), effort: "thorough" })).effort, "thorough", "asked for in words, this once");
+  const card = (await chosen.core.connections()).providers.find((p) => p.id === "gemini")!.status;
+  assert.equal(card.state === "ready" && card.thinks, true, "g-3 thinks, so the choice is on the card");
+  assert.equal(card.state === "ready" && card.effort, "balanced");
+  const older = coreWith(storeWith({ gemini: "good" }, "g-2"));
+  const c2 = (await older.core.connections()).providers.find((p) => p.id === "gemini")!.status;
+  assert.equal(c2.state === "ready" && c2.thinks, false, "g-2 does not think: no slider");
 });
 
 test("the web is offered for a question that wants it, or when the console says a thread is in front", async () => {

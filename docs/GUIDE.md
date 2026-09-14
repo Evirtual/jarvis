@@ -277,9 +277,18 @@ instantly from live readings, at the core; anything else goes to the service.
 The service is given its web search only when the question asks to find, look
 up or check something, or for current facts — news, prices, weather elsewhere,
 scores, pictures — and always for a follow-up in a thread, where research
-lives. Plain talk goes without it, and the model is asked to think briefly, so
-a greeting or a fact comes back in a second or two; a search takes a few
-seconds more. Searching costs, talking doesn't. A question asked while an
+lives. Plain talk goes without it, so a greeting or a fact comes back in a
+second or two; a search takes a few seconds more. Searching costs, talking
+doesn't.
+
+**How long the model thinks** is yours to set, for the models that think at
+all (the gpt-5 family, Gemini 2.5 and on): a three-stop slider under the model
+on the service's card, in Configuration → Connections and in the guide.
+**Quick** (the default) answers in a second or two; **Balanced** thinks for a
+few seconds first; **Thorough** thinks hard — often ten seconds or more before
+the first word, and the dearest answer. For one question only, say "think
+hard about…", "think carefully" or "take your time" and JARVIS goes thorough
+for that question, saying "Thinking hard" under him while he does. A question asked while an
 answer is still arriving is queued, and questions are answered in the order
 asked.
 

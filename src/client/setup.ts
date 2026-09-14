@@ -9,7 +9,7 @@
  */
 
 import type { ProviderId } from "../shared/types.js";
-import { PROVIDER_IDS } from "../shared/types.js";
+import { PROVIDER_IDS, DEFAULT_EFFORT, EFFORTS } from "../shared/types.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
 import { $ } from "./dom.js";
@@ -283,7 +283,10 @@ export function wireSetup(): void {
   body.addEventListener("change", (e) => {
     needsChange(e.target as HTMLElement, body);
     const model = (e.target as HTMLElement).closest<HTMLSelectElement>("select[data-model]");
-    if (model) void api.selectModel(model.dataset.model as ProviderId, model.value).then(() => conn.refresh());
+    // the card is drawn again: a model that thinks brings the thinking slider with it, one that does not takes it away
+    if (model) void api.selectModel(model.dataset.model as ProviderId, model.value).then(() => conn.refresh()).then(render);
+    const effort = (e.target as HTMLElement).closest<HTMLInputElement>("input[data-effort]");
+    if (effort) void api.selectEffort(effort.dataset.effort as ProviderId, EFFORTS[Number(effort.value)] ?? DEFAULT_EFFORT).then(() => conn.refresh()).then(render);
   });
 
   back.addEventListener("click", () => { step = Math.max(0, step - 1); render(); });

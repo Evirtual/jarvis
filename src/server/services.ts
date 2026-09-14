@@ -4,9 +4,9 @@
  */
 
 import { ConsoleCore } from "../shared/services/console.js";
-import { getActive, getModel, resolveKey } from "./config.js";
+import { getActive, getEffort, getModel, resolveKey } from "./config.js";
 
 export { PROVIDERS, SPEECH_RATE } from "../shared/services/index.js";
 export { CoreError } from "../shared/services/console.js";
 
-export const core = new ConsoleCore({ key: resolveKey, model: getModel, active: getActive });
+export const core = new ConsoleCore({ key: resolveKey, model: getModel, effort: getEffort, active: getActive });

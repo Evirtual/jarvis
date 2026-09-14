@@ -77,10 +77,25 @@ export type ProviderStatus =
       voices: VoiceOption[];
       /** Whether this service can turn recorded speech into text. */
       hears: boolean;
+      /** Whether the model in use thinks before answering — then how long is a choice (effort). */
+      thinks: boolean;
+      effort: Effort;
       /** The key works, but the last request failed for a reason on the account (no credit, no access). Cleared by the next success. */
       problem?: string;
     }
   | { state: "error"; maskedKey: string; message: string; source: KeySource };
+
+/**
+ * How long the model thinks before it answers, where the model thinks at all
+ * (the gpt-5 family, Gemini 2.5 and on): quick answers in a second or two,
+ * thorough takes its time — and costs more. Chosen per service on its card,
+ * in Configuration and in the guide; "think hard about…" asks for thorough
+ * for one question.
+ */
+export type Effort = "quick" | "balanced" | "thorough";
+export const EFFORTS: readonly Effort[] = ["quick", "balanced", "thorough"];
+export const DEFAULT_EFFORT: Effort = "quick";
+export const isEffort = (v: unknown): v is Effort => (EFFORTS as readonly unknown[]).includes(v);
 
 /** Where the credential came from — the UI says so, so nothing is mysterious. */
 export type KeySource = "saved" | "environment";
@@ -101,6 +116,10 @@ export interface SaveKeyRequest {
 
 export interface SelectModelRequest {
   model: string;
+}
+
+export interface SelectEffortRequest {
+  effort: Effort;
 }
 
 export interface SetActiveRequest {
@@ -127,6 +146,8 @@ export interface AskRequest {
   address?: Address;
   /** Offer the service its web search tool whatever the wording — a thread is in front, and threads are where research lives. */
   search?: boolean;
+  /** How long to think about this one question, when asked for in words ("think hard about…"); otherwise the service's setting. */
+  effort?: Effort;
 }
 
 /**

@@ -48,15 +48,25 @@ test("a reasoning model is asked at low effort, briefly when nothing is looked u
   const f = fakeFetch([reply(200, sse([{ type: "response.output_text.delta", delta: "Hi." }])), reply(200, sse([{ type: "response.output_text.delta", delta: "Found." }]))]);
   try {
     const sink = (): void => {};
-    await openai.chat("k", "gpt-5-mini", turns, sink, new AbortController().signal, "p", false);
-    assert.deepEqual(f.bodies[0]!.reasoning, { effort: "low" });
+    await openai.chat("k", "gpt-5-mini", turns, sink, new AbortController().signal, "p", { search: false });
+    assert.deepEqual(f.bodies[0]!.reasoning, { effort: "low" }, "quick unless chosen");
     assert.deepEqual(f.bodies[0]!.text, { verbosity: "low" });
     assert.equal(f.bodies[0]!.tools, undefined, "no search tool for plain talk");
-    await openai.chat("k", "gpt-5-mini", turns, sink, new AbortController().signal, "p", true);
+    await openai.chat("k", "gpt-5-mini", turns, sink, new AbortController().signal, "p", { search: true });
     assert.deepEqual(f.bodies[1]!.reasoning, { effort: "low" });
     assert.equal(f.bodies[1]!.text, undefined, "a searched answer is not cut short");
     assert.deepEqual(f.bodies[1]!.tools, [{ type: "web_search" }]);
   } finally { f.restore(); }
+  // the three stops are the API's low, medium and high; only quick is asked to be brief
+  const h = fakeFetch([reply(200, sse([{ type: "response.output_text.delta", delta: "." }])), reply(200, sse([{ type: "response.output_text.delta", delta: "." }]))]);
+  try {
+    await openai.chat("k", "gpt-5-mini", turns, () => {}, new AbortController().signal, "p", { search: false, effort: "balanced" });
+    assert.deepEqual(h.bodies[0]!.reasoning, { effort: "medium" });
+    assert.equal(h.bodies[0]!.text, undefined);
+    await openai.chat("k", "gpt-5-mini", turns, () => {}, new AbortController().signal, "p", { search: false, effort: "thorough" });
+    assert.deepEqual(h.bodies[1]!.reasoning, { effort: "high" });
+    assert.equal(openai.thinks("gpt-5-mini"), true); assert.equal(openai.thinks("o4-mini"), true); assert.equal(openai.thinks("gpt-4.1"), false);
+  } finally { h.restore(); }
   // a model that refuses the reasoning fields is asked again plainly
   const g = fakeFetch([
     reply(400, JSON.stringify({ error: { message: "Unsupported parameter: 'reasoning' is not supported with this model." } }), "application/json"),
@@ -64,7 +74,7 @@ test("a reasoning model is asked at low effort, briefly when nothing is looked u
   ]);
   try {
     const events: AskEvent[] = [];
-    await openai.chat("k", "gpt-5-something-odd", turns, (ev) => events.push(ev), new AbortController().signal, "p", false);
+    await openai.chat("k", "gpt-5-something-odd", turns, (ev) => events.push(ev), new AbortController().signal, "p", { search: false });
     assert.deepEqual(events, [{ t: "status", status: "thinking" }, { t: "text", delta: "Plain." }]);
     assert.equal(g.bodies[1]!.reasoning, undefined);
   } finally { g.restore(); }

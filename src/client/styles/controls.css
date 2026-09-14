@@ -81,6 +81,15 @@
 .sl { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; background: #071119; border: 1px solid var(--line); outline: 0; cursor: pointer; }
 .sl::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 18px; background: var(--ice); box-shadow: 0 0 8px rgba(111,240,255,.6); cursor: pointer; }
 .sl::-moz-range-thumb { width: 11px; height: 18px; border: 0; border-radius: 0; background: var(--ice); }
+/* Three stops under a slider — quick, balanced, thorough — the one in force lit. Three equal
+   columns, so the middle word is centred under the middle stop; the thumb is taller than its
+   track, so the slider keeps the same clear room above and below it. */
+.ctl.effort .sl { margin: 7px 0; }
+.sl-marks { display: grid; grid-template-columns: 1fr 1fr 1fr; font-family: var(--f-hud); font-size: 8.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ice-dim); }
+.sl-marks span:nth-child(2) { text-align: center; }
+.sl-marks span:nth-child(3) { text-align: right; }
+.sl-marks .on { color: var(--ice); }
+.ctl.effort .hint { margin-top: 6px; }
 
 .hint { margin: 8px 0 0; font-size: 10px; color: var(--ice-dim); line-height: 1.5; border-top: 1px solid var(--line); padding-top: 7px; }
 .hint.warn { color: var(--gold); }

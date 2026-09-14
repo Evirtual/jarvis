@@ -3,7 +3,8 @@
  * and the answer streamed back into its window.
  */
 
-import type { ProviderId } from "../shared/types.js";
+import type { ProviderId, Effort } from "../shared/types.js";
+import { effortAsked } from "../shared/services/common.js";
 import { api } from "./api.js";
 import {
   extractDirectives, parseRoute, parseUtterance, type Action, type Route,
@@ -156,7 +157,8 @@ class Exchange {
   target: Target | null = null;
   streamed = "";
   housekeeping: Action[] = [];
-  constructor(readonly question: string, readonly front: Thread | null) {}
+  /** `effort`: depth asked for in words, for this question only; null leaves it to the service's setting. */
+  constructor(readonly question: string, readonly front: Thread | null, readonly effort: Effort | null = null) {}
 
   /** Follow the model's word (routing.ts): the place is made ready and the question written there. Once. */
   place(route: Route | null): Target {
@@ -198,10 +200,10 @@ class Exchange {
  * core, the thread in front, or a thread opened for it. Nothing is written
  * anywhere until it has said so; then the reply streams to that place.
  */
-async function askCore(question: string): Promise<void> {
-  setBusy(true, "Thinking");
+async function askCore(question: string, effort: Effort | null = null): Promise<void> {
+  setBusy(true, effort === "thorough" ? "Thinking hard" : "Thinking");
   voice.beginStream();
-  const x = new Exchange(question, graph.active && !graph.active.kind ? graph.active : null);
+  const x = new Exchange(question, graph.active && !graph.active.kind ? graph.active : null, effort);
   let actions: Action[] = [];
   try {
     actions = finish(x, await stream(x));
@@ -234,7 +236,7 @@ async function stream(x: Exchange): Promise<string> {
   if (recent[recent.length - 1]?.role === "user" && recent[recent.length - 1]?.content === x.question) recent.pop();
   const turns = [...recent.slice(-10), { role: "user" as const, content: x.question }];
   // A thread in front is research, so the web is offered for a follow-up in it whatever the wording (wantsSearch decides for talk at the core).
-  const request = { turns, ...(ctx ? { context: ctx } : {}), address: getAddress(), ...(x.front ? { search: true } : {}) };
+  const request = { turns, ...(ctx ? { context: ctx } : {}), address: getAddress(), ...(x.front ? { search: true } : {}), ...(x.effort ? { effort: x.effort } : {}) };
   const askVia = (provider?: ProviderId): Promise<string> => api.ask(
     { ...request, ...(provider ? { provider } : {}) },
     (full) => {
@@ -468,7 +470,8 @@ async function answer(t: string): Promise<void> {
   // belong in a thread takes it back out (askCore).
   coreChat.add("user", t);
   if (localCommand(t)) return;
-  if (conn.anyReady) await askCore(t);
+  // "think hard about…" asks for the thorough setting for this one question; the words stay in it
+  if (conn.anyReady) await askCore(t, effortAsked(t));
   else {
     jarvis("That needs a reasoning core, sir, and none is connected. Open Config and connect Gemini — it's free — or paste a key right here in the chat.");
     setDrawer(true, "connections");

@@ -9,6 +9,7 @@
  */
 
 import type { ConnectionsResponse, ProviderId, ProviderView } from "../shared/types.js";
+import { DEFAULT_EFFORT, EFFORTS } from "../shared/types.js";
 import { api } from "./api.js";
 import { $, esc } from "./dom.js";
 import { COPY_ICON, TICK_ICON } from "./icons.js";
@@ -148,7 +149,9 @@ export class Connections {
   }
 
   private async onSelect(e: Event): Promise<void> {
-    const el = e.target as HTMLSelectElement;
+    const el = e.target as HTMLSelectElement | HTMLInputElement;
+    const forEffort = el.getAttribute("data-effort") as ProviderId | null;
+    if (forEffort) { this.apply(await api.selectEffort(forEffort, EFFORTS[Number(el.value)] ?? DEFAULT_EFFORT)); return; }
     const id = el.getAttribute("data-model") as ProviderId | null;
     if (!id) return;
     this.apply(await api.selectModel(id, el.value));

@@ -8,6 +8,7 @@ import type {
   AskRequest,
   AskStatus,
   ConnectionsResponse,
+  Effort,
   ProviderId,
   ScanResponse,
   SpeakRequest,
@@ -65,6 +66,8 @@ const serverApi = {
     postJson<ConnectionsResponse>(`/api/connections/${id}`, undefined, "DELETE"),
   selectModel: (id: ProviderId, model: string) =>
     postJson<ConnectionsResponse>(`/api/connections/${id}/model`, { model }),
+  selectEffort: (id: ProviderId, effort: Effort) =>
+    postJson<ConnectionsResponse>(`/api/connections/${id}/effort`, { effort }),
   setActive: (provider: ProviderId) =>
     postJson<ConnectionsResponse>("/api/connections/active", { provider }),
   /** The saved key itself, to copy: only where it is kept in this browser (the web version). The PC's server never sends it. */

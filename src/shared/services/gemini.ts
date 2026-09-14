@@ -4,7 +4,8 @@
  * chat model itself does the hearing: Gemini takes audio as it takes text.
  */
 
-import type { VoiceOption } from "../types.js";
+import type { VoiceOption, Effort } from "../types.js";
+import { DEFAULT_EFFORT } from "../types.js";
 import { HEARING_HINT, MANNER, PERSONA, eventsOf, fromBase64, httpError, pace, rankModels, toBase64, type Service } from "./common.js";
 
 const API = "https://generativelanguage.googleapis.com/v1beta";
@@ -38,6 +39,9 @@ const VOICES: VoiceOption[] = [
  * audio, embeddings, nor the agents and research models listed beside them.
  */
 const CHAT = /^gemini-\d/;
+/** Thinking tokens allowed, by effort: none, the model's own measure (null: nothing sent), or plenty. */
+const THINKING_BUDGET: Record<Effort, number | null> = { quick: 0, balanced: null, thorough: 16384 };
+
 const NOT_CHAT = /tts|transcribe|image|live|audio|embedding|computer-use|robotics|customtools|-exp\b/i;
 
 interface GeminiModel {
@@ -122,13 +126,23 @@ export const gemini: Service = {
     };
   },
 
-  async chat(key, model, turns, emit, signal, persona = PERSONA, search = true) {
+  /** Gemini thinks from 2.5 on; the models before it answer straight away and refuse the thinking fields. */
+  thinks(model) {
+    return /gemini-(?:2\.5|[3-9])/.test(model);
+  },
+
+  async chat(key, model, turns, emit, signal, persona = PERSONA, how = {}) {
+    const search = how.search ?? true;
+    // Thinking is the user's choice: none for quick, the model's own measure
+    // for balanced, a generous budget for thorough. Pro insists on some, so a
+    // refusal of "no thinking" is answered by letting it think.
+    const budget = THINKING_BUDGET[how.effort ?? DEFAULT_EFFORT];
     const contents = turns.map((t) => ({
       role: t.role === "assistant" ? "model" : "user",
       parts: [{ text: t.content }],
     }));
 
-    const call = (withSearch: boolean, thinking: boolean): Promise<Response> =>
+    const call = (withSearch: boolean, asChosen: boolean): Promise<Response> =>
       fetch(`${API}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
         method: "POST",
         headers: headers(key),
@@ -139,25 +153,25 @@ export const gemini: Service = {
           // first word of a greeting. A talking console does without, where
           // the model lets it be switched off (Pro insists on some); the
           // limit leaves room for the answer either way.
-          generationConfig: { maxOutputTokens: 4096, ...(thinking ? {} : { thinkingConfig: { thinkingBudget: 0 } }) },
+          generationConfig: { maxOutputTokens: 4096, ...(asChosen && budget !== null ? { thinkingConfig: { thinkingBudget: budget } } : {}) },
           // Google Search grounding — Gemini's own live-information tool.
           ...(withSearch ? { tools: [{ google_search: {} }] } : {}),
         }),
         signal,
       });
 
-    let r = await call(search, false);
+    let r = await call(search, true);
     if (r.status === 400 && /thinking/i.test(await r.clone().text())) {
-      // This model will not have its thinking switched off: let it think.
-      r = await call(search, true);
+      // This model will not take the budget (Pro will not be switched off): let it think as it does.
+      r = await call(search, false);
     }
     if (search && (r.status === 400 || r.status === 429)) {
       // Grounding isn't offered on every model (400), and has its own, smaller
       // allowance on the free tier (429): answer without it rather than fail.
       // A rejected key or a missing model would only be refused again.
       emit({ t: "status", status: "thinking" });
-      r = await call(false, false);
-      if (r.status === 400 && /thinking/i.test(await r.clone().text())) r = await call(false, true);
+      r = await call(false, true);
+      if (r.status === 400 && /thinking/i.test(await r.clone().text())) r = await call(false, false);
     }
     if (!r.ok || !r.body) throw httpError("Gemini", r.status, await r.text());
 

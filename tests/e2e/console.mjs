@@ -35,6 +35,7 @@ const geminiSse = (text) => `data: ${JSON.stringify({ candidates: [{ content: { 
 
 `;
 const asked = [];    // every question the console sent, in order
+const efforts = [];  // and how hard it asked the model to think each time (reasoning.effort, or null)
 // Every reply says where it belongs in its first words, as the real service is told to:
 // conversation at the core, a follow-up in the thread in front, research in a thread of its own.
 function replyFor(question) {
@@ -79,11 +80,12 @@ page.on('request', (r) => {
     if (r.method() === 'OPTIONS') return r.respond({ status: 204, headers: cors });
     // the voice: a tenth of a second of silence, as raw 24 kHz samples, so the speech path runs and nothing is refused
     if (u.includes('/v1/audio/speech')) return r.respond({ status: 200, headers: { ...cors, 'content-type': 'audio/pcm' }, body: Buffer.alloc(4800) });
-    if (u.includes('/v1/models')) return r.respond({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ object: 'list', data: [{ id: 'gpt-4.1-mini', object: 'model' }, { id: 'gpt-4.1', object: 'model' }, { id: 'gpt-4o-mini-tts', object: 'model' }] }) });
+    if (u.includes('/v1/models')) return r.respond({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ object: 'list', data: [{ id: 'gpt-4.1-mini', object: 'model' }, { id: 'gpt-4.1', object: 'model' }, { id: 'gpt-5-mini', object: 'model' }, { id: 'gpt-4o-mini-tts', object: 'model' }] }) });
     if (u.includes('/v1/responses')) {
       let question = '';
-      try { const b = JSON.parse(r.postData() || '{}'); const last = [...(b.input || [])].reverse().find((t) => t.role === 'user'); question = (last?.content || '').split('\n\n[')[0]; } catch {}
-      asked.push(question);
+      let effort = null;
+      try { const b = JSON.parse(r.postData() || '{}'); const last = [...(b.input || [])].reverse().find((t) => t.role === 'user'); question = (last?.content || '').split('\n\n[')[0]; effort = b.reasoning?.effort ?? null; } catch {}
+      asked.push(question); efforts.push(effort);
       if (failNext && failLeft > 0) { failLeft--; const s = failNext; if (!failLeft) failNext = null; return r.respond({ status: s, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ error: { message: s === 429 ? 'Rate limit reached, please try again later' : 'The server had an error' } }) }); }
       return r.respond({ status: 200, headers: { ...cors, 'content-type': 'text/event-stream' }, body: sse(replyFor(question)) });
     }
@@ -201,8 +203,12 @@ await check('guide: opens on a first visit; connect a key from the card, model p
   await until(() => document.querySelector('#setupBody .provider.ready'), 'the guide to show ChatGPT connected', 15000);
   const models = await page.$$eval('#setupBody select[data-model] option', (o) => o.map((x) => x.value));
   assert(models.includes('gpt-4.1'), 'model list missing');
+  // the newest small model is the default, and it thinks: the thinking slider is on the card, in the guide too
+  const defaults = await page.evaluate(() => ({ model: document.querySelector('#setupBody select[data-model="openai"]')?.value, slider: document.querySelector('#setupBody input[data-effort="openai"]')?.value }));
+  assert(defaults.model === 'gpt-5-mini' && defaults.slider === '0', 'default model and thinking: ' + JSON.stringify(defaults));
   await page.select('#setupBody select[data-model="openai"]', 'gpt-4.1');
   await until(() => document.querySelector('#setupBody select[data-model="openai"]')?.value === 'gpt-4.1', 'the model change to stick');
+  await until(() => !document.querySelector('#setupBody input[data-effort="openai"]'), 'the thinking slider to go for a model that does not think');
   const masked = await page.evaluate(() => document.querySelector('#setupBody .keyline .mask')?.textContent);
   assert(masked && masked.includes('…'), 'masked key missing: ' + masked);
   await click('#setupNext');
@@ -483,6 +489,36 @@ await check('configuration: tabs, copy icon, re-check, disconnect and reconnect'
   await until(() => document.querySelector('#providers .provider.ready'), 'the reconnect', 15000);
   await click('#closeDrawer'); await untilDrawer(false);
   return { copied, clipStartsWith: String(clip).slice(0, 8) };
+});
+
+await check('thinking: the slider on the card sets how long the model thinks, kept over a reload; "think hard" asks for one question', async () => {
+  await fresh();
+  await click('#openDrawer'); await untilDrawer(true);
+  await click('.tab[data-tab="connections"]');
+  await until(() => document.querySelector('#providers input[data-effort="openai"]'), 'the thinking slider on the card');
+  const rest = await page.evaluate(() => ({ value: document.querySelector('#providers input[data-effort="openai"]').value, lit: document.querySelector('#providers .sl-marks .on')?.textContent }));
+  assert(rest.value === '0' && rest.lit === 'Quick', 'at rest: ' + JSON.stringify(rest));
+  const slide = (to) => page.evaluate((v) => { const s = document.querySelector('#providers input[data-effort="openai"]'); s.value = String(v); s.dispatchEvent(new Event('change', { bubbles: true })); }, to);
+  await slide(2);
+  await until(() => document.querySelector('#providers .sl-marks .on')?.textContent === 'Thorough' && document.querySelector('#providers input[data-effort="openai"]').value === '2', 'the card to show Thorough');
+  await snap('thinking');
+  await click('#closeDrawer'); await untilDrawer(false);
+  const n = asked.length;
+  await say('tell me something about owls'); await untilIdle();
+  assert(efforts[n] === 'high', 'thorough was not asked of the model: ' + efforts[n]);
+  await page.reload({ waitUntil: 'networkidle2' });
+  await until(() => /m-(desk|compact)/.test(document.body.className) && /ChatGPT/.test(document.title), 'the console back after the reload');
+  await click('#openDrawer'); await untilDrawer(true);
+  await click('.tab[data-tab="connections"]');
+  await until(() => document.querySelector('#providers input[data-effort="openai"]')?.value === '2', 'the choice kept over a reload');
+  await slide(0);
+  await until(() => document.querySelector('#providers .sl-marks .on')?.textContent === 'Quick', 'back to Quick');
+  await click('#closeDrawer'); await untilDrawer(false);
+  const m = asked.length;
+  await say('think hard about this: what is two and two'); await untilIdle();
+  await say('and one more thing about owls'); await untilIdle();
+  assert(efforts[m] === 'high' && efforts[m + 1] === 'low', 'one question hard, the next quick: ' + JSON.stringify(efforts.slice(m)));
+  return { rest, efforts: efforts.slice(n) };
 });
 
 await check('persistence: reload keeps threads, groups, active thread and title', async () => {

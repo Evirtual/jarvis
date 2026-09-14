@@ -5,7 +5,7 @@
  * primitives are used, so the same code runs in Node and in a browser.
  */
 
-import type { Address, AskEvent, Catalogue, ProviderMeta, Turn } from "../types.js";
+import type { Address, AskEvent, Catalogue, ProviderMeta, Turn, Effort } from "../types.js";
 import { directiveCatalogue } from "../directives.js";
 
 /**
@@ -17,8 +17,10 @@ export interface Service {
   /** Prove the key works, and find what its account can reach. */
   catalogue(key: string): Promise<Catalogue>;
   /** Stream a reply, emitting status and text events as they arrive. */
-  /** Stream an answer. `search`: whether to offer the service's web tool at all — see wantsSearch. */
-  chat(key: string, model: string, turns: Turn[], emit: (ev: AskEvent) => void, signal: AbortSignal, persona: string, search?: boolean): Promise<void>;
+  /** Stream an answer, with the web tool offered or not (wantsSearch) and the thinking asked for (Effort). */
+  chat(key: string, model: string, turns: Turn[], emit: (ev: AskEvent) => void, signal: AbortSignal, persona: string, how?: AskHow): Promise<void>;
+  /** Whether this model thinks before it answers, so its effort is worth choosing. */
+  thinks(model: string): boolean;
   /**
    * One line of speech as it is made: 16-bit little-endian PCM at
    * SPEECH_RATE, in pieces of whatever size the service sends. The first
@@ -124,6 +126,23 @@ export function rankModels(ids: string[]): string[] {
     return s;
   };
   return [...ids].sort((a, b) => score(b) - score(a) || a.localeCompare(b));
+}
+
+/** How a question is to be answered: with the web tool on offer or not, and how much thinking. */
+export interface AskHow {
+  search?: boolean;
+  effort?: Effort;
+}
+
+/**
+ * Depth asked for in words, for this one question: "think hard about…",
+ * "think carefully", "take your time", "think it through" — at the start or
+ * the end of what was said. The words stay in the question; only the effort
+ * changes.
+ */
+const DEPTH_ASKED = /(?:^|[,;.\s])(?:think (?:hard|harder|carefully|deeply|properly|it through|this through)|take your time|deep thought|no rush)(?:[,;:.\s]|$)/i;
+export function effortAsked(text: string): Effort | null {
+  return DEPTH_ASKED.test(text) ? "thorough" : null;
 }
 
 /**

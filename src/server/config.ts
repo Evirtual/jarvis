@@ -13,8 +13,8 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { KeySource, ProviderId } from "../shared/types.js";
-import { isProviderId } from "../shared/types.js";
+import type { KeySource, ProviderId, Effort } from "../shared/types.js";
+import { isProviderId, isEffort } from "../shared/types.js";
 import { PROVIDERS } from "../shared/services/index.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -26,6 +26,8 @@ interface StoredProvider {
   apiKey?: string;
   /** The chat model chosen for this service; the newest on the account when unset. */
   model?: string;
+  /** How long its model thinks; quick when unset. */
+  effort?: Effort;
   /**
    * Disconnected while its key came from the environment: the variable can't
    * be removed from here (and other tools may rely on it), so it's ignored
@@ -52,6 +54,7 @@ export function loadConfig(): StoredConfig {
       providers[k] = {
         ...(typeof entry.apiKey === "string" ? { apiKey: entry.apiKey } : {}),
         ...(typeof entry.model === "string" ? { model: entry.model } : {}),
+        ...(isEffort(entry.effort) ? { effort: entry.effort } : {}),
         ...(entry.ignoreEnv === true ? { ignoreEnv: true } : {}),
       };
     }
@@ -107,6 +110,17 @@ export function getModel(id: ProviderId): string | null {
 export async function setModel(id: ProviderId, model: string): Promise<void> {
   const entry = cache.providers[id] ?? {};
   entry.model = model;
+  cache.providers[id] = entry;
+  await persist();
+}
+
+export function getEffort(id: ProviderId): Effort | null {
+  return cache.providers[id]?.effort ?? null;
+}
+
+export async function setEffort(id: ProviderId, effort: Effort): Promise<void> {
+  const entry = cache.providers[id] ?? {};
+  entry.effort = effort;
   cache.providers[id] = entry;
   await persist();
 }
