@@ -1,5 +1,5 @@
 /**
- * J.A.R.V.I.S. Console — client entry point.
+ * J.A.R.V.I.S. — client entry point.
  *
  * The console is made of modules that each own one thing; none of them
  * runs anything when imported. Everything they need wired — the stage's
@@ -108,7 +108,7 @@ function boot(): void {
   conn.onChange = (c): void => {
     $("openDrawer").classList.toggle("primary", !conn.anyReady);
     $("openDrawer").title = conn.anyReady ? "Configuration" : "Connect a service";
-    document.title = conn.anyReady ? `J.A.R.V.I.S. Console — ${conn.activeName()}` : "J.A.R.V.I.S. Console";
+    document.title = conn.anyReady ? `J.A.R.V.I.S. — ${conn.activeName()}` : "J.A.R.V.I.S.";
     const active = c.providers.find((p) => p.id === c.active);
     const ready = active?.status.state === "ready" ? active.status : null;
     voice.setServerTranscription(!!ready?.hears);

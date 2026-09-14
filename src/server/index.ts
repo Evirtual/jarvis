@@ -1,5 +1,5 @@
 /**
- * J.A.R.V.I.S. Console — server.
+ * J.A.R.V.I.S. — server.
  *
  * Serves the built client, brokers the connected services — answers, hearing
  * and speech — so API keys never reach the browser, and exposes real machine
@@ -451,7 +451,7 @@ server.listen(PORT, () => {
   loadConfig();
   const line = "─".repeat(60);
   console.log(`\n${line}`);
-  console.log("  J.A.R.V.I.S. Console");
+  console.log("  J.A.R.V.I.S.");
   console.log(`  http://localhost:${PORT}`);
   console.log("");
 

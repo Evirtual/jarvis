@@ -1,4 +1,4 @@
-# JARVIS Console — manual QA plan
+# JARVIS — manual QA plan
 
 The unit tests (`npm test`) cover the pure modules. Everything that happens in a
 browser — layout, dragging, stacking, the web, media, voice, phones — is checked

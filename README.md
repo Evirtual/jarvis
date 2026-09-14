@@ -1,6 +1,6 @@
 <p align="center"><img src="src/client/public/icon.svg" width="112" alt="JARVIS's core: segmented cyan rings around a glowing gold triangle"></p>
 
-# J.A.R.V.I.S. Console
+# J.A.R.V.I.S.
 
 [![CI](https://github.com/Evirtual/jarvis/actions/workflows/ci.yml/badge.svg)](https://github.com/Evirtual/jarvis/actions/workflows/ci.yml)
 

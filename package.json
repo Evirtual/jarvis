@@ -1,9 +1,9 @@
 {
-  "name": "jarvis-console",
+  "name": "jarvis",
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Real-telemetry HUD console that answers, hears and speaks through one connected service, for desktop, mobile and the car",
+  "description": "Real-telemetry HUD console that answers, hears and speaks through one connected service, for desktop and mobile",
   "license": "AGPL-3.0-only",
   "author": "Edgaras Neverdauskas",
   "engines": {
