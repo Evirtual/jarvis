@@ -35,13 +35,13 @@ const EFFORT_NOTE: Record<Effort, { name: string; note: string }> = {
   thorough: { name: "Thorough", note: "thinks hard — often ten seconds or more before the first word, and the dearest answer." },
 };
 
-/** The thinking slider: three stops, quick on the left, thorough on the right. */
+/** The thinking slider: three stops, quick on the left, thorough on the right, the thumb over the word at each. */
 function effortControl(p: ProviderView, effort: Effort): string {
   const at = EFFORTS.indexOf(effort);
   const marks = EFFORTS.map((e, i) => `<span${i === at ? ' class="on"' : ""}>${EFFORT_NOTE[e].name}</span>`).join("");
   return (
     `<div class="ctl effort">` +
-    `<span class="ctl-k"><span>Thinking</span><span class="n">${EFFORT_NOTE[effort].name}</span></span>` +
+    `<span class="ctl-k"><span>Thinking</span></span>` +
     `<input class="sl" type="range" min="0" max="${EFFORTS.length - 1}" step="1" value="${at}" data-effort="${p.id}" aria-label="${esc(p.name)} thinking" aria-valuetext="${EFFORT_NOTE[effort].name}">` +
     `<div class="sl-marks">${marks}</div>` +
     `<p class="hint">${EFFORT_NOTE[effort].name}: ${EFFORT_NOTE[effort].note} Say “think hard about…” for one question.</p>` +
