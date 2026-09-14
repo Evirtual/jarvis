@@ -36,29 +36,30 @@ const geminiSse = (text) => `data: ${JSON.stringify({ candidates: [{ content: { 
 `;
 const asked = [];    // every question the console sent, in order
 const efforts = [];  // and how hard it asked the model to think each time (reasoning.effort, or null)
-// Every reply says where it belongs in its first words, as the real service is told to:
-// conversation at the core, a follow-up in the thread in front, research in a thread of its own.
+// Every reply is written into the thread the question was asked in; a thread still called
+// New thread is named by the reply that fills it, as the real service is told to.
 function replyFor(question) {
   const q = question.toLowerCase();
   // Organising the board is said to JARVIS and comes back as a directive (shared/directives.ts).
   let m;
-  if ((m = /^new group called (.+)$/i.exec(question))) return `[[at: core]] Done, sir.\n\n[[do: new_group title="${m[1]}"]]`;
-  if ((m = /^move (.+) into (.+)$/i.exec(question))) return `[[at: core]] Moved, sir.\n\n[[do: move_thread thread="${m[1]}" group="${m[2]}"]]`;
-  if ((m = /^collapse (.+)$/i.exec(question))) return `[[at: core]] Folded, sir.\n\n[[do: collapse_group group="${m[1]}"]]`;
-  if ((m = /^expand (.+)$/i.exec(question))) return `[[at: core]] Opened, sir.\n\n[[do: expand_group group="${m[1]}"]]`;
-  if ((m = /^rename (.+) to (.+)$/i.exec(question))) return `[[at: core]] Renamed, sir.\n\n[[do: rename_thread target="${m[1]}" title="${m[2]}"]]`;
-  if (q.includes('plan a trip')) return '[[at: core]] Certainly, sir: a thread for it.\n\n[[do: new_thread title="Lisbon" ask="What is the weather in Lisbon"]]';
-  if (q.includes('weather in lisbon')) return '[[at: thread]] Mild and bright in Lisbon, sir: **21°** and clear.';
-  if (q.includes('link them')) return '[[at: core]] Linked, sir.\n\n[[do: link_threads a="Lisbon" b="Journeys" why="travel"]]';
-  if (q.includes('rename this')) return '[[at: core]] As you wish, sir.\n\n[[do: rename_thread title="Renamed by JARVIS"]]';
-  if (q.includes('open access')) return '[[at: core]] Opening it, sir.\n\n[[do: open_config tab="access"]]';
-  if (q.includes('naughty')) return '[[at: core]] Of course not, sir.\n\n[[do: rm -rf /]]\n[[do: delete_all]]\n[[do: new_thread title="<img src=x onerror=alert(1)>" ask="say hi"]]';
-  if (q.includes('say hi')) return '[[at: thread]] Hello, sir.';
-  if (q.includes('markdown')) return '[[at: new "Markdown report"]] ## Report\n\n- one\n- two\n  1. nested\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```js\nlet x = 1;\n```\n\n<script>alert(1)</script> and <img src=x onerror=alert(2)>';
-  if (q.includes('slow')) return '[[at: new "The slow one"]] ' + 'S'.repeat(2000) + '. Done, sir.';
-  if (q.includes('follow up')) return '[[at: thread]] Following on, sir.';
-  if (q.includes('no marker')) return 'Marked nowhere, sir.';
-  return `[[at: core]] Noted, sir: “${question.slice(0, 40)}”. All well within tolerance.`;
+  if ((m = /^new group called (.+)$/i.exec(question))) return `Done, sir.\n\n[[do: new_group title="${m[1]}"]]`;
+  if ((m = /^move (.+) into (.+)$/i.exec(question))) return `Moved, sir.\n\n[[do: move_thread thread="${m[1]}" group="${m[2]}"]]`;
+  if ((m = /^collapse (.+)$/i.exec(question))) return `Folded, sir.\n\n[[do: collapse_group group="${m[1]}"]]`;
+  if ((m = /^expand (.+)$/i.exec(question))) return `Opened, sir.\n\n[[do: expand_group group="${m[1]}"]]`;
+  if ((m = /^rename (.+) to (.+)$/i.exec(question))) return `Renamed, sir.\n\n[[do: rename_thread target="${m[1]}" title="${m[2]}"]]`;
+  if (q.includes('plan a trip')) return 'Certainly, sir: a thread for it.\n\n[[do: new_thread title="Lisbon" ask="What is the weather in Lisbon"]]';
+  if (q.includes('weather in lisbon')) return 'Mild and bright in Lisbon, sir: **21°** and clear.';
+  if (q.includes('link them')) return 'Linked, sir.\n\n[[do: link_threads a="Lisbon" b="Journeys" why="travel"]]';
+  if (q.includes('rename this')) return 'As you wish, sir.\n\n[[do: rename_thread title="Renamed by JARVIS"]]';
+  if (q.includes('open access')) return 'Opening it, sir.\n\n[[do: open_config tab="access"]]';
+  if (q.includes('naughty')) return 'Of course not, sir.\n\n[[do: rm -rf /]]\n[[do: delete_all]]\n[[do: new_thread title="<img src=x onerror=alert(1)>" ask="say hi"]]';
+  if (q.includes('say hi')) return 'Hello, sir.';
+  if (q.includes('markdown')) return '## Report\n\n- one\n- two\n  1. nested\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n```js\nlet x = 1;\n```\n\n<script>alert(1)</script> and <img src=x onerror=alert(2)>\n\n[[do: title_thread title="Markdown report"]]';
+  if (q.includes('slow')) return 'S'.repeat(2000) + '. Done, sir.\n\n[[do: title_thread title="The slow one"]]';
+  if (q.includes('follow up')) return 'Following on, sir.';
+  if (q.includes('find owls')) return 'Owls live on every continent but Antarctica, sir.';
+  if (q.includes('play a video')) return 'Here it is, sir.\n\n[[media:video https://www.youtube.com/watch?v=dQw4w9WgXcQ]]';
+  return `Noted, sir: “${question.slice(0, 40)}”. All well within tolerance.`;
 }
 const sse = (text) => { const parts = []; for (let i = 0; i < text.length; i += 9) parts.push(text.slice(i, i + 9)); return [
   `event: response.created\ndata: ${JSON.stringify({ type: 'response.created', response: { id: 'r', object: 'response', status: 'in_progress', output: [] } })}\n\n`,
@@ -96,15 +97,13 @@ page.on('request', (r) => {
     if (u.includes('/models?')) return r.respond({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ models: [{ name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] }] }) });
     if (u.includes(':streamGenerateContent')) {
       if (geminiFail && geminiFailLeft > 0) { geminiFailLeft--; const s = geminiFail; if (!geminiFailLeft) geminiFail = null; return r.respond({ status: s, headers: { ...cors, 'content-type': 'application/json' }, body: JSON.stringify({ error: { code: s, message: 'The model is overloaded. Please try again later.', status: 'UNAVAILABLE' } }) }); }
-      return r.respond({ status: 200, headers: { ...cors, 'content-type': 'text/event-stream' }, body: geminiSse('[[at: core]] Gemini here, sir. All in order.') });
+      return r.respond({ status: 200, headers: { ...cors, 'content-type': 'text/event-stream' }, body: geminiSse('Gemini here, sir. All in order.') });
     }
     return r.respond({ status: 404, headers: cors, body: '{}' });
   }
   if (u.startsWith(base) || u.startsWith('http://127.0.0.1')) return r.continue();
   return r.abort();
 });
-
-/* ---------------- helpers ---------------- */
 
 /* ---------------- helpers ---------------- */
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -120,9 +119,12 @@ const untilAsked = async (from, re, timeout = 20000) => { const t0 = Date.now();
 const say = async (text) => { await page.evaluate((t) => { const i = document.getElementById('input'); i.value = t; i.form.requestSubmit(); }, text); };
 /** JARVIS has finished answering: nothing is being thought about or streamed (say.ts marks the command form busy). */
 const untilIdle = (timeout = 20000) => until(() => document.getElementById('cmdForm').getAttribute('aria-busy') !== 'true' && ![...document.querySelectorAll('section.chatwin .cw-msg.jarvis')].some((m) => /Thinking…|Searching the web…/.test(m.textContent)), 'JARVIS to finish answering', timeout);
-/** What JARVIS last said at the core (the line under him), whole. */
+/** What the console last said itself, from its readings, under JARVIS (the line under him), whole. */
 const coreSaid = () => page.evaluate(() => document.getElementById('coreReply')?.textContent || '');
 const untilSaid = (re, timeout = 10000) => until((s) => new RegExp(s, 'i').test(document.getElementById('coreReply')?.textContent || ''), `the core to say ${re}`, timeout, re.source);
+/** What JARVIS last wrote in the thread in front, whole. */
+const frontSaid = () => page.evaluate(() => { const id = JSON.parse(localStorage.getItem('jarvis.workspace') || '{}').activeId; return [...document.querySelectorAll(`section.chatwin[data-id="${id}"] .cw-msg.jarvis`)].pop()?.textContent || ''; });
+const untilFrontSays = (re, timeout = 10000) => until((s) => { const id = JSON.parse(localStorage.getItem('jarvis.workspace') || '{}').activeId; return new RegExp(s, 'i').test([...document.querySelectorAll(`section.chatwin[data-id="${id}"] .cw-msg.jarvis`)].pop()?.textContent || ''); }, `the thread in front to say ${re}`, timeout, re.source);
 const untilNotice = (re, timeout = 10000) => until((s) => new RegExp(s, 'i').test(document.getElementById('coreNotice')?.textContent || ''), `a notice saying ${re}`, timeout, re.source);
 const untilWindow = (re, timeout = 10000) => until((s) => [...document.querySelectorAll('section.chatwin .cw-title')].some((t) => new RegExp(s, 'i').test(t.textContent.trim())), `a window called ${re}`, timeout, re.source);
 const untilPanels = (pred, what, timeout = 10000) => until((src) => (0, eval)(`(${src})`)([...document.querySelectorAll('.panel.float')].filter((p) => !p.hidden).map((p) => p.dataset.panel)), what, timeout, pred.toString());
@@ -246,50 +248,66 @@ await check('guide: opens on a first visit; connect a key from the card, model p
 await check('local commands: help, time, date, hi, status answer at the core, without a model or a thread', async () => {
   await fresh();
   const before = asked.length;
-  for (const c of ['help', 'what time is it', "what's the date", 'hello']) await say(c);
-  await until(() => document.querySelectorAll('#coreChat .cw-msg.sys ul li').length >= 10, 'the help list in the conversation');
+  await say('help');
+  await until(() => document.querySelectorAll('#coreReply ul li').length >= 10, 'the help list under the core');
+  for (const c of ['what time is it', "what's the date", 'hello']) await say(c);
+  await untilSaid(/good (morning|afternoon|evening)/);
   await say('status');
   await untilSaid(/tolerance|percent|load/);
   const b = await board();
-  const sysList = await page.evaluate(() => document.querySelectorAll('#coreChat .cw-msg.sys ul li').length);
   assert(asked.length === before, 'a local command went to the model');
   assert(b.windows.length === 0, 'a local command opened a thread');
-  return { windows: b.windows.length, helpItems: sysList };
+  return { windows: b.windows.length };
 });
 
-await check('conversation: talk stays at the core, is kept, and is not a thread; a reply with no marker is the core too', async () => {
+await check('everything is a thread: nothing in front opens one; the next question goes into it; "open a new thread and find…" asks in the new one; a video plays in its thread', async () => {
   await fresh();
   await say('how are you today'); await untilIdle();
-  const said = await coreSaid();
-  assert(/Noted, sir/.test(said), 'not answered at the core: ' + said);
-  assert((await board()).windows.length === 0, 'conversation opened a thread');
-  await say('and with no marker'); await untilIdle();
-  assert(/Marked nowhere/.test(await coreSaid()), 'a reply without a marker did not land at the core: ' + await coreSaid());
-  assert((await board()).windows.length === 0, 'a markerless reply opened a thread');
-  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('jarvis.conversation') || '[]').map((l) => l.role + ':' + l.content.slice(0, 20)));
-  assert(kept.some((l) => l.startsWith('user:how are you')) && kept.some((l) => l.startsWith('assistant:Noted')), 'transcript: ' + JSON.stringify(kept));
-  // The Conversation panel: its button opens it with the lines, its count sits on the button, Clear empties it.
-  const badge = await page.evaluate(() => { const b = document.getElementById('pillConversation').getBoundingClientRect(), c = document.getElementById('pConversation').getBoundingClientRect(); return { count: document.getElementById('pConversation').textContent, onButton: c.left >= b.left - 4 && c.right <= b.right + 6 }; });
-  assert(badge.onButton && Number(badge.count) >= 2, 'conversation count not on its button: ' + JSON.stringify(badge));
-  await click('#pillConversation');
-  await untilPanels((p) => p.includes('conversation'), 'the Conversation panel to open');
-  const opened = await page.evaluate(() => ({ lines: document.querySelectorAll('#coreChat .cw-msg').length }));
-  assert(opened.lines >= 2, 'conversation panel: ' + JSON.stringify(opened));
-  await page.evaluate(() => [...document.querySelectorAll('#coreChat button')].find((b) => /clear/i.test(b.textContent)).click());
-  await until(() => document.querySelectorAll('#coreChat .cw-msg').length === 0, 'Clear to empty the conversation');
-  const cleared = await page.evaluate(() => ({ stored: localStorage.getItem('jarvis.conversation'), count: document.getElementById('pConversation').textContent }));
-  assert(cleared.stored === '[]' && cleared.count === '0', 'clear: ' + JSON.stringify(cleared));
-  await click('#pillConversation');
-  await untilPanels((p) => !p.includes('conversation'), 'the button to close the panel');
-  return { said: said.slice(0, 30), kept: kept.length };
+  let w = await ws();
+  assert(w.threads.length === 1 && w.activeId === w.threads[0].id, 'a question with nothing in front did not open a thread in front: ' + JSON.stringify(w.threads.map((t) => t.title)));
+  const turns = (t) => t.turns.map((x) => `${x.role}:${x.content.slice(0, 12)}`);
+  assert(turns(w.threads[0]).join('|') === 'user:how are you |assistant:Noted, sir: ', 'not written into it: ' + JSON.stringify(turns(w.threads[0])));
+  assert(await page.evaluate(() => document.getElementById('coreReply').hidden), 'the reply was said under the core as well');
+  await say('and another thing'); await untilIdle();
+  w = await ws();
+  assert(w.threads.length === 1 && w.threads[0].turns.length === 4, 'the next question did not go into the thread in front: ' + JSON.stringify(w.threads.map(turns)));
+  // Found on 2026-09-14: the thread asked for stayed empty and the question was answered outside it.
+  const first = w.threads[0].id;
+  await say('open a new thread and find owls'); await untilIdle();
+  w = await ws();
+  const owls = w.threads.find((t) => t.id === w.activeId);
+  assert(w.threads.length === 2 && owls && owls.id !== first, 'no second thread in front: ' + JSON.stringify(w.threads.map((t) => t.title)));
+  assert(owls.turns[0]?.content === 'find owls' && /Antarctica/.test(owls.turns[1]?.content || ''), 'the new thread does not hold the question asked with it: ' + JSON.stringify(owls.turns));
+  assert(w.threads.find((t) => t.id === first).turns.length === 4, 'the first thread was written into');
+  // Found on 2026-09-14: a video came back under the core, as a passing line. It is in the thread, playing.
+  await say('play a video of owls'); await untilIdle();
+  await until((id) => document.querySelector(`section.chatwin[data-id="${id}"] iframe[src*="youtube-nocookie.com/embed/dQw4w9WgXcQ"]`), 'the video player in the thread in front', 10000, owls.id);
+  assert(await page.evaluate(() => document.getElementById('coreReply').hidden), 'the video reply was said under the core');
+  const gone = await page.evaluate(() => !document.getElementById('pillConversation') && !document.querySelector('.panel.float[data-panel="conversation"]'));
+  assert(gone, 'the Conversation button or panel is still there');
+  return { threads: w.threads.length, owls: turns(owls) };
 });
 
-await check('model: research opens its own thread, markdown renders, injection stays text, two quick questions answer in order at the core', async () => {
+await check('a conversation kept at the core by an earlier version comes back as a thread, not in front', async () => {
+  await fresh();
+  await page.evaluate(() => localStorage.setItem('jarvis.conversation', JSON.stringify([
+    { role: 'user', content: 'hello from before', at: 1 }, { role: 'sys', content: 'Put away.', at: 2 }, { role: 'assistant', content: 'Good evening, sir.', at: 3 },
+  ])));
+  await page.reload({ waitUntil: 'networkidle2' });
+  await untilWindow(/previous conversation/);
+  const w = await ws();
+  const t = w.threads.find((x) => x.title === 'Previous conversation');
+  assert(t && t.turns.length === 2 && w.activeId === '', 'brought over: ' + JSON.stringify({ turns: t?.turns, active: w.activeId }));
+  assert(await page.evaluate(() => localStorage.getItem('jarvis.conversation') === null), 'the old record was kept after it was brought over');
+  return { turns: t.turns.length };
+});
+
+await check('model: markdown renders in its thread, which the reply names; injection stays text; two quick questions answer in order in the thread in front', async () => {
   await fresh();
   await say('give me a markdown report'); await untilIdle();
   await untilWindow(/markdown report/);
   const b0 = await board();
-  assert(b0.windows.length === 1, 'more than the one thread named by the model: ' + JSON.stringify(b0.windows));
+  assert(b0.windows.length === 1, 'more than the one thread: ' + JSON.stringify(b0.windows));
   const md = await page.evaluate(() => { const w = document.querySelector('section.chatwin'); const b = w.querySelector('.cw-body'); return { table: b.querySelectorAll('table').length, li: b.querySelectorAll('li').length, pre: b.querySelectorAll('pre').length, scripts: b.querySelectorAll('script').length, imgs: b.querySelectorAll('img').length, scriptAsText: b.textContent.includes('<script>alert(1)</script>') }; });
   assert(md.table === 1 && md.li >= 3 && md.pre === 1, 'markdown: ' + JSON.stringify(md));
   assert(md.scripts === 0 && md.imgs === 0 && md.scriptAsText, 'injection: ' + JSON.stringify(md));
@@ -298,9 +316,10 @@ await check('model: research opens its own thread, markdown renders, injection s
   await untilAsked(n, /second quick one/); await untilIdle(30000);
   const order = asked.slice(n);
   assert(order.length === 2 && order[0].includes('first') && order[1].includes('second'), 'order: ' + JSON.stringify(order));
-  assert((await board()).windows.length === 1, 'a quick question opened a thread');
+  const w = await ws();
+  assert(w.threads.length === 1 && w.threads[0].turns.filter((t) => t.role === 'user').length === 3, 'the quick questions did not go into the thread in front: ' + JSON.stringify(w.threads.map((t) => t.turns.length)));
   await say('a follow up please'); await untilIdle();
-  await untilWs((w) => w.threads[0].turns.some((t) => /Following on/.test(t.content)), 'the follow-up to land in the thread in front');
+  await untilWs((x) => x.threads[0].turns.some((t) => /Following on/.test(t.content)), 'the follow-up to land in the thread in front');
   return { md, order };
 });
 
@@ -346,7 +365,7 @@ await check('directives from the model: new_thread with ask, link, rename, open_
   await untilAsked(n, /weather in lisbon/i); await untilIdle(30000);
   await untilWs((w) => w.threads.find((t) => t.title === 'Lisbon')?.turns.some((t) => t.role === 'assistant' && /21°/.test(t.content)), 'Lisbon to be asked and answered', 20000);
   const lisbon = (await ws()).threads.find((t) => t.title === 'Lisbon');
-  await say('link them'); await untilIdle(); await untilSaid(/Linked/);
+  await say('link them'); await untilIdle(); await untilFrontSays(/Linked/);
   await say('rename this'); await untilIdle();
   await untilWs((w) => w.threads.some((t) => t.title === 'Renamed by JARVIS'), 'the rename_thread directive');
   await say('open access'); await untilIdle(); await untilDrawer(true);
@@ -372,7 +391,7 @@ await check('panels: show radar, open weather, close all', async () => {
   return true;
 });
 
-await check('closing the thread in front: nothing takes its place, a follow-up opens no thread, "this thread" has to be named', async () => {
+await check('closing the thread in front: nothing takes its place, the next question opens a thread of its own, "this thread" has to be named', async () => {
   await fresh();
   await say('new thread called Front'); await untilWindow(/front/);
   await say('new thread called Other'); await untilWindow(/other/);
@@ -383,19 +402,22 @@ await check('closing the thread in front: nothing takes its place, a follow-up o
   await untilWs((x) => !!x.threads.find((t) => /other/i.test(t.title))?.archivedAt, 'the thread in front to be put away');
   w = await ws();
   assert(w.activeId === '', 'another thread was put in front after the close: ' + w.activeId);
-  // a reply the model addresses to "the thread" with none in front is conversation: said at the core, written nowhere
+  // with none in front, a question opens a thread of its own — never the one put away, nor the one left on the board
   await say('follow up'); await untilIdle();
-  await untilSaid(/Following on/);
   w = await ws();
-  assert(w.threads.filter((t) => !t.archivedAt).length === 1, 'the follow-up opened a thread: ' + JSON.stringify(w.threads.map((t) => [t.title, !!t.archivedAt])));
-  assert(w.threads.every((t) => !t.turns.some((x) => x.content === 'follow up')), 'the follow-up was written into a thread');
-  assert(w.activeId === '', 'something is in front after a follow-up at the core: ' + w.activeId);
+  const live = w.threads.filter((t) => !t.archivedAt);
+  const opened = live.find((t) => t.id === w.activeId);
+  assert(live.length === 2 && opened && !/front|other/i.test(opened.title), 'the question did not open a thread of its own: ' + JSON.stringify(w.threads.map((t) => [t.title, !!t.archivedAt])));
+  assert(opened.turns[0]?.content === 'follow up' && /Following on/.test(opened.turns[1]?.content || ''), 'not written into it: ' + JSON.stringify(opened.turns));
+  assert(w.threads.filter((t) => t.id !== opened.id).every((t) => !t.turns.length), 'written into another thread');
+  await say('close this chat');
+  await untilWs((x) => x.activeId === '' && x.threads.filter((t) => !t.archivedAt).length === 1, 'that thread to be put away');
   // "this thread" names nothing: a line says so, no thread is touched
   await say('close this chat'); await untilNotice(/no thread in front/);
   w = await ws();
   assert(w.threads.filter((t) => !t.archivedAt).length === 1, 'a thread that was not in front was closed');
   await say('restore the last one');
-  await untilWs((x) => !x.threads.find((t) => /other/i.test(t.title))?.archivedAt, 'restore to bring the thread back');
+  await untilWs((x) => x.threads.filter((t) => !t.archivedAt).length === 2, 'restore to bring the last thread back');
   return { closed: front.title };
 });
 
@@ -419,37 +441,42 @@ await check('threads list: put away, restore, put all away, restore by name, tid
   return { after: w.threads.length, groups: w.groups.length };
 });
 
-await check('error paths: 429 then 500 from the service give a friendly line, then it recovers', async () => {
+await check('error paths: 429 then 500 from the service give a friendly line in the thread, then it recovers', async () => {
   await fresh();
   failNext = 429; failLeft = 5; await say('are you there'); await untilIdle(30000);
-  let last = await coreSaid();
+  let last = await frontSaid();
   assert(/limit|busy|moment|try again/i.test(last || ''), '429 line: ' + last);
   failNext = 500; failLeft = 5; await say('still there'); await untilIdle(30000);
-  last = await coreSaid();
+  last = await frontSaid();
   assert(last && !/Thinking/.test(last), '500 left it thinking: ' + last);
-  await say('and now'); await untilIdle(); await untilSaid(/Noted, sir/);
-  return { recovered: (await coreSaid()).slice(0, 40) };
+  // neither unanswered question stays in the history, to be sent again as if it had been answered
+  let w = await ws();
+  assert(w.threads.length === 1 && w.threads[0].turns.length === 0, 'an unanswered question was kept: ' + JSON.stringify(w.threads.map((t) => t.turns)));
+  await say('and now'); await untilIdle(); await untilFrontSays(/Noted, sir/);
+  w = await ws();
+  assert(w.threads.length === 1, 'the recovery opened another thread');
+  return { recovered: (await frontSaid()).slice(0, 40) };
 });
 
-await check('a spare service: answers when the first is busy, with one notice; both down is one line, not two boxes', async () => {
+await check('a spare service: answers when the first is busy, with one notice; both down is one line in the thread, with no notice left over', async () => {
   await fresh();
   // connect a second service in Configuration; ChatGPT stays the one in use
   await connectService('gemini', KEY_GEMINI);
   assert(/ChatGPT/.test(await page.title()), 'the service in use changed: ' + await page.title());
   assert((await cores()).with.sort().join() === 'gemini,openai', 'two services expected: ' + JSON.stringify(await cores()));
-  // ChatGPT at its limit: the notice says so and names the spare; the spare answers at the core
-  failNext = 429; failLeft = 5; await say('who is there'); await untilIdle(30000); await untilSaid(/Gemini here/);
-  const b = await board(); const line = await coreSaid();
+  // ChatGPT at its limit: the notice says so and names the spare; the spare answers in the thread
+  failNext = 429; failLeft = 5; await say('who is there'); await untilIdle(30000); await untilFrontSays(/Gemini here/);
+  const b = await board(); const line = await frontSaid();
   assert(/answering through Gemini/i.test(b.notice || ''), 'no word of the spare: ' + b.notice);
-  // both down: one line under the core carrying both reasons, and no notice left over it
+  // both down: one line in the thread carrying both reasons, and no notice left over it
   failNext = 429; failLeft = 5; geminiFail = 503; geminiFailLeft = 5; await say('anyone there'); await untilIdle(30000);
-  await untilSaid(/Gemini is busy/);
-  const both = await coreSaid();
-  const shown = await page.evaluate(() => ({ notice: !document.getElementById('coreNotice').hidden, reply: !document.getElementById('coreReply').hidden, boxes: document.querySelectorAll('.core-line').length }));
+  await untilFrontSays(/Gemini is busy/);
+  const both = await frontSaid();
+  const shown = await page.evaluate(() => ({ notice: !document.getElementById('coreNotice').hidden, reply: !document.getElementById('coreReply').hidden }));
   assert(/limit|quota/i.test(both), 'not both reasons in one line: ' + both);
-  assert(shown.reply && !shown.notice && shown.boxes === 1, 'a notice left over the line, or two boxes: ' + JSON.stringify(shown));
+  assert(!shown.notice && !shown.reply, 'something left under the core as well: ' + JSON.stringify(shown));
   failNext = null; failLeft = 0; geminiFail = null; geminiFailLeft = 0;
-  await say('and now'); await untilIdle(); await untilSaid(/Noted, sir/);
+  await say('and now'); await untilIdle(); await untilFrontSays(/Noted, sir/);
   return { line: line.slice(0, 80) };
 });
 

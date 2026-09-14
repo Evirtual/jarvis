@@ -22,7 +22,6 @@ export const ICON = {
 
 /** One picture per instrument (and the threads list), finer-lined. */
 const INSTRUMENT: Record<string, string> = {
-  conversation: '<path d="M4 5.5h16v10.5H9.5L5 19.5v-3.5H4z"/><path d="M8 9.5h8M8 12.5h5"/>',
   threads: '<circle cx="12" cy="12" r="3"/><circle cx="4.5" cy="6" r="1.8"/><circle cx="19.5" cy="6" r="1.8"/><circle cx="12" cy="20.5" r="1.8"/><path d="M6 7l3.6 3M18 7l-3.6 3M12 15v3.7"/>',
   compute: '<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9.5 3.5v3M14.5 3.5v3M9.5 17.5v3M14.5 17.5v3M3.5 9.5h3M3.5 14.5h3M17.5 9.5h3M17.5 14.5h3"/>',
   graphics: '<rect x="2.5" y="6.5" width="19" height="10" rx="1.5"/><circle cx="9" cy="11.5" r="2.8"/><path d="M14.5 9.5h4M14.5 12h4M14.5 14.5h2.5M5 16.5v2.5"/>',

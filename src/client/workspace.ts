@@ -158,6 +158,19 @@ function asTurns(v: unknown): Turn[] {
     .map((t) => ({ role: t.role === "assistant" ? ("assistant" as const) : ("user" as const), content: String(t.content ?? "") }));
 }
 
+/**
+ * What was said at the core before everything was a thread — lines of
+ * `{ role, content }` — as a thread's turns. The console's notices were kept
+ * among them ("sys"); they were never the conversation, and are left out.
+ */
+export function conversationTurns(v: unknown): Turn[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((l): l is { role: "user" | "assistant"; content: string } =>
+      !!l && typeof l === "object" && ((l as Turn).role === "user" || (l as Turn).role === "assistant") && typeof (l as Turn).content === "string" && !!(l as Turn).content)
+    .map((l) => ({ role: l.role, content: l.content }));
+}
+
 function asTies(v: unknown): { to: string; why: string }[] | undefined {
   if (!Array.isArray(v)) return undefined;
   const out = v
@@ -299,8 +312,7 @@ export class Workspace {
   get archived(): Thread[] { return this.data.threads.filter((t) => !!t.archivedAt).sort((a, b) => b.archivedAt! - a.archivedAt!); }
   get groups(): Group[] { return this.data.groups; }
   get activeId(): string { return this.data.activeId; }
-  /** The thread in front — or nothing at all, on a clean screen. */
-  /** The thread in front — the one a follow-up goes to. None, when none was opened or the last one was closed: then what you say is conversation. */
+  /** The thread in front — the one a question goes to. None, when none was opened or the last one was closed: then a question opens a thread of its own. */
   get active(): Thread | undefined {
     const t = this.thread(this.data.activeId);
     return t && !t.archivedAt ? t : undefined;
@@ -418,6 +430,15 @@ export class Workspace {
     this.data.threads.push(t);
     this.data.activeId = t.id;
     this.expandGroup(groupId);
+    return t;
+  }
+
+  /** A thread made of history kept somewhere else: put on the board, but not in front. */
+  adoptThread(title: string, turns: Turn[]): Thread {
+    const front = this.data.activeId;
+    const t = this.createThread({ title });
+    t.turns = turns;
+    this.data.activeId = front;
     return t;
   }
 
@@ -543,11 +564,11 @@ export class Workspace {
     return t;
   }
 
-  /** Keep the focus on a live thread — or on nothing, if the board is now clear. */
   /**
    * The thread in front is gone: nothing takes its place. A question asked now
-   * is conversation, not a follow-up to whichever thread happened to be newest —
-   * a thread is in front only when it was opened, tapped or asked for.
+   * opens a thread of its own, rather than landing in whichever thread happened
+   * to be newest — a thread is in front only when it was opened, tapped or
+   * asked for.
    */
   private afterRemoval(): void {
     if (this.live.some((t) => t.id === this.data.activeId)) return;

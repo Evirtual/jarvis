@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { NEEDS_CONFIRMATION, extractDirectives, intentOf, parseRoute, parseUtterance, type ParseContext } from "../src/client/commands.ts";
+import { NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type ParseContext } from "../src/client/commands.ts";
 import { DIRECTIVES, directiveCatalogue } from "../src/shared/directives.ts";
 import { effortAsked, rankModels, wantsSearch } from "../src/shared/services/common.ts";
 
@@ -87,15 +87,6 @@ test("close means archive; only an explicit phrase deletes", () => {
   for (const q of ["restore the last one", "open the last thread I closed", "bring back the thread I just put away", "undo that close", "restore"]) {
     assert.deepEqual(intentOf(q, ctx()), { name: "restore_thread", title: "", last: true }, q);
   }
-});
-
-test("a reply says where it belongs in its first words; no word means the core", () => {
-  assert.deepEqual(parseRoute("[[at: core]] Good afternoon, sir."), { route: { at: "core" }, text: "Good afternoon, sir.", undecided: false });
-  assert.deepEqual(parseRoute("[[at: thread]] Sintra is worth the day."), { route: { at: "thread" }, text: "Sintra is worth the day.", undecided: false });
-  assert.deepEqual(parseRoute('[[at: new "Lisbon in October"]] Mild, sir.'), { route: { at: "new", title: "Lisbon in October" }, text: "Mild, sir.", undecided: false });
-  assert.deepEqual(parseRoute("Good afternoon, sir."), { route: null, text: "Good afternoon, sir.", undecided: false });
-  assert.deepEqual(parseRoute("[[at: co"), { route: null, text: "", undecided: true }, "still arriving");
-  assert.deepEqual(parseRoute("[[do: mute]]").undecided, false, "a directive is not a route");
 });
 
 test("clearing the put-away threads is its own request, and always asks first", () => {

@@ -74,9 +74,6 @@
             <button class="ic" id="pillThreads" data-open="threads" type="button" title="Threads" aria-label="Threads">
               <span class="ic-count" id="pThreads">—</span>
             </button>
-            <button class="ic" id="pillConversation" data-open="conversation" type="button" title="Conversation — what you and J.A.R.V.I.S. have said" aria-label="Conversation">
-              <span class="ic-count" id="pConversation">—</span>
-            </button>
           </div>
           <button class="ic" id="openDrawer" type="button" title="Configuration" aria-label="Configuration">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -86,7 +83,7 @@
         <div class="core-label">
           <span class="core-state" id="logState" hidden></span>
         </div>
-        <!-- The line under the core: a passing notice, and the reply JARVIS is saying, in one box (say.ts). -->
+        <!-- The line under the core: a passing notice, and the console's own answer, in one box (say.ts). -->
         <div class="core-line glass" id="coreLine" role="status" aria-live="polite" hidden>
           <div class="core-notice" id="coreNotice" hidden></div>
           <div class="core-reply" id="coreReply" hidden></div>
@@ -100,12 +97,6 @@
           <section class="panel float glass" data-panel="threads" hidden>
             <h2 class="drag">Threads<span class="tail"></span><span class="aux" id="threadsAux">—</span><button class="p-x" type="button" aria-label="Close Threads" title="Close Threads"></button></h2>
             <div class="tl" id="threadList"></div>
-          </section>
-
-          <!-- The conversation at the core: what you and JARVIS say outside any thread (core-chat.ts). -->
-          <section class="panel float glass" data-panel="conversation" hidden>
-            <h2 class="drag">Conversation<span class="tail"></span><span class="aux" id="convAux">—</span><button class="p-x" type="button" aria-label="Close Conversation" title="Close Conversation"></button></h2>
-            <div class="tl-core" id="coreChat"></div>
           </section>
 
           <section class="panel float glass" data-panel="compute" hidden>

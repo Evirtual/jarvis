@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import { capitalise, clip, editDistance } from "../src/client/text.ts";
 import { esc, fmtRate, gib, gib0, hhmm } from "../src/client/dom.ts";
 import { maskKey, pace, prepareTurns } from "../src/shared/services/common.ts";
-import { coreChat } from "../src/client/core-chat.ts";
 import { clamp } from "../src/client/num.ts";
 
 /* ---------------- text ---------------- */
@@ -104,36 +103,22 @@ test("pace: a slider's figure becomes an instruction in words", () => {
   assert.equal(pace(1.0), "Speak at an easy, natural pace.");
 });
 
-/* ---------------- the conversation at the core ---------------- */
-
-test("the conversation keeps the last eighty lines, hands the model only talk, and takes a line back", () => {
-  coreChat.clear();
-  for (let i = 0; i < 90; i++) coreChat.add(i % 2 ? "assistant" : "user", `line ${i}`);
-  assert.equal(coreChat.lines.length, 80, "capped");
-  assert.equal(coreChat.lines[0]!.content, "line 10", "the oldest fall off the top");
-  coreChat.add("sys", "a notice");
-  assert.ok(coreChat.recent(3).every((t) => t.role !== "sys"), "notices are not sent to the model");
-  assert.equal(coreChat.recent(3).length, 3);
-  assert.equal(coreChat.lines.length, 80, "the cap holds on every add");
-  coreChat.add("user", "a question");
-  coreChat.forget("user", "a question");
-  assert.notEqual(coreChat.lines[coreChat.lines.length - 1]!.content, "a question", "taken back when it belonged in a thread");
-  const n = coreChat.lines.length;
-  coreChat.forget("user", "not the last line");
-  assert.equal(coreChat.lines.length, n, "only the last line, only if it matches");
-  coreChat.clear();
-  assert.equal(coreChat.lines.length, 0);
-});
-
 /* ---------------- what is kept in the browser ---------------- */
 
-test("a setting kept under an older name is moved to its current one once, and never over a newer value", async () => {
+/** A browser's storage for the length of a test: what it keeps, and whether it takes a save. */
+function fakeStorage(): { kept: Map<string, string>; refuse: (yes: boolean) => void } {
   const kept = new Map<string, string>();
+  let refusing = false;
   (globalThis as { localStorage?: unknown }).localStorage = {
     getItem: (k: string) => kept.get(k) ?? null,
-    setItem: (k: string, v: string) => { kept.set(k, v); },
+    setItem: (k: string, v: string) => { if (refusing) throw new Error("QuotaExceededError"); kept.set(k, v); },
     removeItem: (k: string) => { kept.delete(k); },
   };
+  return { kept, refuse: (yes) => { refusing = yes; } };
+}
+
+test("a setting kept under an older name is moved to its current one once, and never over a newer value", async () => {
+  const { kept } = fakeStorage();
   try {
     const { KEY, migrateStorage, recall } = await import("../src/client/storage.ts");
     kept.set("jarvis.pitch", "0.9");
@@ -144,6 +129,41 @@ test("a setting kept under an older name is moved to its current one once, and n
     assert.equal(recall(KEY.panelsOpen), "radar");
     assert.equal(kept.has("jarvis.pitch"), false);
     assert.equal(kept.has("jarvis.panelsOpen"), false);
+  } finally {
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  }
+});
+
+test("the conversation kept at the core before everything was a thread becomes a thread, not in front, and is then dropped", async () => {
+  const { kept, refuse } = fakeStorage();
+  try {
+    const { BoardStore } = await import("../src/client/board-store.ts");
+    const said = [
+      { role: "user", content: "hello", at: 1 },
+      { role: "assistant", content: "Good evening, sir.", at: 2 },
+      { role: "sys", content: "Put away.", at: 3 }, // the console's notice, not the conversation
+      { role: "user", content: "how are the systems", at: 4 },
+    ];
+    kept.set("jarvis.conversation", JSON.stringify(said));
+    // The browser refuses the save: the old record stays, to be brought over next time.
+    refuse(true);
+    const refused = new BoardStore();
+    assert.equal(refused.ws.all.length, 1, "on the board for this visit");
+    assert.equal(kept.has("jarvis.conversation"), true, "not dropped before the board holding it was saved");
+    refuse(false);
+    const store = new BoardStore();
+    const t = store.ws.all[0]!;
+    assert.equal(store.ws.all.length, 1);
+    assert.equal(t.title, "Previous conversation");
+    assert.deepEqual(t.turns.map((x) => x.role), ["user", "assistant", "user"], "notices left out");
+    assert.equal(store.ws.activeId, "", "on the board, not in front");
+    assert.equal(kept.has("jarvis.conversation"), false, "dropped once saved");
+    assert.equal(JSON.parse(kept.get("jarvis.workspace")!).threads[0].title, "Previous conversation");
+    // An empty one leaves nothing behind and makes no thread.
+    kept.clear();
+    kept.set("jarvis.conversation", "[]");
+    assert.equal(new BoardStore().ws.all.length, 0);
+    assert.equal(kept.has("jarvis.conversation"), false);
   } finally {
     delete (globalThis as { localStorage?: unknown }).localStorage;
   }

@@ -210,7 +210,7 @@ export class ConsoleCore {
     // Live readings ride along with the newest question only, never the history.
     const turns = prepareTurns(body.turns, body.context);
     if (!turns) throw new CoreError("no_turns", "There's nothing to answer.");
-    return { id, key: c.key, model: c.model, turns, persona: personaFor(body.address === "madam" ? "madam" : "sir"), search: body.search === true || wantsSearch(turns), effort: body.effort ?? this.store.effort(id) ?? DEFAULT_EFFORT };
+    return { id, key: c.key, model: c.model, turns, persona: personaFor(body.address === "madam" ? "madam" : "sir"), search: wantsSearch(turns), effort: body.effort ?? this.store.effort(id) ?? DEFAULT_EFFORT };
   }
 
   /**

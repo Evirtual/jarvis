@@ -42,7 +42,7 @@ localStorage.removeItem("jarvis.stack");
 
 | ID | Steps | Expected |
 | --- | --- | --- |
-| L-01 | Clean start at 1440×900 | Only the title row (Threads and Conversation top-left, each with a count, J.A.R.V.I.S. centred, Configuration top-right), JARVIS at the bottom centre, and the deck. No thread, no text box. |
+| L-01 | Clean start at 1440×900 | Only the title row (Threads top-left with its count, J.A.R.V.I.S. centred, Configuration top-right), JARVIS at the bottom centre, and the deck. No thread, no text box. |
 | L-02 | Look at the deck | New thread button left of JARVIS, keyboard right of him. CPU/GPU/Disk on the left edge, Net/LAN/Sky on the right edge. Readings show icon + value only (no labels). |
 | L-03 | Each reading's colour | CPU, GPU, Disk, Net, LAN, Sky each have their instrument's colour on border/icon; the same colour as that panel's border and title. Open a panel: its reading lights up in that colour. |
 | L-04 | Narrow the window (1440 → 768) | Each side folds its least important reading first (Disk, then LAN, …) into its own More (2×2 grid icon). Nothing overlaps JARVIS or the side buttons. |
@@ -74,6 +74,9 @@ localStorage.removeItem("jarvis.stack");
 | T-06 | New threads never land on others | With four loose windows placed, "open a new thread" ×3: none overlaps an existing window or group. |
 | T-07 | × on a window | Put away; appears under "Put away" in the Threads panel; "restore Baltic cable damage" brings it back. |
 | T-08 | Commands don't pollute | Any local command (fold, rename, switch, yes/no) writes nothing into a thread's history. |
+| T-09 (model) | With a thread in front, ask anything — "hello", a fact, a search | The answer is written in that thread. Nothing JARVIS answers through the service appears under him. |
+| T-10 (model) | "open a new thread and find the latest on Starship" | One new thread opens in front, holding that question and its answer; the thread before it is untouched. |
+| T-11 (model) | Close the thread in front, then ask something | A new thread opens for it; the thread put away is not written into. |
 
 ## 4. Groups (drag and drop)
 
@@ -120,6 +123,7 @@ localStorage.removeItem("jarvis.stack");
 | M-03 | Play a video, drag its window around open space | Video keeps playing; the drag is smooth (no blur while carried). |
 | M-04 | Play a video, drag its window out of its group and back | Keeps playing. (Moving it into a *different* group re-parents it and reloads the player — known.) |
 | M-05 (model) | "what are your sources for that? give me the links" | Sources line with clickable https links. |
+| M-06 (model) | "play a YouTube video of the Starship launch" | The player appears in the thread in front, not under JARVIS, and he doesn't ask whether to play it. |
 
 ## 8. Panels and sheets
 
@@ -156,9 +160,13 @@ localStorage.removeItem("jarvis.stack");
 
 "status", "what time is it", "weather", "show me the radar", "close all panels",
 "open config", "mute" / "unmute", "use the Charon voice", "speak faster",
-"switch to Rail Baltica", "minimise Baltic cable damage", "open the Baltic cable
-damage thread", "rename Solar storms to Space weather." — each acts at once, with
-a short notice, and nothing reaches the model. While an answer is streaming, a new
+"switch to Rail Baltica", "open the Baltic cable damage thread" — each acts at
+once, with a short notice or a line under JARVIS, nothing reaches the model,
+and no thread is opened or written into. "help" lists what he answers to under
+him, and the list stays until tapped. Renaming, moving and folding by name
+("rename Solar storms to Space weather", "minimise Baltic cable damage") are
+said to JARVIS, so his reply is written into the thread in front, or a new one
+when none is in front. While an answer is streaming, a new
 request is **queued** ("Queued — I'll take … next") and asked in the thread that
 was in front when you asked.
 
@@ -1126,3 +1134,31 @@ Typecheck clean, 118 unit tests, 21 end-to-end scenarios, build clean.
      the card as it had been. Found by the end-to-end suite on the CI runner,
      where the timing differs. A refresh that began before the latest change
      is dropped.
+
+### 2026-09-14 — everything is a thread
+
+Found by the user testing the web version; the decision and its reasons are
+in [PLAN-everything-is-a-thread.md](PLAN-everything-is-a-thread.md). The
+end-to-end suite now covers both bugs, and a conversation kept by the earlier
+version being brought over. Typecheck clean, unit tests and 21 end-to-end
+scenarios passing (in Brave; Edge would not start headless on this machine),
+build clean.
+
+121. "Open a new thread and find X" opened an empty thread and answered at
+     the core. The console had opened the thread and sent only "find X" with a
+     note that anything but a follow-up was conversation, so the model put
+     the answer at the core. Replies no longer choose a place: every answer
+     goes into the thread in front, or a new thread when none is in front, and
+     "find X" is asked in the thread just opened.
+122. Asked to play a YouTube video, the model asked whether to, and the video
+     came back under the core, in a line that fades after a few seconds. The
+     video is in the thread now, playing, and the model is told to give a video
+     result rather than ask.
+123. The Conversation panel, its button and the talk kept outside threads are
+     gone. What an earlier version kept is brought onto the board once, as a
+     thread called "Previous conversation", not in front, and the old record
+     is dropped only after the board holding it has been saved.
+124. A follow-up in a thread was always offered web search, because threads
+     used to hold only research. Threads hold talk too now, so search is
+     offered when the question asks for the world, or when the thread's
+     earlier answers came from the web.

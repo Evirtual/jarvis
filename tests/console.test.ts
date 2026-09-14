@@ -136,11 +136,22 @@ test("how long the model thinks: the service's setting, quick unless chosen; ask
   assert.equal(c2.state === "ready" && c2.thinks, false, "g-2 does not think: no slider");
 });
 
-test("the web is offered for a question that wants it, or when the console says a thread is in front", async () => {
+test("the web is offered for a question that wants it, or a follow-up in a thread whose answers came from it", async () => {
   const { core } = coreWith(storeWith({ gemini: "good" }));
   assert.equal((await core.prepare(question("hello there"))).search, false);
   assert.equal((await core.prepare(question("find the latest news on the cables"))).search, true);
-  assert.equal((await core.prepare({ ...question("and Germany?"), search: true })).search, true);
+  const researched = [
+    { role: "user" as const, content: "find the latest news on the cables" },
+    { role: "assistant" as const, content: "According to Reuters, a second cable was cut." },
+    { role: "user" as const, content: "and Germany?" },
+  ];
+  assert.equal((await core.prepare({ turns: researched })).search, true, "a follow-up to research");
+  const talked = [
+    { role: "user" as const, content: "tell me a joke" },
+    { role: "assistant" as const, content: "A duck walks into a bar, sir." },
+    { role: "user" as const, content: "and another?" },
+  ];
+  assert.equal((await core.prepare({ turns: talked })).search, false, "a thread holds talk too: being in one is not a reason to search");
 });
 
 test("the reasons a question can't be asked are the user's words, with a code for the server", async () => {

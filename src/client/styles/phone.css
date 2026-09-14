@@ -123,7 +123,7 @@ body.m-compact .overlays:not(:has(> .panel.float:not([hidden]))) { display: none
 /* …except the Threads list, which on a phone is a modal sheet like More: it
    rises from the line where the fade over the bottom controls begins (main.ts
    lifts it out of the list), and a tap outside it closes it. */
-body.m-compact .panel.float[data-panel="threads"], body.m-compact .panel.float[data-panel="conversation"] {
+body.m-compact .panel.float[data-panel="threads"] {
   position: fixed; left: var(--edge) !important; right: var(--edge); top: auto !important;
   bottom: var(--sheet-bottom);
   width: auto !important; height: auto !important;
@@ -169,7 +169,7 @@ body.m-compact .tl-foot [data-all="tidy"] { display: none; }
    above it, so the button that opened the sheet can close it; a tap on the
    veil closes it too (deck.ts). */
 .sheet-veil { position: absolute; inset: 0; z-index: 70; display: none; }
-body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden]), .panel.float[data-panel="conversation"]:not([hidden])) .sheet-veil {
+body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden])) .sheet-veil {
   display: block; animation: veilIn .2s var(--ease-soft);
 }
 @keyframes veilIn { from { opacity: 0; } }
@@ -183,7 +183,7 @@ body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="th
    gap from the bottom as from the sides, over the deck; a confirmation sits
    the same way. (The guide runs to the edge, full width: see its own rules.) */
 body.m-compact { --sheet-bottom: calc(var(--edge) + env(safe-area-inset-bottom, 0px)); }
-body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden]), .panel.float[data-panel="conversation"]:not([hidden])) :is(.core-label, .core-line) {
+body.m-compact .stage:has(.deck .menu:not([hidden]), .panel.float[data-panel="threads"]:not([hidden])) :is(.core-label, .core-line) {
   opacity: 0;
 }
 

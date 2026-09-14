@@ -45,11 +45,12 @@ away again. In **Config → Voice** you can make tapping him open the keyboard
 instead. Enter sends.
 
 The word just above him says what he's doing — listening, transcribing,
-thinking, speaking, sweeping — and is gone when he's idle. What he says
-appears in one box on that line: a passing notice ("Sweep complete — 12
-hosts", "Put away") above, the reply he is saying below; a tap on the box
-opens the Conversation, which keeps both. The bin takes the line over while
-something is carried. On a phone that line
+thinking, speaking, sweeping — and is gone when he's idle. The console's own
+words appear in one box on that line: a passing notice ("Sweep complete — 12
+hosts", "Put away") above, and below it what the console answers itself from
+its readings (the time, "status", "help"). Neither is kept, and a tap puts the
+box away; everything he answers through the service is written into a thread.
+The bin takes the line over while something is carried. On a phone that line
 always has room: sheets stop above it and never cover him.
 
 He calls you **sir** — or **ma'am**, if you'd rather: **Config → Voice →
@@ -58,10 +59,12 @@ and writes, his own notices included.
 
 ## The board
 
-- **A clean screen is the starting state, and talk keeps it clean.** Saying
-  something to JARVIS opens nothing: the answer is spoken and shown under him,
-  and kept in the Conversation panel ("show the conversation", or tap the line). A thread opens when
-  JARVIS has to look something up for you, or when you ask for one.
+- **Everything you ask is a thread.** A clean screen is the starting state.
+  The first question you ask opens a thread, and his answer is written into
+  it. The next question goes into the thread in front, until you start
+  another: "new thread", the + button, or tap a different one. Close the
+  thread in front and nothing takes its place, so the next question opens a
+  thread of its own.
 - **A thread is a window.** One thread on its own is just that — no group, no
   label around it. Each gets its own colour, and a `#ABCD` tag so two threads
   with the same name can be told apart ("close Research #7F2K"). Drag its title
@@ -70,11 +73,10 @@ and writes, his own notices included.
   comes back into view if it would be off the edge. Dragging a window with a
   video playing doesn't interrupt the video (moving it into a *different* group
   does reload the player).
-- **A thread is named by him.** A thread he opens for research is named in
-  the same reply that fills it — two to four words for its subject ("Lisbon in
-  October") — so "switch to the Lisbon thread" finds it. One you open yourself
-  without a name is called New thread until he first answers in it, when he
-  names it. Rename any thread by hand or by word.
+- **A thread is named by him.** A thread without a name is called New thread
+  until he first answers in it; that answer names it, two to four words for
+  its subject ("Lisbon in October"), so "switch to the Lisbon thread" finds
+  it. Rename any thread by hand or by word.
 - **Windows stay as you leave them.** The first click on a window only brings
   it forward; clicking the title bar of the window you're in folds it to a bar.
   Nothing folds or shrinks on its own. A conversation stays on its latest line
@@ -243,19 +245,12 @@ news in Cambodia"* opens a window and asks that question in it.
   an API key straight into the chat; it's stored locally and never sent to a
   model
 
-**Conversation first.** JARVIS listens and talks back; the console follows.
-Anything he can answer from what he knows is said at the core, however long,
-and kept in the Conversation panel, where lists and tables render in full —
-open it with the button beside Threads, say "show the conversation", or tap the line under him. Anything he had to find on the web is research, and research is kept: it
-goes in a thread of its own, named by him, with its sources — unless you say
-"just tell me", in which case the searched answer is said at the core. Ask for
-a thread, a window, or to keep something, and it is a thread. Pictures and
-footage always get a window, since they can't be spoken. A follow-up to the
-thread in front goes into that thread — and when you close the thread in front,
-nothing takes its place: what you say next is conversation until you open, tap
-or ask for a thread. He decides all of this from your words,
-and says where each reply belongs before he says it; the console never opens
-a thread of its own accord.
+**One place for every answer.** JARVIS listens and talks back, and
+everything he answers goes into the thread in front, or into a new thread
+when none is in front: talk, research with its sources, pictures, videos that
+play where they are. The console decides where, never the model, so an
+answer can't land somewhere you weren't looking. Starting a new subject is
+your choice, not his.
 
 The thread, panel, voice and setup lines above are the console's own and
 work with nothing connected. Grouping, moving, linking, renaming and folding
@@ -267,17 +262,17 @@ confirmation on your behalf, or change a model.
 **He sees the whole console.** Every question carries a snapshot: every group,
 every thread with a summary and its tag, what connects them, what's open, how
 he's set up, and whether this is the PC or the web version. With it go the
-last dozen lines of your conversation at the core and, when a thread is in
-front, that thread's last exchanges — so a follow-up is answered in its own
-context, and other threads reach him only as one-line summaries, or as
-findings through the web when two threads are connected.
+last dozen messages of the thread the question is asked in, so a follow-up is
+answered in its own context. Other threads reach him only as one-line
+summaries, or as findings through the web when two threads are connected.
 
 Short questions about this machine ("status", "my IP", "weather") are answered
-instantly from live readings, at the core; anything else goes to the service.
+instantly from live readings, under him, and not kept, since a reading is
+only true when it is said; anything else goes to the service.
 The service is given its web search only when the question asks to find, look
 up or check something, or for current facts — news, prices, weather elsewhere,
-scores, pictures — and always for a follow-up in a thread, where research
-lives. Plain talk goes without it, so a greeting or a fact comes back in a
+scores, pictures — or when the thread's earlier answers came from the web.
+Plain talk goes without it, so a greeting or a fact comes back in a
 second or two; a search takes a few seconds more. Searching costs, talking
 doesn't.
 

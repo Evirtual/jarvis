@@ -1,11 +1,9 @@
-/* The line under the core: the reply JARVIS is saying and a passing notice,
-   one box on the status line (say.ts); and the Conversation panel's list. */
-
-/* ---------- the line under the core: one box, two rows (say.ts) ---------- */
-/* Conversation lives here, not in a window: the reply JARVIS is saying
-   (.core-reply), drawn as it would be in a thread, and above it a passing
-   notice (.core-notice) — what the console did or couldn't do. One box on the
-   status line above him; a tap opens the Conversation, which keeps both. */
+/* The line under the core: one box, two rows (say.ts). The console's own
+   answer from its readings (.core-reply), drawn as it would be in a thread,
+   and above it a passing notice (.core-notice) — what the console did or
+   couldn't do. One box on the status line above him; neither is kept, and a
+   tap puts it away. Everything JARVIS answers through the service is in a
+   thread. */
 .core-line {
   position: absolute; left: var(--core-x, 50%); top: var(--status-y, 70%); z-index: 214;
   transform: translate(-50%, calc(-100% + 10px)); opacity: 0;
@@ -17,9 +15,3 @@
 .core-line.in { opacity: 1; transform: translate(-50%, -100%); }
 .core-notice { color: var(--text); } /* a shade quieter than what he is saying */
 .core-notice:not([hidden]) + .core-reply:not([hidden]) { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--line); }
-/* the Conversation panel's list of lines */
-.tl-core { margin-bottom: 6px; }
-.tl-chat {
-  display: flex; flex-direction: column; gap: 8px; max-height: 40vh; overflow-y: auto;
-  padding: 8px 10px; border: 1px solid var(--line); font-size: 12px; line-height: 1.5;
-}

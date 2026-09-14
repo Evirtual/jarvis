@@ -1,7 +1,7 @@
 /**
  * Which layout the screen gets: the full stage, or — on a phone — the core
- * over a list, with the instruments in the list and the Threads list and
- * the Conversation as sheets over it.
+ * over a list, with the instruments in the list and the Threads list as a
+ * sheet over it.
  */
 
 import { $ } from "./dom.js";
@@ -24,12 +24,10 @@ export function applyMode(): void {
   const overlays = $("overlays"), list = $("windows");
   if (mode === "compact" && overlays.parentElement !== list) list.prepend(overlays);
   else if (mode !== "compact" && overlays.parentElement === list) list.after(overlays);
-  // …but the Threads list and the Conversation are modal sheets on a phone, not items in the list.
-  for (const name of ["conversation", "threads"]) {
-    const sheet = document.querySelector<HTMLElement>(`.panel.float[data-panel="${name}"]`)!;
-    if (mode === "compact" && sheet.parentElement === overlays) $("stage").append(sheet);
-    else if (mode !== "compact" && sheet.parentElement !== overlays) overlays.prepend(sheet);
-  }
+  // …but the Threads list is a modal sheet on a phone, not an item in the list.
+  const sheet = document.querySelector<HTMLElement>('.panel.float[data-panel="threads"]')!;
+  if (mode === "compact" && sheet.parentElement === overlays) $("stage").append(sheet);
+  else if (mode !== "compact" && sheet.parentElement !== overlays) overlays.prepend(sheet);
   if (changed) graph.renderAll();
   panels.relayout();
   paintThreadCount();
@@ -42,8 +40,6 @@ export function wireLayout(): void {
   document.addEventListener("pointerdown", (e) => {
     const t = e.target as Element;
     if (mode !== "compact" || !(t instanceof Element)) return;
-    for (const sheet of ["threads", "conversation"] as const) {
-      if (panels.isOpen(sheet) && !t.closest(`.panel.float[data-panel="${sheet}"], #pillThreads, #pillConversation, #coreLine, .confirm-dialog, .confirm-backdrop`)) panels.hide(sheet);
-    }
+    if (panels.isOpen("threads") && !t.closest('.panel.float[data-panel="threads"], #pillThreads, #coreLine, .confirm-dialog, .confirm-backdrop')) panels.hide("threads");
   });
 }

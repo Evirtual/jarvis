@@ -12,7 +12,7 @@ export const KEY = {
   stack: "jarvis.stack",
   /** Phone: the order the threads were dragged into (stage.ts). */
   phoneOrder: "jarvis.phoneOrder",
-  /** The conversation at the core (core-chat.ts). */
+  /** Where the talk at the core was kept before everything became a thread: read once, into a thread, and dropped (board-store.ts). */
   conversation: "jarvis.conversation",
   /** The web version's keys, and what each can reach (browser-core.ts). */
   cores: "jarvis.cores",
@@ -96,4 +96,11 @@ export function recall(k: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** Drop a value from this browser's storage. */
+export function forget(k: string): void {
+  try {
+    localStorage.removeItem(k);
+  } catch { /* storage blocked: nothing was kept to drop */ }
 }

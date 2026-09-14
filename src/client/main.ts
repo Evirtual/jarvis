@@ -33,7 +33,6 @@ import { paintHosts, startReadings, wireReadings } from "./readings.js";
 import { partOfDay } from "./local.js";
 import { paintThread, wireBoard } from "./threads.js";
 import { wireThreadsPanel } from "./threads-panel.js";
-import { wireConversationPanel } from "./conversation-panel.js";
 import { refreshLinks } from "./board-links.js";
 import { wireVoiceUi } from "./voice-ui.js";
 import { wireMemory } from "./memory.js";
@@ -66,7 +65,6 @@ function boot(): void {
   wireBoard();
   wireMemory();
   wireThreadsPanel();
-  wireConversationPanel();
   wireDeck();
   wireLayout();
   wireDrawer();

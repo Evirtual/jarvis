@@ -1,16 +1,15 @@
 /**
- * How JARVIS speaks to you: the line under the core — the reply he is
- * saying, and a passing notice above it, in one box — lines written into a
+ * How JARVIS speaks to you: the line under the core — the console's own
+ * answer, and a passing notice above it, in one box — lines written into a
  * thread's window, his status word, and whether he is busy.
  */
 
 import { addressed } from "./address.js";
 import { $ } from "./dom.js";
 import { line } from "./message.js";
-import { graph, panels, voice } from "./state.js";
+import { graph, voice } from "./state.js";
 import { drainQueue, queued } from "./ask.js";
 import { pendingConfirm } from "./confirm.js";
-import { coreChat } from "./core-chat.js";
 import { S } from "./readings.js";
 
 const logState = $("logState");
@@ -22,11 +21,13 @@ export let busy = false;
  *
  *   the notice  what the console did or couldn't do — "Put away", "Queued",
  *               the greeting — for a few seconds, above the reply;
- *   the reply   what JARVIS is saying, drawn as a reply would be in a
+ *   the reply   what the console answers itself from its readings — the
+ *               time, the status, help — drawn as a reply would be in a
  *               thread, while it is spoken and a while after.
  *
- * The box shows while either row does; a tap on it opens the Conversation,
- * where both are kept.
+ * Neither is kept: everything JARVIS answers through the service is written
+ * into a thread (ask.ts), and a reading is only true when it is said. The box
+ * shows while either row does; a tap on it puts it away.
  * ===================================================================== */
 
 const box = $("coreLine");
@@ -48,18 +49,14 @@ function paintLine(): void {
   }
 }
 
-/**
- * A passing notice. Spoken unless told not to; kept in the Conversation as a
- * note unless it is only passing ("Queued").
- */
-export function notice(text: string, opts: { speak?: boolean; record?: boolean } = {}): void {
+/** A passing notice, spoken unless told not to. */
+export function notice(text: string, opts: { speak?: boolean } = {}): void {
   text = addressed(text);
   noticeRow.textContent = text;
   noticeRow.hidden = false;
   if (noticeTimer) clearTimeout(noticeTimer);
   noticeTimer = window.setTimeout(hideNotice, 6000);
   paintLine();
-  if (opts.record !== false) coreChat.add("sys", text);
   if (opts.speak !== false) voice.speak(text);
 }
 
@@ -72,16 +69,20 @@ export function hideNotice(): void {
 }
 
 /**
- * The reply being said. It stays while it is spoken and a while after, or
- * until tapped. `partial`: the text is still arriving.
+ * The console's own answer, said under the core: shown and spoken, and gone a
+ * while after it has been said, or when tapped. `more` is Markdown shown
+ * under what is said but not spoken — a list, a table — and it keeps the line
+ * until tapped or until something else is said, since it takes longer to read
+ * than to hear.
  */
-export function reply(text: string, opts: { partial?: boolean } = {}): void {
-  replyRow.replaceChildren(...line("jarvis", text).childNodes);
+export function jarvis(text: string, opts: { more?: string } = {}): void {
+  text = addressed(text);
+  replyRow.replaceChildren(...line("jarvis", opts.more ? `${text}\n\n${opts.more}` : text).childNodes);
   replyRow.hidden = false;
   if (replyTimer) clearTimeout(replyTimer);
-  replyTimer = null;
-  if (!opts.partial) replyTimer = window.setTimeout(replyFades, 14_000);
+  replyTimer = opts.more ? null : window.setTimeout(replyFades, 14_000);
   paintLine();
+  voice.speak(text);
 }
 
 /** After its time, and once it has been said in full. */
@@ -97,18 +98,7 @@ export function hideReply(): void {
   paintLine();
 }
 
-box.addEventListener("click", () => { panels.show("conversation"); hideReply(); hideNotice(); });
-
-/**
- * JARVIS speaks, at the core: a line of conversation, kept in the transcript
- * (the Conversation panel) and spoken. Threads hold research; this is talk.
- */
-export function jarvis(text: string, opts: { speak?: boolean; record?: boolean } = {}): void {
-  text = addressed(text);
-  if (opts.record !== false) coreChat.add("assistant", text);
-  reply(text);
-  if (opts.speak !== false) voice.speak(text);
-}
+box.addEventListener("click", () => { hideReply(); hideNotice(); });
 
 /* ===================================================================== *
  * Lines in a thread's window

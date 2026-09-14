@@ -108,10 +108,9 @@ anything moves and every other frame at rest.
 ## What leaves your machine
 
 - **The connected service** sees your questions, your recorded speech and the
-  text it speaks — nothing else. Each question carries the last few lines of
-  your conversation at the core, a snapshot of the board (thread titles and
-  one-line summaries, and the last exchanges of the thread in front) and the
-  live readings it may need.
+  text it speaks — nothing else. Each question carries the last dozen
+  messages of the thread it is asked in, a snapshot of the board (thread
+  titles and one-line summaries) and the live readings it may need.
 - **Two services see your IP for readings** on the PC: ip-api.com and
   open-meteo.com. Set `JARVIS_OFFLINE=1` to disable both — the console then
   reports it has no uplink data rather than inventing any. The web version asks
@@ -154,3 +153,7 @@ is built.
 - An earlier version had a built-in code agent. It has been removed;
   conversations from it are kept as ordinary threads, renamed "Previous
   conversation".
+- Everything JARVIS answers is written into a thread. An earlier version also
+  kept talk outside any thread, in a Conversation panel; what it kept is
+  brought onto the board once, as a thread called "Previous conversation".
+  Why: [PLAN-everything-is-a-thread.md](PLAN-everything-is-a-thread.md).

@@ -8,7 +8,6 @@ import { $, esc } from "./dom.js";
 import { type PanelName } from "./panels.js";
 import { radar, panels } from "./state.js";
 import { paintThreadList } from "./threads-panel.js";
-import { paintCoreChat } from "./conversation-panel.js";
 import { paintTelemetry } from "./readings.js";
 import { mode } from "./layout.js";
 
@@ -22,7 +21,7 @@ import { mode } from "./layout.js";
 
 // Readings use the same visual vocabulary as the rows in their More sheets.
 const CHIP_ICONS: Record<string, string> = {
-  pillThreads: "threads", pillConversation: "conversation", pillCpu: "compute", pillGpu: "graphics", pillDisk: "storage",
+  pillThreads: "threads", pillCpu: "compute", pillGpu: "graphics", pillDisk: "storage",
   pillLan: "perimeter", pillNet: "uplink", pillWx: "environment",
 };
 
@@ -137,7 +136,6 @@ export function wireDeck(): void {
   panels.onChange = (): void => {
     document.querySelectorAll<HTMLElement>("[data-open]").forEach((b) => b.classList.toggle("on", panels.isOpen(b.dataset.open as PanelName)));
     if (panels.isOpen("threads")) paintThreadList();
-    if (panels.isOpen("conversation")) paintCoreChat();
     radar.visible = panels.isOpen("perimeter");
     // a panel's body is painted only while it is open — fill it the moment it opens
     paintTelemetry();

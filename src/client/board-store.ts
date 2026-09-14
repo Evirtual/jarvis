@@ -4,8 +4,9 @@
  * the Workspace the stage draws.
  */
 
-import { KEY, recall, store } from "./storage.js";
-import { Workspace, migrate, type WorkspaceData } from "./workspace.js";
+import type { Turn } from "../shared/types.js";
+import { KEY, forget, recall, store } from "./storage.js";
+import { Workspace, conversationTurns, migrate, type WorkspaceData } from "./workspace.js";
 
 export class BoardStore {
   readonly ws: Workspace;
@@ -14,6 +15,25 @@ export class BoardStore {
 
   constructor() {
     this.ws = new Workspace(BoardStore.load());
+    this.adoptConversation();
+  }
+
+  /**
+   * The talk kept at the core before everything was a thread, brought onto
+   * the board as an ordinary thread — there, but not in front. The old record
+   * is dropped only once the board holding it has been saved; a browser that
+   * refuses the save keeps it, to be brought over on the next visit.
+   */
+  private adoptConversation(): void {
+    const raw = recall(KEY.conversation);
+    if (raw === null) return;
+    let turns: Turn[] = [];
+    try { turns = conversationTurns(JSON.parse(raw)); } catch { /* unreadable: nothing to bring over */ }
+    if (turns.length) {
+      this.ws.adoptThread("Previous conversation", turns);
+      if (!store(KEY.workspace, JSON.stringify(this.ws.data))) return;
+    }
+    forget(KEY.conversation);
   }
 
   /**

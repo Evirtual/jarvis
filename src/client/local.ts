@@ -1,11 +1,11 @@
 /**
- * Questions answered from live readings, never from a model.
+ * Questions answered from live readings, never from a model — said under the
+ * core and not kept in any thread: a reading is only true when it is said.
  */
 
 import { gib, hhmm } from "./dom.js";
-import { panels, voice } from "./state.js";
+import { voice } from "./state.js";
 import { jarvis } from "./say.js";
-import { coreChat } from "./core-chat.js";
 import { readiness } from "./readiness.js";
 import { S, T, W } from "./readings.js";
 import { SERVERLESS } from "./server.js";
@@ -58,9 +58,7 @@ export function localCommand(raw: string): boolean {
   const elsewhere = /\b(?:in|at|for|near)\s+(?!here\b|home\b)[a-z]/.test(q);
 
   if (/^(help|commands|what can you do|what can i say)$/.test(q)) {
-    jarvis("Here's what I answer to directly, sir — it's in the conversation, and you can ask me to operate anything on this console in plain words.");
-    coreChat.add("sys", HELP);
-    panels.show("conversation");
+    jarvis("Here's what I answer to directly, sir — and you can ask me to operate anything on this console in plain words.", { more: HELP });
     return true;
   }
   if (short && /^(?:what(?:'s| is) the )?time(?: is it)?$|^what time is it$/.test(q)) {
@@ -117,16 +115,16 @@ export function localCommand(raw: string): boolean {
     }
     if (!S.hosts.length) { jarvis("I haven't swept the network, sir — I only do that when asked. Say scan and I'll have a look."); return true; }
     const named = S.hosts.filter((h) => h.vendor && h.vendor !== "Randomised MAC");
+    const table = "```\n" + S.hosts
+      .map((h) => `${h.ip.padEnd(16)}${`${Math.round(h.rttMs)}ms`.padStart(6)}  ${h.hostname ?? h.vendor ?? h.mac ?? "unidentified"}`)
+      .join("\n") + "\n```";
     jarvis(
       `${S.hosts.length} devices answering on ${S.subnet}, sir. The router is at ${S.gateway ?? "the usual place"}. ` +
       (named.length
         ? `I can identify ${named.length} of them — ${named.slice(0, 4).map((h) => h.vendor).join(", ")}.`
         : "Most are using randomised addresses."),
+      { more: table },
     );
-    coreChat.add("sys", "```\n" + S.hosts
-      .map((h) => `${h.ip.padEnd(16)}${`${Math.round(h.rttMs)}ms`.padStart(6)}  ${h.hostname ?? h.vendor ?? h.mac ?? "unidentified"}`)
-      .join("\n") + "\n```");
-    panels.show("conversation");
     return true;
   }
   if (short && /\b(?:uplink|wi-?fi|my ip|ip address|isp|am i online|connection status|internet (?:status|connection|speed))\b/.test(q)) {

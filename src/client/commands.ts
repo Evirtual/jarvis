@@ -98,7 +98,6 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
     [/\b(?:graphics|gpu|video card|vram)\b/, "graphics"],
     [/\b(?:storage|disks?|drives?)\b/, "storage"],
     [/\b(?:uplink|wi-?fi|network|internet|connection)\b/, "uplink"],
-    [/\b(?:conversation|transcript|what (?:we|you|i) (?:said|talked about))\b/, "conversation"],
   ];
   if ((/\b(?:close|hide|dismiss|put away|clear)\s+(?:all|every|the)?\s*(?:panels?|overlays?|everything)\b/.test(q) ||
        /\bput\s+(?:all\s+)?(?:the\s+)?(?:panels?|overlays?)\s+away\b/.test(q)) && !/\b(?:thread|chat|group)\b/.test(q)) {
@@ -106,7 +105,7 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   }
   const showP = /\b(?:show|open|display|bring up|pull up|let me see|give me)\b/.test(q);
   const hideP = /\b(?:close|hide|dismiss|put away)\b/.test(q);
-  if ((showP || hideP) && /\b(?:panel|stats|readings?|map|radar|weather|compute|graphics|gpu|cpu|storage|disks?|uplink|environment|perimeter|conversation|transcript)\b/.test(q)) {
+  if ((showP || hideP) && /\b(?:panel|stats|readings?|map|radar|weather|compute|graphics|gpu|cpu|storage|disks?|uplink|environment|perimeter)\b/.test(q)) {
     const hit = PANEL_WORDS.find(([rx]) => rx.test(q));
     if (hit) return hideP && !showP ? { name: "hide_panel", panel: hit[1] } : { name: "show_panel", panel: hit[1] };
   }
@@ -215,35 +214,6 @@ export function parseUtterance(text: string, ctx: ParseContext = NO_CONTEXT): Pa
 /* ===================================================================== *
  * What the reasoning core writes
  * ===================================================================== */
-
-/**
- * Where a reply belongs, declared by the model in its first words:
- * [[at: core]] — conversation, said under the core and kept in the transcript;
- * [[at: thread]] — the thread in front (or one named: [[at: thread "Title"]]);
- * [[at: new "Title"]] — a thread opened for it. The console follows; it never
- * decides this itself.
- */
-export type Route = { at: "core" } | { at: "thread"; title?: string } | { at: "new"; title?: string };
-const ROUTE = /^\s*\[\[\s*at:\s*(core|thread|new)(?:\s+"([^"]*)")?\s*\]\]\s*/i;
-
-/**
- * The route at the start of a reply, and the reply without it. While a reply
- * is still arriving, its first characters may be a marker not yet complete:
- * `undecided` then, and nothing should be shown yet. No marker at all means
- * the core.
- */
-export function parseRoute(text: string): { route: Route | null; text: string; undecided: boolean } {
-  const m = ROUTE.exec(text);
-  if (m) {
-    const at = m[1]!.toLowerCase() as Route["at"];
-    const title = m[2]?.trim();
-    const route: Route = at === "core" ? { at } : { at, ...(title ? { title } : {}) };
-    return { route, text: text.slice(m[0].length), undecided: false };
-  }
-  const head = text.trimStart();
-  if (/^\[\[?/.test(head) && !head.includes("]]") && head.length < 60) return { route: null, text: "", undecided: true };
-  return { route: null, text, undecided: false };
-}
 
 const DIRECTIVE = /\[\[do:\s*([a-z_]+)((?:\s+[a-z_]+\s*=\s*"[^"]*")*)\s*\]\]/gi;
 const MAX_DIRECTIVES = 8;

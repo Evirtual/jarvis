@@ -1,15 +1,12 @@
 /**
  * Asking: the command line and the queue, what the reasoning core is told,
- * and the answer streamed back into its window.
+ * and the answer streamed back into its thread.
  */
 
 import type { ProviderId, Effort } from "../shared/types.js";
 import { effortAsked } from "../shared/services/common.js";
 import { api } from "./api.js";
-import {
-  extractDirectives, parseRoute, parseUtterance, type Action, type Route,
-} from "./commands.js";
-import { coreChat } from "./core-chat.js";
+import { extractDirectives, parseUtterance, type Action } from "./commands.js";
 import { addressed, getAddress } from "./address.js";
 import { $, gib } from "./dom.js";
 import { line } from "./message.js";
@@ -17,14 +14,13 @@ import { type Thread } from "./stage.js";
 import { clip } from "./text.js";
 import { DEFAULT_TITLE, threadRef } from "./workspace.js";
 import { conn, graph, input, panels, voice, ws } from "./state.js";
-import { addMsg, busy, hideNotice, hideReply, jarvis, notice, noteIn, reply, setBusy } from "./say.js";
-import { interceptKey, KEY_PATTERNS, parseCtx, resolve, runAction } from "./actions.js";
+import { addMsg, busy, hideNotice, hideReply, jarvis, notice, noteIn, setBusy } from "./say.js";
+import { interceptKey, KEY_PATTERNS, parseCtx, runAction } from "./actions.js";
 import { S, T, W } from "./readings.js";
 import { paintThread, paintThreadCount } from "./threads.js";
 import { boardLinks, refreshLinks, relatedContext } from "./board-links.js";
 import { localCommand } from "./local.js";
 import { mode } from "./layout.js";
-import { whereTo } from "./routing.js";
 import { showKeyboard, tapSpeaks, keyboardShown } from "./voice-ui.js";
 import { setDrawer } from "./drawer.js";
 import { SERVERLESS } from "./server.js";
@@ -138,72 +134,64 @@ function cleanReply(s: string): string {
   return cleaned.trim();
 }
 
-/** The thread in front, with its last exchanges: what a follow-up is a follow-up to. */
-function frontContext(t: Thread): string {
-  const tail = t.turns.slice(-6).map((x) => `${x.role === "user" ? "User" : "You"}: ${clip(x.content, 400)}`);
+/** What the snapshot doesn't say about the thread we're in: that this is it, and whether it still wants a name. */
+function threadContext(t: Thread): string {
   const unnamed = t.title === DEFAULT_TITLE ? ' It has no name yet: end your reply with [[do: title_thread title="…"]].' : "";
-  return `[The thread in front on the console is “${t.title} #${threadRef(t)}”${tail.length ? `; its last exchanges: ${tail.join(" / ")}` : ", empty so far"}. A follow-up to it belongs there ([[at: thread]]); anything else is conversation at the core.${unnamed}]`;
+  return `[This conversation is the thread “${t.title} #${threadRef(t)}” on the console.${unnamed}]`;
 }
 
-/** Where a reply is being written: under the core, or into a thread's window. */
-type Target = { kind: "core" } | { kind: "thread"; thread: Thread; body: HTMLElement };
+/**
+ * Where a question is answered: the thread in front — or, with none in front
+ * (or only the readiness card, which holds no conversation), a thread opened
+ * for it. The console decides this; the model is never asked.
+ */
+function threadFor(): Thread {
+  const front = graph.active;
+  return front && !front.kind ? front : ws.createThread();
+}
 
 /**
- * One question on its way to its answer: where the reply is going once the
- * model has said (place), what of it has arrived (streamed), and the
- * housekeeping it carried.
+ * One question on its way to its answer, in its thread: the row the reply is
+ * written into, what of it has arrived (streamed), and the housekeeping it
+ * carried.
  */
 class Exchange {
-  target: Target | null = null;
   streamed = "";
   housekeeping: Action[] = [];
-  /** `effort`: depth asked for in words, for this question only; null leaves it to the service's setting. */
-  constructor(readonly question: string, readonly front: Thread | null, readonly effort: Effort | null = null) {}
+  /** The reply's row in the thread's window: "Thinking…" until the first words arrive. */
+  readonly body: HTMLElement;
 
-  /** Follow the model's word (routing.ts): the place is made ready and the question written there. Once. */
-  place(route: Route | null): Target {
-    if (this.target) return this.target;
-    const to = whereTo(route, this.front, (title) => { const r = resolve(title); return typeof r === "string" ? null : r; });
-    const thread = to.kind === "thread" ? to.thread : to.kind === "new" ? ws.createThread(to.title ? { title: to.title } : {}) : null;
-    if (!thread) { this.target = { kind: "core" }; return this.target; }
+  /** The question written into its thread, in front, with a row ready for the reply. `effort`: depth asked for in words, for this question only; null leaves it to the service's setting. */
+  constructor(readonly question: string, readonly thread: Thread, readonly effort: Effort | null = null) {
     if (!ws.isOpen(thread)) ws.setOpen(thread.id, true);
     graph.commit();
     graph.focus(thread.id);
     paintThread();
-    hideReply(); // the reply is written in the window, not under the core
-    addMsg("user", this.question, thread.id);
-    thread.turns.push({ role: "user", content: this.question });
-    coreChat.forget("user", this.question); // it is the thread's, not the conversation's
+    hideReply(); // a reading said under the core a moment ago is not part of this
+    addMsg("user", question, thread.id);
+    thread.turns.push({ role: "user", content: question });
     graph.streamingId = thread.id;
-    const body = addMsg("jarvis", "Thinking…", thread.id);
-    graph.attachLive(thread.id, body);
-    this.target = { kind: "thread", thread, body };
-    return this.target;
+    this.body = addMsg("jarvis", "Thinking…", thread.id);
+    graph.attachLive(thread.id, this.body);
   }
 
-  /** The reply so far, where it is going. */
+  /** The reply so far, drawn as the finished reply will be, so a list doesn't jump into shape at the end. */
   write(text: string): void {
-    const t = this.target;
-    if (!t) return;
-    if (t.kind === "core") { reply(text, { partial: true }); return; }
-    // Drawn as the finished reply will be, so a list doesn't jump into shape at the end.
-    t.body.replaceChildren(...line("jarvis", text).childNodes);
-    const b = graph.bodyOf(t.thread.id);
+    this.body.replaceChildren(...line("jarvis", text).childNodes);
+    const b = graph.bodyOf(this.thread.id);
     if (b) b.scrollTop = b.scrollHeight;
   }
 }
 
 /**
- * Ask the connected service. The model hears the recent conversation at the
- * core and sees the console — the thread in front with its last exchanges —
- * and says in its first words where the reply belongs (parseRoute): the
- * core, the thread in front, or a thread opened for it. Nothing is written
- * anywhere until it has said so; then the reply streams to that place.
+ * Ask the connected service, in the thread the question belongs to
+ * (threadFor). The model is sent that thread — its last dozen messages — and
+ * sees the console, and the reply streams into the thread as it arrives.
  */
 async function askCore(question: string, effort: Effort | null = null): Promise<void> {
   setBusy(true, effort === "thorough" ? "Thinking hard" : "Thinking");
   voice.beginStream();
-  const x = new Exchange(question, graph.active && !graph.active.kind ? graph.active : null, effort);
+  const x = new Exchange(question, threadFor(), effort);
   let actions: Action[] = [];
   try {
     actions = finish(x, await stream(x));
@@ -211,7 +199,7 @@ async function askCore(question: string, effort: Effort | null = null): Promise<
     fail(x, err);
   }
   graph.streamingId = null;
-  if (x.target?.kind === "thread") housekeep(x.target.thread, x.housekeeping);
+  housekeep(x.thread, x.housekeeping);
   graph.save();
   refreshLinks();
   setBusy(false);
@@ -220,31 +208,26 @@ async function askCore(question: string, effort: Effort | null = null): Promise<
 
 /** Everything the model is told with the question. */
 function context(x: Exchange): string {
-  const front = x.front;
-  return [appSnapshot(), contextBlock(), front ? frontContext(front) : "", front ? relatedContext(front) : ""].filter(Boolean).join("\n");
+  return [appSnapshot(), contextBlock(), threadContext(x.thread), relatedContext(x.thread)].filter(Boolean).join("\n");
 }
 
 /**
- * The question streamed to where it belongs, through the service in use — or
+ * The question streamed into its thread, through the service in use — or
  * the spare, when the first is at its limit or out of credit before a word
  * has been said. Resolves to the whole reply.
  */
 async function stream(x: Exchange): Promise<string> {
   const ctx = context(x);
-  // The recent conversation, then the question — which is already the transcript's last line (answer), so not twice.
-  const recent = coreChat.recent(11);
-  if (recent[recent.length - 1]?.role === "user" && recent[recent.length - 1]?.content === x.question) recent.pop();
-  const turns = [...recent.slice(-10), { role: "user" as const, content: x.question }];
-  // A thread in front is research, so the web is offered for a follow-up in it whatever the wording (wantsSearch decides for talk at the core).
-  const request = { turns, ...(ctx ? { context: ctx } : {}), address: getAddress(), ...(x.front ? { search: true } : {}), ...(x.effort ? { effort: x.effort } : {}) };
+  // The thread so far, ending with the question just written into it. The
+  // service is offered the web when the question or the thread's earlier
+  // answers want it (wantsSearch), not merely for being in a thread.
+  const request = { turns: x.thread.turns.slice(-12), ...(ctx ? { context: ctx } : {}), address: getAddress(), ...(x.effort ? { effort: x.effort } : {}) };
   const askVia = (provider?: ProviderId): Promise<string> => api.ask(
     { ...request, ...(provider ? { provider } : {}) },
     (full) => {
-      const r = parseRoute(full);
-      if (r.undecided) return; // the marker is still arriving: nothing to show yet
-      x.place(r.route);
-      // Hide console directives while they stream in; they are acted on, not read.
-      const visible = r.text.split("[[")[0] ?? "";
+      // Console directives and media markers are acted on or drawn once the reply is whole, not read as they arrive.
+      const visible = full.split("[[")[0] ?? "";
+      if (!visible) return; // nothing to show yet: it stays "Thinking…"
       x.streamed = visible;
       x.write(visible);
       voice.pushText(visible);
@@ -252,7 +235,7 @@ async function stream(x: Exchange): Promise<string> {
     (status) => {
       if (status === "searching") {
         setBusy(true, "Searching the web");
-        if (x.target?.kind === "thread" && x.target.body.textContent === "Thinking…") x.write("Searching the web…");
+        if (x.body.textContent === "Thinking…") x.write("Searching the web…");
       }
     },
   );
@@ -267,88 +250,69 @@ async function stream(x: Exchange): Promise<string> {
     try {
       return await askVia(spare);
     } catch (err2) {
-      // the spare failed too: one line with both reasons, not two boxes at once
+      // the spare failed too: one line in the thread with both reasons, and the notice taken back
       hideNotice();
       throw new Error(`${why} ${err2 instanceof Error ? err2.message : String(err2)}`);
     }
   }
 }
 
-/** The reply, whole: written in full where it belongs, kept, and spoken to its end. Returns the console operations it asked for. */
+/** The reply, whole: written in full in its thread, kept, and spoken to its end. Returns the console operations it asked for. */
 function finish(x: Exchange, raw: string): Action[] {
-  const routed = parseRoute(raw);
-  const t = x.place(routed.route); // a reply of directives alone still has a place
-  const d = extractDirectives(routed.text);
+  const d = extractDirectives(raw);
   // his own housekeeping — naming the thread — waits until the exchange is recorded
   x.housekeeping = d.actions.filter(isHousekeeping);
   const actions = d.actions.filter((a) => !isHousekeeping(a));
   const out = cleanReply(d.text);
-  if (t.kind === "core") {
-    if (!out && actions.length) { hideReply(); voice.stop(); }
-    else {
-      const said = out || "I've nothing useful on that, sir.";
-      coreChat.add("assistant", said);
-      reply(said);
-      if (out) voice.endStream(x.streamed); // most of it has been spoken already; this sends the last sentence
-      else voice.speak(said);
-    }
-    return actions;
-  }
-  graph.detachLive(t.thread.id, t.body);
+  graph.detachLive(x.thread.id, x.body);
   if (!out && actions.length) {
-    t.body.remove();
+    x.body.remove();
     voice.stop();
   } else if (!out) {
-    t.thread.turns.pop();
+    x.thread.turns.pop();
     x.write("I've nothing useful on that, sir.");
-    voice.speak(t.body.textContent ?? "");
+    voice.speak(x.body.textContent ?? "");
   } else {
     // Streaming starts as plain text. Replace its final row with the normal
     // thread renderer so source links, images and video players appear now
     // as well as after this thread is reopened.
-    t.body.replaceWith(line("jarvis", out));
-    t.thread.turns.push({ role: "assistant", content: out });
-    voice.endStream(x.streamed);
+    x.body.replaceWith(line("jarvis", out));
+    x.thread.turns.push({ role: "assistant", content: out });
+    voice.endStream(x.streamed); // most of it has been spoken already; this sends the last sentence
   }
   return actions;
 }
 
-/** The service refused, or could not be reached: the reason, where the reply would have gone. */
+/** The service refused, or could not be reached: the reason, in the thread, where the reply would have been. */
 function fail(x: Exchange, err: unknown): void {
   const msg = addressed(err instanceof Error ? err.message : String(err));
-  const t = x.target ?? x.place(null);
-  if (t.kind === "core") {
-    reply(msg);
-  } else {
-    // The question leaves the history — it was never answered, and must not
-    // be sent again as if it had been — but it stays on screen with the
-    // reason, both kept live so the window's next redraw keeps them too.
-    const asked = t.thread.turns[t.thread.turns.length - 1];
-    t.thread.turns.pop();
-    graph.detachLive(t.thread.id, t.body);
-    if (asked?.role === "user") {
-      const askedLine = line("user", asked.content);
-      t.body.before(askedLine);
-      graph.attachLive(t.thread.id, askedLine);
-    }
-    graph.attachLive(t.thread.id, t.body);
-    x.write(msg);
+  // The question leaves the history — it was never answered, and must not
+  // be sent again as if it had been — but it stays on screen with the
+  // reason, both kept live so the window's next redraw keeps them too.
+  const asked = x.thread.turns[x.thread.turns.length - 1];
+  graph.detachLive(x.thread.id, x.body);
+  if (asked?.role === "user") {
+    x.thread.turns.pop();
+    const askedLine = line("user", asked.content);
+    x.body.before(askedLine);
+    graph.attachLive(x.thread.id, askedLine);
   }
+  graph.attachLive(x.thread.id, x.body);
+  x.write(msg);
   voice.speak(msg);
   void conn.refresh();
 }
 
 /**
  * The console operations the reply asked for. Its words already acknowledged
- * the request, so the outcome is reported quietly rather than talked over.
+ * the request, so the outcome is noted quietly in the thread it was asked in
+ * rather than talked over.
  */
 async function carryOut(x: Exchange, actions: Action[]): Promise<void> {
   for (const a of actions) {
-    if (a.name === "new_thread" && a.branch && !a.parent && x.target?.kind === "thread") a.parentId = x.target.thread.id;
+    if (a.name === "new_thread" && a.branch && !a.parent) a.parentId = x.thread.id;
     const note = await runAction(a, true);
-    if (!note) continue;
-    if (x.target?.kind === "thread") noteIn(graph.activeId, note);
-    else notice(note, { speak: false });
+    if (note) noteIn(x.thread.id, note);
   }
 }
 
@@ -435,7 +399,7 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
     // Asked in the thread you were looking at when you asked, even if JARVIS
     // has moved on to another window by the time he gets to it.
     queued.push({ text: t, ...(graph.activeId ? { threadId: graph.activeId } : {}) });
-    if (busy) notice(`Queued — I'll take “${clip(t, 60)}” next.`, { record: false });
+    if (busy) notice(`Queued — I'll take “${clip(t, 60)}” next.`);
     else setTimeout(drainQueue, 0);
     return;
   }
@@ -460,15 +424,13 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
 
 /**
  * What you said, answered: by the console itself when it is one of the things
- * it answers directly, otherwise by the connected service — which says where
- * the reply belongs (askCore). The console makes no thread of its own accord.
+ * it answers directly from its readings — said under the core, not kept —
+ * otherwise by the connected service, in the thread in front or a thread
+ * opened for it (askCore).
  */
 async function answer(t: string): Promise<void> {
   // The server keeps 4,000 characters of a question; say so rather than cut quietly.
   if (t.length > 4000) { notice("That's over 4,000 characters, sir — I'll take the first 4,000."); t = t.slice(0, 4000); }
-  // What you said goes in the conversation first; a reply that turns out to
-  // belong in a thread takes it back out (askCore).
-  coreChat.add("user", t);
   if (localCommand(t)) return;
   // "think hard about…" asks for the thorough setting for this one question; the words stay in it
   if (conn.anyReady) await askCore(t, effortAsked(t));

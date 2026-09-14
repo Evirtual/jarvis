@@ -18,7 +18,7 @@ import type { ProviderId } from "./types.js";
 
 /* ---------------- what the console has ---------------- */
 
-export const PANEL_NAMES = ["threads", "conversation", "compute", "graphics", "storage", "perimeter", "uplink", "environment"] as const;
+export const PANEL_NAMES = ["threads", "compute", "graphics", "storage", "perimeter", "uplink", "environment"] as const;
 export type PanelName = (typeof PANEL_NAMES)[number];
 
 export const CONFIG_TABS = ["connections", "voice", "access", "quick"] as const;
@@ -138,7 +138,7 @@ export const DIRECTIVES: readonly Directive[] = [
     make: (a) => ({ name: "open_config", tab: CONFIG_TABS.find((t) => t === a.tab) ?? "connections" }) },
   { name: "open_setup", use: "", doc: "the first-run guide, when asked for it", make: () => ({ name: "open_setup" }) },
   { name: "sweep_network", use: "", doc: "sweeps the network — only when asked", make: () => ({ name: "sweep" }) },
-  { name: "show_panel", use: `name="${PANEL_NAMES.join("|")}"`, doc: "opens an instrument panel (conversation: the transcript of what was said at the core)",
+  { name: "show_panel", use: `name="${PANEL_NAMES.join("|")}"`, doc: "opens an instrument panel",
     make: (a) => PANEL_NAMES.includes(a.name as PanelName) ? { name: "show_panel", panel: a.name as PanelName } : null },
   { name: "hide_panel", use: 'name="…|all"', doc: "closes one, or all",
     make: (a) => a.name === "all" || PANEL_NAMES.includes(a.name as PanelName) ? { name: "hide_panel", panel: a.name as PanelName | "all" } : null },
