@@ -39,14 +39,15 @@ const HELP = [
       ]),
   "- **time** · **date** — the obvious",
   "", // a blank line, or the next line would be read as the item above continuing
-  "Operate the console in plain words, alone or mid-sentence:",
+  "Operate the console in plain words — said on its own, a command is done at once:",
   "- new thread … · branch off … (a subthread) · close this chat (put away) · restore … · go back to …",
-  "- connect A with B (puts them in one bubble) · move A into Travel · new group called … · collapse Research",
   "- show the radar · open the weather · show the threads · close all panels",
   "- switch to Gemini / ChatGPT · use the Charon voice · speak faster · mute / unmute",
   "- paste an API key here and I'll connect it — it never reaches a model",
   "",
-  "Anything else goes to the connected service, with live readings and web search.",
+  "Start with a thread and go on with the question — \"new thread about owls\", \"go back to Lisbon and find hotels\" — and it is asked there.",
+  "",
+  "Anything else comes to me, with live readings and web search — organising the board too: connect A with B, move A into Travel, new group called …, collapse Research.",
 ].join("\n");
 
 const NO_READINGS_YET = "Telemetry hasn't attached yet, sir. Give me a moment.";

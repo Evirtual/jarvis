@@ -294,6 +294,53 @@ await check('everything is a thread: nothing in front opens one; the next questi
   return { threads: w.threads.length, owls: turns(owls) };
 });
 
+await check('the thread you choose is where the answer goes: tapped, named, named with a question, or new from the button', async () => {
+  await fresh();
+  await say('new thread called Alpha'); await untilWindow(/^alpha$/);
+  await say('new thread called Beta'); await untilWindow(/^beta$/);
+  const w0 = await ws();
+  const alpha = w0.threads.find((t) => t.title === 'Alpha').id, beta = w0.threads.find((t) => t.title === 'Beta').id;
+  /** The questions a thread holds, in order. */
+  const asksIn = async (id) => (await ws()).threads.find((t) => t.id === id)?.turns.filter((x) => x.role === 'user').map((x) => x.content) ?? [];
+  // the newest thread is in front: the question goes there
+  await say('one for Beta'); await untilIdle();
+  // a tap on another window puts it in front, and the next question goes there
+  const body = await page.$(`section.chatwin[data-id="${alpha}"] .cw-body`);
+  const box = await body.boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await until((id) => JSON.parse(localStorage.getItem('jarvis.workspace') || '{}').activeId === id, 'a tap to put Alpha in front', 5000, alpha);
+  await say('one for Alpha'); await untilIdle();
+  // named: "go to Beta", then a question
+  await say('go to Beta');
+  await until((id) => JSON.parse(localStorage.getItem('jarvis.workspace') || '{}').activeId === id, '"go to Beta" to put Beta in front', 5000, beta);
+  await say('two for Beta'); await untilIdle();
+  // named with the question in the same breath
+  await say('go back to Alpha and two for Alpha'); await untilIdle();
+  // the deck's New thread button: the next question goes into the new window
+  await click('#newThread');
+  await until((ids) => { const w = JSON.parse(localStorage.getItem('jarvis.workspace') || '{}'); return w.activeId && !ids.includes(w.activeId); }, 'the button to put a new thread in front', 5000, [alpha, beta]);
+  const fresh3 = (await ws()).activeId;
+  await say('one for the new one'); await untilIdle();
+  const got = { alpha: await asksIn(alpha), beta: await asksIn(beta), fresh: await asksIn(fresh3) };
+  assert(JSON.stringify(got.beta) === JSON.stringify(['one for Beta', 'two for Beta']), 'Beta holds: ' + JSON.stringify(got));
+  assert(JSON.stringify(got.alpha) === JSON.stringify(['one for Alpha', 'two for Alpha']), 'Alpha holds: ' + JSON.stringify(got));
+  assert(JSON.stringify(got.fresh) === JSON.stringify(['one for the new one']), 'the new thread holds: ' + JSON.stringify(got));
+  assert((await ws()).threads.length === 3, 'a thread too many: ' + JSON.stringify((await ws()).threads.map((t) => t.title)));
+  return got;
+});
+
+await check('a command word inside a sentence goes to JARVIS as a question, never acts', async () => {
+  await fresh();
+  const n = asked.length;
+  await say('show me the weather in Paris'); await untilIdle();
+  await say('silence of the lambs, who directed it'); await untilIdle();
+  const b = await board();
+  assert(!b.panels.includes('environment'), 'the weather panel opened');
+  assert(await page.evaluate(() => document.getElementById('voiceOut').checked), 'JARVIS was muted');
+  assert(asked.slice(n).join('|') === 'show me the weather in Paris|silence of the lambs, who directed it', 'not asked whole: ' + JSON.stringify(asked.slice(n)));
+  return { asked: asked.slice(n) };
+});
+
 await check('a conversation kept at the core by an earlier version comes back as a thread, not in front', async () => {
   await fresh();
   await page.evaluate(() => localStorage.setItem('jarvis.conversation', JSON.stringify([

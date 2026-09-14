@@ -221,11 +221,19 @@ Connections, and typing always works.
 
 ## Everything by conversation
 
-Anything you can click, you can say, on its own or mid-sentence. An utterance
-is split into instructions and a question: *"start a new chat and find today's
-news in Cambodia"* opens a window and asks that question in it, and so does
-*"open a new thread about owls"*: what a new thread is about, said in the
-same breath, is its first question.
+Anything you can click, you can say. What you say is one of three things:
+
+- **A command, said on its own** — "mute", "show the radar", "close this
+  chat", "switch to Gemini" — is carried out at once, with nothing connected.
+- **A thread, then a question** — *"start a new chat and find today's news in
+  Cambodia"*, *"open a new thread about owls"*, *"go back to Lithuania and
+  find hotels"* — opens the thread or brings it in front, and asks the
+  question there.
+- **Anything else is a question for JARVIS, whole.** A command word inside a
+  sentence never acts by itself: "show me the weather in Paris" is a
+  question about Paris, not the weather panel; "silence of the lambs, who
+  directed it" doesn't mute him. When a sentence really does ask for
+  something on the console, he does it himself.
 
 - **Threads:** "open a new chat and…", "branch off and…", "close this chat",
   "restore Cambodia", "go back to Lithuania", "open the Cambodia thread",
@@ -255,9 +263,9 @@ answer can't land somewhere you weren't looking. Starting a new subject is
 your choice, not his.
 
 The thread, panel, voice and setup lines above are the console's own and
-work with nothing connected. Grouping, moving, linking, renaming and folding
-by name — and any phrasing the console's own patterns miss — are said to
-JARVIS, who operates the console himself from one fixed list of actions. He can open, group, connect, rename,
+work with nothing connected, said on their own. Grouping, moving, linking,
+renaming and folding by name — and a command inside a longer sentence — are
+said to JARVIS, who operates the console himself from one fixed list of actions. He can open, group, connect, rename,
 fold and put away threads — he can never delete anything, answer a
 confirmation on your behalf, or change a model.
 

@@ -160,13 +160,15 @@ localStorage.removeItem("jarvis.stack");
 
 "status", "what time is it", "weather", "show me the radar", "close all panels",
 "open config", "mute" / "unmute", "use the Charon voice", "speak faster",
-"switch to Rail Baltica", "open the Baltic cable damage thread" — each acts at
-once, with a short notice or a line under JARVIS, nothing reaches the model,
-and no thread is opened or written into. "help" lists what he answers to under
-him, and the list stays until tapped. Renaming, moving and folding by name
-("rename Solar storms to Space weather", "minimise Baltic cable damage") are
-said to JARVIS, so his reply is written into the thread in front, or a new one
-when none is in front. While an answer is streaming, a new
+"switch to Rail Baltica", "open the Baltic cable damage thread" — said on its
+own, each acts at once, with a short notice or a line under JARVIS, nothing
+reaches the model, and no thread is opened or written into. "help" lists what
+he answers to under him, and the list stays until tapped. A command word inside
+a longer sentence ("show me the weather in Paris") never acts: the sentence
+goes to JARVIS whole. Renaming, moving and folding by name ("rename Solar
+storms to Space weather", "minimise Baltic cable damage") are said to JARVIS,
+so his reply is written into the thread in front, or a new one when none is in
+front. While an answer is streaming, a new
 request is **queued** ("Queued — I'll take … next") and asked in the thread that
 was in front when you asked.
 
@@ -1169,3 +1171,21 @@ build clean.
      "about this" still only opens the thread. And "open a new thread about
      the weather" opened the Environment panel, because the panel words were
      read first; a request for a thread is read before the other commands.
+126. The console scanned every sentence for command words and acted on
+     them. Twenty everyday sentences, six misread: "show me the weather in
+     Paris" opened the Environment panel and dropped the question; "can you
+     show me the storage options for a NAS" opened Storage; "use ChatGPT to
+     write a poem" switched service and never asked; "delete all the
+     duplicates in a list in Python" asked to delete the whole board;
+     "silence of the lambs, who directed it" muted him; "restore the old
+     painting techniques…" looked for a thread. A command now acts only when
+     it is the whole of what was said; a sentence that begins by choosing a
+     thread ("new thread about…", "go back to Lisbon and…") is asked there;
+     everything else goes to JARVIS whole. All six are regression tests.
+127. "Go back to Alpha and find X" switched to Alpha and lost the question:
+     "alpha and find x" was taken as a name, because a name matched any
+     thread whose title it contained. A command names a thread with its name
+     and nothing more ("the Lisbon airport website" is not the Lisbon
+     thread). Checked end to end that the answer goes where you chose: a
+     tapped window, "go to Beta", "go back to Alpha and …", the New thread
+     button.

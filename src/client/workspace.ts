@@ -373,8 +373,12 @@ export class Workspace {
   /**
    * Find a thread by a spoken or typed name. Returns every candidate when the
    * name fits more than one equally well, so the caller can ask which.
+   * `nameOnly`: the words must be a name and nothing more — a title may hold
+   * more than was said ("Lisbon" for "Lisbon in October"), but what was said
+   * may not hold more than the title ("the Lisbon airport website" is not the
+   * Lisbon thread).
    */
-  findThread(name: string, opts: { archived?: boolean } = {}): Match {
+  findThread(name: string, opts: { archived?: boolean; nameOnly?: boolean } = {}): Match {
     const n = norm(name);
     const pool = opts.archived ? this.archived : this.live;
     const pick = (list: Thread[]): Match | null =>
@@ -392,7 +396,7 @@ export class Workspace {
     const exact = pool.filter((t) => norm(t.title) === n);
     const byExact = pick(exact);
     if (byExact) return byExact;
-    const partial = pool.filter((t) => { const tt = norm(t.title); return !!tt && (tt.includes(n) || n.includes(tt)); });
+    const partial = pool.filter((t) => { const tt = norm(t.title); return !!tt && (tt.includes(n) || (!opts.nameOnly && n.includes(tt))); });
     const byPartial = pick(partial);
     if (byPartial) return byPartial;
     const near = pool

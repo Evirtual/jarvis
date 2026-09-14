@@ -82,6 +82,17 @@ test("thread names are resolved forgivingly, and ambiguity is reported", () => {
   assert.equal(ws.findThread("mars").kind, "none");
 });
 
+test("a name and nothing more: what was said may be part of a title, but may not hold more than it", () => {
+  const ws = new Workspace();
+  ws.createThread({ title: "Lisbon" });
+  ws.createThread({ title: "Alpha in October" });
+  assert.equal(ws.findThread("the Lisbon airport website").kind, "one", "forgiving, as the model's directives are");
+  assert.equal(ws.findThread("the Lisbon airport website", { nameOnly: true }).kind, "none", "a command's name holds nothing but the name");
+  assert.equal(ws.findThread("lisbon and find hotels", { nameOnly: true }).kind, "none");
+  assert.equal(ws.findThread("the Lisbon thread", { nameOnly: true }).kind, "one");
+  assert.equal(ws.findThread("alpha", { nameOnly: true }).kind, "one", "part of a title still names it");
+});
+
 /* ---------------- linking groups threads into one bubble ---------------- */
 
 test("connecting two General threads makes a group named for the connection", () => {

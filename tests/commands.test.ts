@@ -6,9 +6,12 @@ import { DIRECTIVES, directiveCatalogue } from "../src/shared/directives.ts";
 import { effortAsked, rankModels, wantsSearch } from "../src/shared/services/common.ts";
 
 const threads = ["General", "Lithuania", "Trip planning", "Cambodia news"];
+const putAway = ["Cambodia", "Trip planning"];
 const groups = ["Research", "Travel"];
+const answersTo = (list: string[], n: string): boolean => list.some((t) => t.toLowerCase().includes(n.toLowerCase().replace(/^the /, "").replace(/ thread$/, "")));
 const ctx = (over: Partial<ParseContext> = {}): ParseContext => ({
-  knowsThread: (n) => threads.some((t) => t.toLowerCase().includes(n.toLowerCase().replace(/^the /, "").replace(/ thread$/, ""))),
+  knowsThread: (n) => answersTo(threads, n),
+  knowsPutAway: (n) => answersTo(putAway, n),
   knowsGroup: (n) => groups.some((g) => g.toLowerCase() === n.toLowerCase()),
   pendingApproval: false,
   ...over,
@@ -120,10 +123,42 @@ test("a question about the voice is not a request to change it", () => {
   assert.deepEqual(intentOf("set voice George", ctx()), { name: "set_voice", voice: "george" });
 });
 
-test("what is left after the commands is only asked if it has words in it", () => {
-  assert.equal(parseUtterance("use the Fable voice.", ctx()).ask, "");
-  assert.equal(parseUtterance("use the Fable voice, ?", ctx()).ask, "");
-  assert.equal(parseUtterance("use the Fable voice and what time is it in Tokyo?", ctx()).ask, "what time is it in Tokyo?");
+test("a command said on its own is carried out; the punctuation and the please around it don't matter", () => {
+  assert.deepEqual(parseUtterance("use the Fable voice.", ctx()), { actions: [{ name: "set_voice", voice: "fable" }], ask: "" });
+  assert.deepEqual(parseUtterance("use the Fable voice, ?", ctx()), { actions: [{ name: "set_voice", voice: "fable" }], ask: "" });
+  assert.deepEqual(parseUtterance("Jarvis, mute", ctx()), { actions: [{ name: "mute" }], ask: "" });
+  assert.deepEqual(parseUtterance("could you show me the radar, please", ctx()), { actions: [{ name: "show_panel", panel: "perimeter" }], ask: "" });
+});
+
+test("a command word inside a sentence never acts: the sentence goes to JARVIS whole", () => {
+  for (const s of [
+    "show me the weather in Paris",
+    "can you show me the storage options for a NAS",
+    "use ChatGPT to write a poem",
+    "delete all the duplicates in a list in Python",
+    "silence of the lambs, who directed it",
+    "restore the old painting techniques, how did they do it",
+    "use the Fable voice and what time is it in Tokyo?",
+    "speak faster and tell me a joke",
+    "close the deal: how do I negotiate a raise",
+    "new window managers for Linux",
+    "branch prediction in CPUs, explained",
+    "another one",
+  ]) {
+    assert.deepEqual(parseUtterance(s, ctx()), { actions: [], ask: s }, s);
+  }
+  assert.equal(parseUtterance("Jarvis, what is the capital of Peru?", ctx()).ask, "what is the capital of Peru?", "the address is not the question");
+});
+
+test("a sentence that begins by going to a thread asks the rest of it there", () => {
+  assert.deepEqual(parseUtterance("go back to Lithuania and find hotels in Vilnius", ctx()), { actions: [{ name: "switch_thread", title: "lithuania" }], ask: "find hotels in Vilnius" });
+  assert.deepEqual(parseUtterance("switch to Trip planning, what's the cheapest week", ctx()), { actions: [{ name: "switch_thread", title: "trip planning" }], ask: "what's the cheapest week" });
+  assert.deepEqual(parseUtterance("go to Mars and find water", ctx()), { actions: [], ask: "go to Mars and find water" }, "no thread by that name: a question");
+});
+
+test("restoring by name is only for a thread that was put away", () => {
+  assert.deepEqual(intentOf("restore Trip planning", ctx()), { name: "restore_thread", title: "Trip planning" });
+  assert.equal(intentOf("restore the Roman aqueducts", ctx()), null, "nothing put away by that name: a question");
 });
 
 test("the newest model first, and a date or a 'latest' alias never outranks it", () => {

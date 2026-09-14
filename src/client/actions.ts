@@ -62,10 +62,12 @@ export function resolve(name: string, opts: { archived?: boolean } = {}): Thread
 }
 
 export function parseCtx(): ParseContext {
+  // A command names a thread with its name and nothing more, or it is a question.
   return {
-  knowsThread: (n) => ws.findThread(n).kind !== "none",
-  knowsGroup: (n) => !!ws.findGroup(n),
-  pendingApproval: !!pendingConfirm,
+    knowsThread: (n) => ws.findThread(n, { nameOnly: true }).kind !== "none",
+    knowsPutAway: (n) => ws.findThread(n, { archived: true, nameOnly: true }).kind !== "none",
+    knowsGroup: (n) => !!ws.findGroup(n),
+    pendingApproval: !!pendingConfirm,
   };
 }
 

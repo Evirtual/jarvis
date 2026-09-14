@@ -387,7 +387,8 @@ async function handleSubmit(text: string, fromQueue = false): Promise<void> {
     return;
   }
 
-  // Instructions to the console are carried out; what's left is the question.
+  // A command on its own is carried out; a sentence that starts by choosing a
+  // thread is asked in it; anything else is a question (commands.ts).
   const { actions, ask } = parseUtterance(t, parseCtx());
 
   // Operating the console never has to wait for an answer to finish. A
