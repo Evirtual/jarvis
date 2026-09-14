@@ -480,8 +480,8 @@ await check('configuration: tabs, copy icon, re-check, disconnect and reconnect'
   await until(() => /Copied|refused/.test(document.querySelector('#providers [data-act="copy"][data-id="openai"]')?.getAttribute('title') || ''), 'the copy to be tried', 5000);
   const copied = await page.evaluate(() => document.querySelector('#providers [data-act="copy"][data-id="openai"]').getAttribute('title'));
   const clip = await page.evaluate(() => navigator.clipboard.readText()).catch(() => 'unreadable');
-  await click('#providers [data-act="recheck"][data-id="openai"]');
-  await until(() => document.querySelector('#providers .provider.ready [data-act="recheck"]'), 'the re-check to finish', 15000);
+  await click('#providers [data-act="recheck"][data-id="openai"]'); // the button reads Checking, disabled, until the answer is back
+  await until(() => { const b = document.querySelector('#providers [data-act="recheck"][data-id="openai"]'); return b && !b.disabled; }, 'the re-check to finish', 15000);
   await click('#providers [data-act="remove"][data-id="openai"]');
   await until(() => document.querySelector('#providers input[data-key="openai"]'), 'disconnect to show the key form', 5000);
   await page.type('#providers input[data-key="openai"]', 'sk-proj-' + 'Z9y8X7w6'.repeat(8));

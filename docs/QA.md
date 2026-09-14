@@ -1121,3 +1121,8 @@ Typecheck clean, 118 unit tests, 21 end-to-end scenarios, build clean.
      question to both services (ChatGPT's low/medium/high, Gemini's thinking
      budget). "Think hard about…" asks for thorough for one question, with
      "Thinking hard" under him meanwhile.
+120. Disconnect (or a change of model, service or thinking) while a re-check
+     was in flight: the re-check's answer landed after the change and showed
+     the card as it had been. Found by the end-to-end suite on the CI runner,
+     where the timing differs. A refresh that began before the latest change
+     is dropped.

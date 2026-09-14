@@ -95,14 +95,20 @@ export class Connections {
     return p?.status.state === "ready" ? { models: p.status.models, model: p.status.model } : null;
   }
 
+  /** How many times what is connected has changed here; a refresh that began before the latest change is out of date. */
+  private changes = 0;
+
   async refresh(revalidate = false): Promise<void> {
-    this.data = await api.connections(revalidate);
-    this.render();
-    this.onChange?.(this.data);
-    for (const f of this.onConnectionsChanged) f();
+    const at = this.changes;
+    const next = await api.connections(revalidate);
+    // A re-check in flight while a key was disconnected (or a model, a service or the thinking
+    // chosen) would land after the change and show the screen as it was: drop it.
+    if (at !== this.changes) return;
+    this.apply(next);
   }
 
   private apply(next: ConnectionsResponse): void {
+    this.changes++;
     this.data = next;
     this.render();
     this.onChange?.(next);
