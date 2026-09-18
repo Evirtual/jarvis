@@ -2,10 +2,12 @@
  * Speech, in and out.
  *
  * Out: the voice chosen (voice-choice.ts) — a neural voice made by the
- * connected service, or the device's own. Replies are split into sentences,
- * synthesised in parallel, decoded, and scheduled back-to-back on the audio
- * clock: one continuous voice, with the first sentence playing while the
- * rest are still being made.
+ * connected service, or the device's own. The opening sentence (or its first
+ * clause, if it runs long) is synthesised the moment it is complete; the rest
+ * is gathered and sent as one piece when the voice is about to run dry. Each
+ * piece is decoded and scheduled back-to-back on the audio clock: one
+ * continuous voice, playing while the next piece is still being made (see
+ * "speaking" below).
  *
  * In: the page records the microphone and the connected service turns it
  * into text (hearing.ts). That avoids Chrome's dictation, which quietly

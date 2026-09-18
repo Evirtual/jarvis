@@ -83,7 +83,8 @@ that, and the setup guide will say so plainly.
 - **Removed:** OpenRouter (`oauth.ts`, its route and messages), Anthropic from
   chat (the SDK went with it), Kokoro and Moonshine with their workers and
   dependencies, and the cross-origin isolation in `sw.js` that existed only for
-  them. The one runtime dependency left is `openai`.
+  them. The one runtime dependency left was `openai`; the SDK has since
+  been replaced by plain `fetch` (docs/QA.md), so today it is `marked`.
 
 ## The first-run guide (`client/setup.ts`), built 2026-09-12
 
