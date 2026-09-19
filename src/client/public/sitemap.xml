@@ -4,4 +4,8 @@
     <loc>https://jarvis.edgarasneverdauskas.com/</loc>
     <changefreq>monthly</changefreq>
   </url>
+  <url>
+    <loc>https://jarvis.edgarasneverdauskas.com/article/</loc>
+    <changefreq>monthly</changefreq>
+  </url>
 </urlset>

@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en" data-page="jarvis">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Five days building J.A.R.V.I.S. with Claude</title>
+<meta name="description" content="What it took, what broke, and who did what, counted from 476 messages, 4,295 replies and 132 commits.">
+<meta name="author" content="Edgaras Neverdauskas">
+<meta name="color-scheme" content="light dark">
+<script>try{var t=localStorage.getItem('articles-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="canonical" href="https://articles.edgarasneverdauskas.com/jarvis/">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://jarvis.edgarasneverdauskas.com/article/">
+<meta property="og:site_name" content="Articles — Edgaras Neverdauskas">
+<meta property="og:title" content="Five days building J.A.R.V.I.S. with Claude">
+<meta property="og:description" content="What it took, what broke, and who did what, counted from 476 messages, 4,295 replies and 132 commits.">
+<meta property="og:image" content="https://jarvis.edgarasneverdauskas.com/article/cover-medium-1500x750.png">
+<meta property="og:image:alt" content="Medium cover: Five days building J.A.R.V.I.S., beside a screenshot of the console">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Five days building J.A.R.V.I.S. with Claude">
+<meta name="twitter:description" content="What it took, what broke, and who did what, counted from 476 messages, 4,295 replies and 132 commits.">
+<meta name="twitter:image" content="https://jarvis.edgarasneverdauskas.com/article/cover-medium-1500x750.png">
+<meta name="twitter:image:alt" content="Medium cover: Five days building J.A.R.V.I.S., beside a screenshot of the console">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&amp;display=swap">
+<link rel="stylesheet" href="./assets/site.css">
+<script src="./assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#story">Skip to the article</a>
+<header class="site-head">
+  <nav aria-label="Site"><a class="home" href="https://articles.edgarasneverdauskas.com/"><span aria-hidden="true">←</span> All articles</a></nav>
+  <div class="theme-switch" role="group" aria-label="Colour theme" hidden>
+      <button type="button" data-theme-value="system" aria-pressed="true">Auto</button>
+      <button type="button" data-theme-value="light" aria-pressed="false">Light</button>
+      <button type="button" data-theme-value="dark" aria-pressed="false">Dark</button>
+    </div>
+</header>
+<main class="layout" id="main">
+  <aside class="kit" aria-label="Share kit">
+    <details class="kit-box" id="kit">
+      <summary><span class="kit-sum"><span class="kit-title">Share kit</span><span class="kit-hint">Copy the story, images and posts</span></span></summary>
+      <div class="kit-body">
+        <section aria-labelledby="kit-story">
+          <h2 id="kit-story">Story</h2>
+          <div class="btn-grid">
+            <button type="button" class="btn primary" data-copy-rich>Copy article as rich text</button>
+            <button type="button" class="btn" data-copy="story-title">Copy title</button>
+            <button type="button" class="btn" data-copy="story-dek">Copy subtitle</button>
+            <button type="button" class="btn wide" data-copy="md-source">Copy article as Markdown</button>
+          </div>
+          <p class="kit-note">Rich text keeps the headings, bold, lists and links when pasted into an editor such as Medium or LinkedIn. Images aren’t included: the copy has a bold line where each one goes, with its address, caption and alt text.</p>
+          <details class="alt"><summary>Show the Markdown</summary><textarea id="md-source" rows="8" readonly aria-label="The article as Markdown"># Five days building J.A.R.V.I.S. with Claude
+
+*What it took, what broke, and who did what, counted from 476 messages, 4,295 replies and 132 commits.*
+
+On a Thursday morning in September I started with a single web page in Claude. Eight minutes later I typed my first real request, typo and all: "need jarvis voice".
+
+Five days later I had an Iron Man style console that talks back. It keeps every conversation as a thread on a board, reads the real machine it runs on, installs as an app on a phone, and is live on the web for anyone to try.
+
+This is the honest account of how it got there. Not the highlight reel, the ledger. I went back through every session log and the full git history, so the numbers here are counted, not remembered.
+
+## What JARVIS is
+
+You tap the glowing core and speak, or type. JARVIS answers, hears and speaks through one AI service you connect, Gemini or ChatGPT. Everything you ask goes into a thread on the board: talk, research with its sources, pictures, videos that play where they are. Ask in the thread you have open, or start a new one. Every figure on screen is measured, not simulated: real processor load, real network, real weather where you are.
+
+It runs in the browser with nothing to install. There is also a PC version with a small server of its own, which can read what a browser can't. Either way, your keys stay on your device.
+
+## How it started, day by day
+
+**Thursday: ambition, then the first "no".** The first hour was all wishes: a voice, a model from the internet, a radar. Within 75 minutes I had dropped the idea of running AI models on my own machine and uninstalled Ollama. It was too slow and too heavy. The services would do the thinking.
+
+Then came the principle that shaped everything after. The radar on screen was fake, and I said so: it "is just mimicking". From then on, every number JARVIS shows had to be real.
+
+By lunchtime the shape appeared: a glowing core, with conversations as small floating windows around it, "like in a movie". By evening I had hit my Claude usage limit twice.
+
+**Friday: a product, not a demo.** JARVIS moved from the middle of the screen to the bottom, where he became the main button: tap to talk. Much of the day went into the phone layout. I made a few changes with OpenAI's Codex and had Claude review them. At 21:37 I created the GitHub repository. The first commit landed nine minutes later, a day and a half into the project.
+
+Just before midnight came the question that set the architecture: why not talk to OpenAI or Gemini directly? The web version became serverless. The page talks to the AI service straight from your browser, and your key never leaves it.
+
+**Saturday: the busiest day, and the biggest rethink.** I sent 209 messages. By 1:29 in the morning I had moved from Claude Pro to Claude Max. By lunchtime we had a new rule for the whole design: the connection is the core. One connected service answers, hears and speaks.
+
+Out went OpenRouter, Claude as a chat option, and the two speech models we had been running ourselves, Kokoro for the voice and Moonshine for hearing. In a browser they were five to ten times slower than on a PC. I also wrote down the standard I wanted the code held to: nicely written, no hacks, an architecture anyone can follow.
+
+At one point that day I had $1.90 of OpenAI credit left. Gemini's free tier ran out in the middle of a test.
+
+**Sunday: conversation first, and the moment it got out of hand.** A test suite that drives a real browser arrived at lunchtime. In the afternoon I dictated an idea by voice: the AI model, not the app's own rules, should decide where each reply belongs. Talk stays in the conversation, and research gets a thread.
+
+Then, at 21:48, the most useful message of the week. I asked why there were two notification boxes on screen doing the same job, and admitted "this project is getting out of hand". I was losing track of how it worked.
+
+Claude re-read the entire repository and wrote a six-step plan to simplify it. I replied "ok do all six". The six steps were committed between 22:47 and 00:22. Each was type-checked, unit-tested, run end to end in a real browser, and checked on desktop and phone before the next began.
+
+**Monday: fast, then focused.** Answers had been slow, and now we found out why. Every question went out with the web search tool attached and the model's thinking left at its default. So we offered search only when a question wants the world, and asked the model to think briefly. A greeting went from 7.8 seconds to 2.8. A simple fact went from 5.6 to 1.8. A news search went from 44.7 seconds to 7.2.
+
+Then came a slider, so each person can choose how long the model thinks. Next, an experiment: letting JARVIS find and open files on the PC. Halfway through, I realised it was a different product. I deleted the branch.
+
+The afternoon undid Sunday's big idea. Testing found two bugs with the same cause: "open a new thread and find X" left the new thread empty and answered elsewhere, and a YouTube video landed in the caption under JARVIS, which fades after a few seconds. Both came from the model choosing where each reply belonged. It guessed well most of the time, and a guess that is right most of the time is a bug generator. So the app decides now: every answer goes into the thread you have open, or a new one. The same afternoon, the app's own command parser went the same way. It had been scanning every sentence for command words, and "silence of the lambs, who directed it" muted him. A command now counts only when it is the whole of what you said.
+
+## The obstacles
+
+- **AI in a browser is slow.** Voice and hearing models that feel instant on a PC crawl in a web page. The answer was to stop running models ourselves.
+- **There is no "sign in with ChatGPT" for apps like this.** People have to bring an API key, and most have never seen one. So the first-run guide explains where to get a key and what it costs, and Gemini's free tier is the default way in.
+- **Free tiers run out exactly when you test.** Gemini's allowance for voice ran out mid-session more than once. That is why the console falls back to the device's own voice and says so, instead of going quiet.
+- **Browsers are not the same.** Brave has no built-in dictation. Microphone and sound permissions behave differently everywhere. A phone draws its own bars over your page.
+- **The model has limits too.** I hit Claude's usage limit three times. Ten times the conversation outgrew the model's memory and had to be summarised, and the work carried on from those notes.
+- **Services don't always mean what they list.** One OpenAI account offered a model the API then refused for every single question.
+
+## What we got wrong
+
+The QA log has 127 numbered fixes. A sample, because they are more instructive than the successes:
+
+- The instrument panels always covered the threads, because they lived on two separate layers.
+- "Tidy up" piled every window into the top-left corner.
+- A thread was named ".", the leftover of a sentence the parser misread.
+- JARVIS said "Put all 1 thread away, sir. They're…"
+- Gemini's key travelled in the request address, where servers write it to logs. It moved to a header.
+- Closing a thread put another in front, so the next question landed in the wrong conversation.
+- After a change to how windows glide, dropping one window onto another quietly stopped making a group, and no test noticed. A check in a real browser found it.
+- One message appeared in two notification boxes at once. That was the "two pills".
+- "Show me the weather in Paris" opened the weather panel and threw the question away. "Delete all the duplicates in a list in Python" offered to delete the whole board.
+
+Most were found the same way. I used it, took a screenshot and said what looked wrong. I sent 202 screenshots in five days.
+
+## What went right
+
+- **A rule about truth.** "Truthful over friendly": a count means what the screen shows, and a confirmation reports what actually happened. It keeps catching real bugs. On the last day JARVIS said "Opened" for a file that Windows had not opened. The wording turned out to be hiding a real failure.
+- **Real data only.** No fake readings, even when a fake would have looked better.
+- **One codebase, two versions.** The same code runs as a web page and on a PC. A fix lands in both.
+- **Tests that use a real browser.** There are 122 unit tests and 23 end-to-end scenarios. Each scenario starts from a clean console, and all of them run on every push.
+- **Deleting.** The git history shows 40,281 lines added and 16,611 removed. Some of the best days were mostly removals.
+
+## Everything we rethought
+
+- **Day one:** local AI models through Ollama, dropped by mid-morning. A "drive mode" nobody needed.
+- **Day two:** a proxy server we did not need, once the web version could talk to the services directly.
+- **Day three:** OpenRouter, Claude as a chat option, and our own voice and hearing models.
+- **Day four:** hand-written rules for what the user meant. The model decides now, and the console's own commands shrank to a small, fixed set. The OpenAI software library went too, replaced by plain web requests.
+- **Day five:** PC control, which became its own future product. And the day-four idea itself: the model no longer decides where a reply goes, and the app no longer reads commands out of the middle of sentences. One rule each, decided by the app.
+
+An early "code mode", where JARVIS handed a request to Claude Code, got as far as a plan and a trial run. Each of these felt like a setback at the time. None of them was.
+
+## Who did what
+
+I sent 476 messages. A typical one was 14 words. I sent 202 screenshots, and I stopped Claude mid-task 17 times to change course.
+
+Claude replied 4,295 times and made 6,354 tool calls: 2,394 commands, 1,620 file edits and 1,464 actions in a browser. That is about nine replies and thirteen actions for every message I wrote.
+
+![By the numbers](https://articles.edgarasneverdauskas.com/jarvis/numbers-1400.png)
+
+My part was deciding. What JARVIS is, and what it is not. What looks wrong. When something is getting too complicated. When an idea belongs to a different product. That meant testing on my own devices, and saying no, often.
+
+The models' part was everything that turns a decision into working software: the code, the tests, the documentation, the QA log, the commits, and checking all of it in a real browser.
+
+The bottleneck was never typing code. It was knowing what I wanted, seeing what was wrong, and saying no.
+
+## Opus 5 and Fable 5.1
+
+Two Claude models did almost all of the work.
+
+**Claude Opus 5** carried most of days one to three: the first build, the web version and the move to one connected service. It came back on day five for the PC experiment and the afternoon's rethink. It gave 2,654 replies, 3.03 million output tokens and 3,761 tool calls.
+
+**Claude Fable 5.1** joined on day two and carried most of day four and the morning of day five: conversation first, the six-step simplification, faster answers and the thinking slider. It gave 1,579 replies, 2.30 million output tokens and 2,533 tool calls.
+
+The logs show a difference in working style. Fable wrote more per reply, 1,454 tokens against 1,142, and made more tool calls per reply, 1.60 against 1.42. Fable also leaned on the command line: 1,261 commands to 535 direct file edits, often writing one small script that changed many files at once. Opus worked file by file, with 1,132 commands to 1,081 edits.
+
+Treat this as a record, not a benchmark. The two models worked on different days and on different jobs. A few small runs from Claude Sonnet 5 came from that early code-mode trial.
+
+## What it cost
+
+I started on Claude Pro. It lasted about five hours on the first day: I hit its usage limit at 14:21, and again at 19:21. By the third day I had moved to Claude Max, and even that ran out once, late on the fourth night. A build like this runs for hours at a time: reading the whole project, running commands, driving a browser. That is what the subscription pays for.
+
+The app itself cost almost nothing to run. Gemini's free tier and a few dollars of OpenAI credit covered testing, and GitHub Pages hosts the web version for free.
+
+## What I would tell someone starting
+
+- **Your job moves from typing to deciding.** Most of my messages were one sentence. The hard part was knowing which sentence.
+- **Say no early.** The best decisions of the week were removals, and the first came 75 minutes in.
+- **Write your principles down.** "Truthful over friendly" and "no hacks" settled dozens of small arguments before they started.
+- **Use it like a user.** Screenshots of real screens found what tests missed. Then turn each find into a test.
+- **Schedule the simplification.** Complexity arrives quietly. When you notice two things doing one job, stop and re-read everything.
+- **Don't let anything guess.** A rule that is right most of the time produces bugs that look random. When a bug seems random, look for the guess behind it and replace it with one rule.
+- **Know which product you are building.** A good idea can still belong somewhere else.
+- **Measure the machine too.** The logs told me things my memory had wrong.
+
+## In one paragraph
+
+Five days, 39 hours of active work, one person and two AI models produced a working product, 132 commits and 127 fixes. The models wrote almost every line. The product, though, came from a long run of small human decisions: what to keep, what to drop, what looked wrong, and when to stop and simplify. Building with AI didn't remove the hard part of making software. It removed everything around it, and left the hard part standing in plain view.
+
+*Try it at [jarvis.edgarasneverdauskas.com](https://jarvis.edgarasneverdauskas.com). The code is open source under AGPL-3.0 at [github.com/Evirtual/jarvis](https://github.com/Evirtual/jarvis). Built with Claude Code, Claude Opus 5 and Claude Fable 5.1.*</textarea></details>
+        </section>
+        <section aria-labelledby="kit-images">
+          <h2 id="kit-images">Images (3)</h2>
+          <ul class="img-list">
+        <li class="img-row">
+          <img src="cover-medium-1500x750.png" alt="" width="1500" height="750" loading="lazy" decoding="async">
+          <p class="img-name">Medium cover<span>cover-medium-1500x750.png · 1500&nbsp;×&nbsp;750</span></p>
+          <div class="img-more">
+            <div class="fig-tools">
+              <button type="button" class="chip" data-copy="k-cap-cover-medium" aria-label="Copy caption, medium cover">Copy caption</button>
+              <button type="button" class="chip" data-copy="k-alt-cover-medium" aria-label="Copy alt text, medium cover">Copy alt</button>
+              <a class="chip" href="cover-medium-1500x750.png" download aria-label="Download image, medium cover (cover-medium-1500x750.png)">Download</a>
+            </div>
+            <details class="alt"><summary>Caption and alt text</summary>
+              <p class="lbl">Caption</p><p id="k-cap-cover-medium">J.A.R.V.I.S. on the PC, with example threads on the board. Image and app: Edgaras Neverdauskas.</p>
+              <p class="lbl">Alt text · 81 characters</p><p id="k-alt-cover-medium">Medium cover: Five days building J.A.R.V.I.S., beside a screenshot of the console</p>
+            </details>
+          </div>
+        </li>
+<li class="img-row">
+          <img src="cover-linkedin-1920x1080.png" alt="" width="1920" height="1080" loading="lazy" decoding="async">
+          <p class="img-name">LinkedIn cover<span>cover-linkedin-1920x1080.png · 1920&nbsp;×&nbsp;1080</span></p>
+          <div class="img-more">
+            <div class="fig-tools">
+              <button type="button" class="chip" data-copy="k-cap-cover-linkedin" aria-label="Copy caption, linkedin cover">Copy caption</button>
+              <button type="button" class="chip" data-copy="k-alt-cover-linkedin" aria-label="Copy alt text, linkedin cover">Copy alt</button>
+              <a class="chip" href="cover-linkedin-1920x1080.png" download aria-label="Download image, linkedin cover (cover-linkedin-1920x1080.png)">Download</a>
+            </div>
+            <details class="alt"><summary>Caption and alt text</summary>
+              <p class="lbl">Caption</p><p id="k-cap-cover-linkedin">J.A.R.V.I.S. on the PC, with example threads on the board. Image and app: Edgaras Neverdauskas.</p>
+              <p class="lbl">Alt text · 83 characters</p><p id="k-alt-cover-linkedin">LinkedIn cover: Five days building J.A.R.V.I.S., beside a screenshot of the console</p>
+            </details>
+          </div>
+        </li>
+<li class="img-row">
+          <img src="numbers-1400.png" alt="" width="1400" height="2243" loading="lazy" decoding="async">
+          <p class="img-name">Numbers card<span>numbers-1400.png · 1400&nbsp;×&nbsp;2243</span></p>
+          <div class="img-more">
+            <div class="fig-tools">
+              <button type="button" class="chip" data-copy="k-cap-numbers" aria-label="Copy caption, numbers card">Copy caption</button>
+              <button type="button" class="chip" data-copy="k-alt-numbers" aria-label="Copy alt text, numbers card">Copy alt</button>
+              <a class="chip" href="numbers-1400.png" download aria-label="Download image, numbers card (numbers-1400.png)">Download</a>
+            </div>
+            <details class="alt"><summary>Caption and alt text</summary>
+              <p class="lbl">Caption</p><p id="k-cap-numbers">Five days, counted from the session logs and git history: what I put in, and what the models did with it.</p>
+              <p class="lbl">Alt text · 14 characters</p><p id="k-alt-numbers">By the numbers</p>
+            </details>
+          </div>
+        </li>
+          </ul>
+        </section>
+        <section aria-labelledby="kit-share">
+          <h2 id="kit-share">Posts (1)</h2>
+        <div class="share">
+          <div class="share-head">
+            <h3>LinkedIn post</h3>
+            <button type="button" class="chip" data-copy="share-linkedin" aria-label="Copy LinkedIn post">Copy</button>
+          </div>
+          <p class="share-meta">1,536 characters</p>
+          <pre id="share-linkedin" tabindex="0">I've been thinking about what my part actually was while two AI models built something for me. So five days ago I typed "need jarvis voice" into Claude.
+
+Today J.A.R.V.I.S. is an Iron Man style console that talks back, keeps every conversation as a thread and reads the machine it runs on. 39 hours of active work, 132 commits.
+
+Afterwards I went through every session log to count who did what. Claude, across Opus 5 and Fable 5.1, replied 4,295 times and made 6,354 tool calls. I sent 476 messages. A typical one was 14 words.
+
+So what did those 14 words do?
+
+On Sunday night I asked why there were two notification boxes on screen doing the same job, and admitted the project was getting out of hand. I could no longer follow how it worked. Claude re-read the whole repository and proposed six steps to simplify it. All six were committed by half past midnight.
+
+Every test passed before that and after it. None of them could tell me the product had become confusing.
+
+Most of my messages were like that one. This looks wrong. Drop that. That belongs somewhere else. On the last day I started on PC control, finding and opening files, and halfway through realised it was a different product. I deleted the branch.
+
+The models wrote almost every line. The product came from saying no.
+
+If you're building a product with AI and the building is fast but the product keeps drifting, feel free to DM me. I'm open to consulting and product/engineering advisory work.
+
+I wrote it all up, the 127 logged fixes included, in the article below.</pre>
+        </div>
+        </section>
+      </div>
+    </details>
+  </aside>
+  <article class="story" id="story" aria-labelledby="story-title" tabindex="-1">
+    <header class="story-head">
+      <p class="kicker">Five days · 39 hours</p>
+      <h1 id="story-title">Five days building J.A.R.V.I.S. with Claude</h1>
+      <p class="dek" id="story-dek">What it took, what broke, and who did what, counted from 476 messages, 4,295 replies and 132 commits.</p>
+      <p class="byline"><span>Edgaras Neverdauskas</span><span>11 min read</span><span>2,474 words</span></p>
+      <nav class="also" aria-label="This story elsewhere">
+        <p><span class="also-label">Also on</span><a href="https://medium.com/@edgarasneverdauskas/five-days-building-j-a-r-v-i-s-with-claude-0533b1953060" rel="noopener">Medium<span aria-hidden="true"> ↗</span></a><a href="https://www.linkedin.com/pulse/five-days-building-jarvis-claude-edgaras-neverdauskas-kqxjc/" rel="noopener">LinkedIn<span aria-hidden="true"> ↗</span></a></p>
+        <p><span class="also-label">Project</span><a href="https://jarvis.edgarasneverdauskas.com" rel="noopener">jarvis.edgarasneverdauskas.com<span aria-hidden="true"> ↗</span></a></p>
+      </nav>
+    </header>
+    <figure class="fig fig-cover" id="fig-cover-medium">
+  <div class="frame"><img src="cover-medium-1500x750.png" alt="Medium cover: Five days building J.A.R.V.I.S., beside a screenshot of the console" width="1500" height="750" decoding="async" fetchpriority="high"></div>
+  <figcaption>
+    <p class="cap" id="cap-cover-medium">J.A.R.V.I.S. on the PC, with example threads on the board. Image and app: Edgaras Neverdauskas.</p>
+    <div class="fig-tools">
+      <button type="button" class="chip" data-copy="cap-cover-medium" aria-label="Copy caption, medium cover">Copy caption</button>
+      <button type="button" class="chip" data-copy="alt-cover-medium" aria-label="Copy alt text, medium cover">Copy alt</button>
+      <a class="chip" href="cover-medium-1500x750.png" download aria-label="Download image, medium cover (cover-medium-1500x750.png)">Download</a>
+    </div>
+    <details class="alt"><summary>Alt text <span>· 81 characters</span></summary><p id="alt-cover-medium">Medium cover: Five days building J.A.R.V.I.S., beside a screenshot of the console</p></details>
+  </figcaption>
+</figure>
+    <div class="prose" id="article-body">
+<p>On a Thursday morning in September I started with a single web page in Claude. Eight minutes later I typed my first real request, typo and all: "need jarvis voice".</p>
+<p>Five days later I had an Iron Man style console that talks back. It keeps every conversation as a thread on a board, reads the real machine it runs on, installs as an app on a phone, and is live on the web for anyone to try.</p>
+<p>This is the honest account of how it got there. Not the highlight reel, the ledger. I went back through every session log and the full git history, so the numbers here are counted, not remembered.</p>
+<h2>What JARVIS is</h2>
+<p>You tap the glowing core and speak, or type. JARVIS answers, hears and speaks through one AI service you connect, Gemini or ChatGPT. Everything you ask goes into a thread on the board: talk, research with its sources, pictures, videos that play where they are. Ask in the thread you have open, or start a new one. Every figure on screen is measured, not simulated: real processor load, real network, real weather where you are.</p>
+<p>It runs in the browser with nothing to install. There is also a PC version with a small server of its own, which can read what a browser can't. Either way, your keys stay on your device.</p>
+<h2>How it started, day by day</h2>
+<p><strong>Thursday: ambition, then the first "no".</strong> The first hour was all wishes: a voice, a model from the internet, a radar. Within 75 minutes I had dropped the idea of running AI models on my own machine and uninstalled Ollama. It was too slow and too heavy. The services would do the thinking.</p>
+<p>Then came the principle that shaped everything after. The radar on screen was fake, and I said so: it "is just mimicking". From then on, every number JARVIS shows had to be real.</p>
+<p>By lunchtime the shape appeared: a glowing core, with conversations as small floating windows around it, "like in a movie". By evening I had hit my Claude usage limit twice.</p>
+<p><strong>Friday: a product, not a demo.</strong> JARVIS moved from the middle of the screen to the bottom, where he became the main button: tap to talk. Much of the day went into the phone layout. I made a few changes with OpenAI's Codex and had Claude review them. At 21:37 I created the GitHub repository. The first commit landed nine minutes later, a day and a half into the project.</p>
+<p>Just before midnight came the question that set the architecture: why not talk to OpenAI or Gemini directly? The web version became serverless. The page talks to the AI service straight from your browser, and your key never leaves it.</p>
+<p><strong>Saturday: the busiest day, and the biggest rethink.</strong> I sent 209 messages. By 1:29 in the morning I had moved from Claude Pro to Claude Max. By lunchtime we had a new rule for the whole design: the connection is the core. One connected service answers, hears and speaks.</p>
+<p>Out went OpenRouter, Claude as a chat option, and the two speech models we had been running ourselves, Kokoro for the voice and Moonshine for hearing. In a browser they were five to ten times slower than on a PC. I also wrote down the standard I wanted the code held to: nicely written, no hacks, an architecture anyone can follow.</p>
+<p>At one point that day I had $1.90 of OpenAI credit left. Gemini's free tier ran out in the middle of a test.</p>
+<p><strong>Sunday: conversation first, and the moment it got out of hand.</strong> A test suite that drives a real browser arrived at lunchtime. In the afternoon I dictated an idea by voice: the AI model, not the app's own rules, should decide where each reply belongs. Talk stays in the conversation, and research gets a thread.</p>
+<p>Then, at 21:48, the most useful message of the week. I asked why there were two notification boxes on screen doing the same job, and admitted "this project is getting out of hand". I was losing track of how it worked.</p>
+<p>Claude re-read the entire repository and wrote a six-step plan to simplify it. I replied "ok do all six". The six steps were committed between 22:47 and 00:22. Each was type-checked, unit-tested, run end to end in a real browser, and checked on desktop and phone before the next began.</p>
+<p><strong>Monday: fast, then focused.</strong> Answers had been slow, and now we found out why. Every question went out with the web search tool attached and the model's thinking left at its default. So we offered search only when a question wants the world, and asked the model to think briefly. A greeting went from 7.8 seconds to 2.8. A simple fact went from 5.6 to 1.8. A news search went from 44.7 seconds to 7.2.</p>
+<p>Then came a slider, so each person can choose how long the model thinks. Next, an experiment: letting JARVIS find and open files on the PC. Halfway through, I realised it was a different product. I deleted the branch.</p>
+<p>The afternoon undid Sunday's big idea. Testing found two bugs with the same cause: "open a new thread and find X" left the new thread empty and answered elsewhere, and a YouTube video landed in the caption under JARVIS, which fades after a few seconds. Both came from the model choosing where each reply belonged. It guessed well most of the time, and a guess that is right most of the time is a bug generator. So the app decides now: every answer goes into the thread you have open, or a new one. The same afternoon, the app's own command parser went the same way. It had been scanning every sentence for command words, and "silence of the lambs, who directed it" muted him. A command now counts only when it is the whole of what you said.</p>
+<h2>The obstacles</h2>
+<ul>
+<li><strong>AI in a browser is slow.</strong> Voice and hearing models that feel instant on a PC crawl in a web page. The answer was to stop running models ourselves.</li>
+<li><strong>There is no "sign in with ChatGPT" for apps like this.</strong> People have to bring an API key, and most have never seen one. So the first-run guide explains where to get a key and what it costs, and Gemini's free tier is the default way in.</li>
+<li><strong>Free tiers run out exactly when you test.</strong> Gemini's allowance for voice ran out mid-session more than once. That is why the console falls back to the device's own voice and says so, instead of going quiet.</li>
+<li><strong>Browsers are not the same.</strong> Brave has no built-in dictation. Microphone and sound permissions behave differently everywhere. A phone draws its own bars over your page.</li>
+<li><strong>The model has limits too.</strong> I hit Claude's usage limit three times. Ten times the conversation outgrew the model's memory and had to be summarised, and the work carried on from those notes.</li>
+<li><strong>Services don't always mean what they list.</strong> One OpenAI account offered a model the API then refused for every single question.</li>
+</ul>
+<h2>What we got wrong</h2>
+<p>The QA log has 127 numbered fixes. A sample, because they are more instructive than the successes:</p>
+<ul>
+<li>The instrument panels always covered the threads, because they lived on two separate layers.</li>
+<li>"Tidy up" piled every window into the top-left corner.</li>
+<li>A thread was named ".", the leftover of a sentence the parser misread.</li>
+<li>JARVIS said "Put all 1 thread away, sir. They're…"</li>
+<li>Gemini's key travelled in the request address, where servers write it to logs. It moved to a header.</li>
+<li>Closing a thread put another in front, so the next question landed in the wrong conversation.</li>
+<li>After a change to how windows glide, dropping one window onto another quietly stopped making a group, and no test noticed. A check in a real browser found it.</li>
+<li>One message appeared in two notification boxes at once. That was the "two pills".</li>
+<li>"Show me the weather in Paris" opened the weather panel and threw the question away. "Delete all the duplicates in a list in Python" offered to delete the whole board.</li>
+</ul>
+<p>Most were found the same way. I used it, took a screenshot and said what looked wrong. I sent 202 screenshots in five days.</p>
+<h2>What went right</h2>
+<ul>
+<li><strong>A rule about truth.</strong> "Truthful over friendly": a count means what the screen shows, and a confirmation reports what actually happened. It keeps catching real bugs. On the last day JARVIS said "Opened" for a file that Windows had not opened. The wording turned out to be hiding a real failure.</li>
+<li><strong>Real data only.</strong> No fake readings, even when a fake would have looked better.</li>
+<li><strong>One codebase, two versions.</strong> The same code runs as a web page and on a PC. A fix lands in both.</li>
+<li><strong>Tests that use a real browser.</strong> There are 122 unit tests and 23 end-to-end scenarios. Each scenario starts from a clean console, and all of them run on every push.</li>
+<li><strong>Deleting.</strong> The git history shows 40,281 lines added and 16,611 removed. Some of the best days were mostly removals.</li>
+</ul>
+<h2>Everything we rethought</h2>
+<ul>
+<li><strong>Day one:</strong> local AI models through Ollama, dropped by mid-morning. A "drive mode" nobody needed.</li>
+<li><strong>Day two:</strong> a proxy server we did not need, once the web version could talk to the services directly.</li>
+<li><strong>Day three:</strong> OpenRouter, Claude as a chat option, and our own voice and hearing models.</li>
+<li><strong>Day four:</strong> hand-written rules for what the user meant. The model decides now, and the console's own commands shrank to a small, fixed set. The OpenAI software library went too, replaced by plain web requests.</li>
+<li><strong>Day five:</strong> PC control, which became its own future product. And the day-four idea itself: the model no longer decides where a reply goes, and the app no longer reads commands out of the middle of sentences. One rule each, decided by the app.</li>
+</ul>
+<p>An early "code mode", where JARVIS handed a request to Claude Code, got as far as a plan and a trial run. Each of these felt like a setback at the time. None of them was.</p>
+<h2>Who did what</h2>
+<p>I sent 476 messages. A typical one was 14 words. I sent 202 screenshots, and I stopped Claude mid-task 17 times to change course.</p>
+<p>Claude replied 4,295 times and made 6,354 tool calls: 2,394 commands, 1,620 file edits and 1,464 actions in a browser. That is about nine replies and thirteen actions for every message I wrote.</p>
+<figure class="fig" id="fig-numbers">
+  <div class="frame"><img src="numbers-1400.png" alt="By the numbers" width="1400" height="2243" decoding="async" loading="lazy"></div>
+  <figcaption>
+    <p class="cap" id="cap-numbers">Five days, counted from the session logs and git history: what I put in, and what the models did with it.</p>
+    <div class="fig-tools">
+      <button type="button" class="chip" data-copy="cap-numbers" aria-label="Copy caption, numbers card">Copy caption</button>
+      <button type="button" class="chip" data-copy="alt-numbers" aria-label="Copy alt text, numbers card">Copy alt</button>
+      <a class="chip" href="numbers-1400.png" download aria-label="Download image, numbers card (numbers-1400.png)">Download</a>
+    </div>
+    <details class="alt"><summary>Alt text <span>· 14 characters</span></summary><p id="alt-numbers">By the numbers</p></details>
+  </figcaption>
+</figure>
+<p>My part was deciding. What JARVIS is, and what it is not. What looks wrong. When something is getting too complicated. When an idea belongs to a different product. That meant testing on my own devices, and saying no, often.</p>
+<p>The models' part was everything that turns a decision into working software: the code, the tests, the documentation, the QA log, the commits, and checking all of it in a real browser.</p>
+<p>The bottleneck was never typing code. It was knowing what I wanted, seeing what was wrong, and saying no.</p>
+<h2>Opus 5 and Fable 5.1</h2>
+<p>Two Claude models did almost all of the work.</p>
+<p><strong>Claude Opus 5</strong> carried most of days one to three: the first build, the web version and the move to one connected service. It came back on day five for the PC experiment and the afternoon's rethink. It gave 2,654 replies, 3.03 million output tokens and 3,761 tool calls.</p>
+<p><strong>Claude Fable 5.1</strong> joined on day two and carried most of day four and the morning of day five: conversation first, the six-step simplification, faster answers and the thinking slider. It gave 1,579 replies, 2.30 million output tokens and 2,533 tool calls.</p>
+<p>The logs show a difference in working style. Fable wrote more per reply, 1,454 tokens against 1,142, and made more tool calls per reply, 1.60 against 1.42. Fable also leaned on the command line: 1,261 commands to 535 direct file edits, often writing one small script that changed many files at once. Opus worked file by file, with 1,132 commands to 1,081 edits.</p>
+<p>Treat this as a record, not a benchmark. The two models worked on different days and on different jobs. A few small runs from Claude Sonnet 5 came from that early code-mode trial.</p>
+<h2>What it cost</h2>
+<p>I started on Claude Pro. It lasted about five hours on the first day: I hit its usage limit at 14:21, and again at 19:21. By the third day I had moved to Claude Max, and even that ran out once, late on the fourth night. A build like this runs for hours at a time: reading the whole project, running commands, driving a browser. That is what the subscription pays for.</p>
+<p>The app itself cost almost nothing to run. Gemini's free tier and a few dollars of OpenAI credit covered testing, and GitHub Pages hosts the web version for free.</p>
+<h2>What I would tell someone starting</h2>
+<ul>
+<li><strong>Your job moves from typing to deciding.</strong> Most of my messages were one sentence. The hard part was knowing which sentence.</li>
+<li><strong>Say no early.</strong> The best decisions of the week were removals, and the first came 75 minutes in.</li>
+<li><strong>Write your principles down.</strong> "Truthful over friendly" and "no hacks" settled dozens of small arguments before they started.</li>
+<li><strong>Use it like a user.</strong> Screenshots of real screens found what tests missed. Then turn each find into a test.</li>
+<li><strong>Schedule the simplification.</strong> Complexity arrives quietly. When you notice two things doing one job, stop and re-read everything.</li>
+<li><strong>Don't let anything guess.</strong> A rule that is right most of the time produces bugs that look random. When a bug seems random, look for the guess behind it and replace it with one rule.</li>
+<li><strong>Know which product you are building.</strong> A good idea can still belong somewhere else.</li>
+<li><strong>Measure the machine too.</strong> The logs told me things my memory had wrong.</li>
+</ul>
+<h2>In one paragraph</h2>
+<p>Five days, 39 hours of active work, one person and two AI models produced a working product, 132 commits and 127 fixes. The models wrote almost every line. The product, though, came from a long run of small human decisions: what to keep, what to drop, what looked wrong, and when to stop and simplify. Building with AI didn't remove the hard part of making software. It removed everything around it, and left the hard part standing in plain view.</p>
+<p class="close"><em>Try it at <a href="https://jarvis.edgarasneverdauskas.com">jarvis.edgarasneverdauskas.com</a>. The code is open source under AGPL-3.0 at <a href="https://github.com/Evirtual/jarvis">github.com/Evirtual/jarvis</a>. Built with Claude Code, Claude Opus 5 and Claude Fable 5.1.</em></p>
+    </div>
+    <footer class="story-foot">
+      <p class="also-end"><span>Read it on <a href="https://medium.com/@edgarasneverdauskas/five-days-building-j-a-r-v-i-s-with-claude-0533b1953060" rel="noopener">Medium<span aria-hidden="true"> ↗</span></a> / <a href="https://www.linkedin.com/pulse/five-days-building-jarvis-claude-edgaras-neverdauskas-kqxjc/" rel="noopener">LinkedIn<span aria-hidden="true"> ↗</span></a></span><span><a href="https://jarvis.edgarasneverdauskas.com" rel="noopener">Visit the project<span aria-hidden="true"> ↗</span></a></span></p>
+      <nav class="more" aria-labelledby="more-jarvis">
+        <h2 id="more-jarvis">More build stories</h2>
+        <ul><li><a href="https://articles.edgarasneverdauskas.com/css-3d-lab/">CSS 3D Lab: learning 3D on the web by playing with it</a></li><li><a href="https://articles.edgarasneverdauskas.com/self-aware-writing/">A book that knows you're reading it</a></li></ul>
+      </nav>
+    </footer>
+  </article>
+</main>
+<footer class="site-foot">
+  <a href="https://articles.edgarasneverdauskas.com/"><span aria-hidden="true">←</span> All articles</a>
+  <a href="https://edgarasneverdauskas.com">edgarasneverdauskas.com</a>
+</footer>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="application/json" id="kit-data">{"richHtml":"\u003ch1>Five days building J.A.R.V.I.S. with Claude\u003c/h1>\n\u003cp>\u003cem>What it took, what broke, and who did what, counted from 476 messages, 4,295 replies and 132 commits.\u003c/em>\u003c/p>\n\u003cp>On a Thursday morning in September I started with a single web page in Claude. Eight minutes later I typed my first real request, typo and all: \"need jarvis voice\".\u003c/p>\n\u003cp>Five days later I had an Iron Man style console that talks back. It keeps every conversation as a thread on a board, reads the real machine it runs on, installs as an app on a phone, and is live on the web for anyone to try.\u003c/p>\n\u003cp>This is the honest account of how it got there. Not the highlight reel, the ledger. I went back through every session log and the full git history, so the numbers here are counted, not remembered.\u003c/p>\n\u003ch2>What JARVIS is\u003c/h2>\n\u003cp>You tap the glowing core and speak, or type. JARVIS answers, hears and speaks through one AI service you connect, Gemini or ChatGPT. Everything you ask goes into a thread on the board: talk, research with its sources, pictures, videos that play where they are. Ask in the thread you have open, or start a new one. Every figure on screen is measured, not simulated: real processor load, real network, real weather where you are.\u003c/p>\n\u003cp>It runs in the browser with nothing to install. There is also a PC version with a small server of its own, which can read what a browser can't. Either way, your keys stay on your device.\u003c/p>\n\u003ch2>How it started, day by day\u003c/h2>\n\u003cp>\u003cstrong>Thursday: ambition, then the first \"no\".\u003c/strong> The first hour was all wishes: a voice, a model from the internet, a radar. Within 75 minutes I had dropped the idea of running AI models on my own machine and uninstalled Ollama. It was too slow and too heavy. The services would do the thinking.\u003c/p>\n\u003cp>Then came the principle that shaped everything after. The radar on screen was fake, and I said so: it \"is just mimicking\". From then on, every number JARVIS shows had to be real.\u003c/p>\n\u003cp>By lunchtime the shape appeared: a glowing core, with conversations as small floating windows around it, \"like in a movie\". By evening I had hit my Claude usage limit twice.\u003c/p>\n\u003cp>\u003cstrong>Friday: a product, not a demo.\u003c/strong> JARVIS moved from the middle of the screen to the bottom, where he became the main button: tap to talk. Much of the day went into the phone layout. I made a few changes with OpenAI's Codex and had Claude review them. At 21:37 I created the GitHub repository. The first commit landed nine minutes later, a day and a half into the project.\u003c/p>\n\u003cp>Just before midnight came the question that set the architecture: why not talk to OpenAI or Gemini directly? The web version became serverless. The page talks to the AI service straight from your browser, and your key never leaves it.\u003c/p>\n\u003cp>\u003cstrong>Saturday: the busiest day, and the biggest rethink.\u003c/strong> I sent 209 messages. By 1:29 in the morning I had moved from Claude Pro to Claude Max. By lunchtime we had a new rule for the whole design: the connection is the core. One connected service answers, hears and speaks.\u003c/p>\n\u003cp>Out went OpenRouter, Claude as a chat option, and the two speech models we had been running ourselves, Kokoro for the voice and Moonshine for hearing. In a browser they were five to ten times slower than on a PC. I also wrote down the standard I wanted the code held to: nicely written, no hacks, an architecture anyone can follow.\u003c/p>\n\u003cp>At one point that day I had $1.90 of OpenAI credit left. Gemini's free tier ran out in the middle of a test.\u003c/p>\n\u003cp>\u003cstrong>Sunday: conversation first, and the moment it got out of hand.\u003c/strong> A test suite that drives a real browser arrived at lunchtime. In the afternoon I dictated an idea by voice: the AI model, not the app's own rules, should decide where each reply belongs. Talk stays in the conversation, and research gets a thread.\u003c/p>\n\u003cp>Then, at 21:48, the most useful message of the week. I asked why there were two notification boxes on screen doing the same job, and admitted \"this project is getting out of hand\". I was losing track of how it worked.\u003c/p>\n\u003cp>Claude re-read the entire repository and wrote a six-step plan to simplify it. I replied \"ok do all six\". The six steps were committed between 22:47 and 00:22. Each was type-checked, unit-tested, run end to end in a real browser, and checked on desktop and phone before the next began.\u003c/p>\n\u003cp>\u003cstrong>Monday: fast, then focused.\u003c/strong> Answers had been slow, and now we found out why. Every question went out with the web search tool attached and the model's thinking left at its default. So we offered search only when a question wants the world, and asked the model to think briefly. A greeting went from 7.8 seconds to 2.8. A simple fact went from 5.6 to 1.8. A news search went from 44.7 seconds to 7.2.\u003c/p>\n\u003cp>Then came a slider, so each person can choose how long the model thinks. Next, an experiment: letting JARVIS find and open files on the PC. Halfway through, I realised it was a different product. I deleted the branch.\u003c/p>\n\u003cp>The afternoon undid Sunday's big idea. Testing found two bugs with the same cause: \"open a new thread and find X\" left the new thread empty and answered elsewhere, and a YouTube video landed in the caption under JARVIS, which fades after a few seconds. Both came from the model choosing where each reply belonged. It guessed well most of the time, and a guess that is right most of the time is a bug generator. So the app decides now: every answer goes into the thread you have open, or a new one. The same afternoon, the app's own command parser went the same way. It had been scanning every sentence for command words, and \"silence of the lambs, who directed it\" muted him. A command now counts only when it is the whole of what you said.\u003c/p>\n\u003ch2>The obstacles\u003c/h2>\n\u003cul>\n\u003cli>\u003cstrong>AI in a browser is slow.\u003c/strong> Voice and hearing models that feel instant on a PC crawl in a web page. The answer was to stop running models ourselves.\u003c/li>\n\u003cli>\u003cstrong>There is no \"sign in with ChatGPT\" for apps like this.\u003c/strong> People have to bring an API key, and most have never seen one. So the first-run guide explains where to get a key and what it costs, and Gemini's free tier is the default way in.\u003c/li>\n\u003cli>\u003cstrong>Free tiers run out exactly when you test.\u003c/strong> Gemini's allowance for voice ran out mid-session more than once. That is why the console falls back to the device's own voice and says so, instead of going quiet.\u003c/li>\n\u003cli>\u003cstrong>Browsers are not the same.\u003c/strong> Brave has no built-in dictation. Microphone and sound permissions behave differently everywhere. A phone draws its own bars over your page.\u003c/li>\n\u003cli>\u003cstrong>The model has limits too.\u003c/strong> I hit Claude's usage limit three times. Ten times the conversation outgrew the model's memory and had to be summarised, and the work carried on from those notes.\u003c/li>\n\u003cli>\u003cstrong>Services don't always mean what they list.\u003c/strong> One OpenAI account offered a model the API then refused for every single question.\u003c/li>\n\u003c/ul>\n\u003ch2>What we got wrong\u003c/h2>\n\u003cp>The QA log has 127 numbered fixes. A sample, because they are more instructive than the successes:\u003c/p>\n\u003cul>\n\u003cli>The instrument panels always covered the threads, because they lived on two separate layers.\u003c/li>\n\u003cli>\"Tidy up\" piled every window into the top-left corner.\u003c/li>\n\u003cli>A thread was named \".\", the leftover of a sentence the parser misread.\u003c/li>\n\u003cli>JARVIS said \"Put all 1 thread away, sir. They're…\"\u003c/li>\n\u003cli>Gemini's key travelled in the request address, where servers write it to logs. It moved to a header.\u003c/li>\n\u003cli>Closing a thread put another in front, so the next question landed in the wrong conversation.\u003c/li>\n\u003cli>After a change to how windows glide, dropping one window onto another quietly stopped making a group, and no test noticed. A check in a real browser found it.\u003c/li>\n\u003cli>One message appeared in two notification boxes at once. That was the \"two pills\".\u003c/li>\n\u003cli>\"Show me the weather in Paris\" opened the weather panel and threw the question away. \"Delete all the duplicates in a list in Python\" offered to delete the whole board.\u003c/li>\n\u003c/ul>\n\u003cp>Most were found the same way. I used it, took a screenshot and said what looked wrong. I sent 202 screenshots in five days.\u003c/p>\n\u003ch2>What went right\u003c/h2>\n\u003cul>\n\u003cli>\u003cstrong>A rule about truth.\u003c/strong> \"Truthful over friendly\": a count means what the screen shows, and a confirmation reports what actually happened. It keeps catching real bugs. On the last day JARVIS said \"Opened\" for a file that Windows had not opened. The wording turned out to be hiding a real failure.\u003c/li>\n\u003cli>\u003cstrong>Real data only.\u003c/strong> No fake readings, even when a fake would have looked better.\u003c/li>\n\u003cli>\u003cstrong>One codebase, two versions.\u003c/strong> The same code runs as a web page and on a PC. A fix lands in both.\u003c/li>\n\u003cli>\u003cstrong>Tests that use a real browser.\u003c/strong> There are 122 unit tests and 23 end-to-end scenarios. Each scenario starts from a clean console, and all of them run on every push.\u003c/li>\n\u003cli>\u003cstrong>Deleting.\u003c/strong> The git history shows 40,281 lines added and 16,611 removed. Some of the best days were mostly removals.\u003c/li>\n\u003c/ul>\n\u003ch2>Everything we rethought\u003c/h2>\n\u003cul>\n\u003cli>\u003cstrong>Day one:\u003c/strong> local AI models through Ollama, dropped by mid-morning. A \"drive mode\" nobody needed.\u003c/li>\n\u003cli>\u003cstrong>Day two:\u003c/strong> a proxy server we did not need, once the web version could talk to the services directly.\u003c/li>\n\u003cli>\u003cstrong>Day three:\u003c/strong> OpenRouter, Claude as a chat option, and our own voice and hearing models.\u003c/li>\n\u003cli>\u003cstrong>Day four:\u003c/strong> hand-written rules for what the user meant. The model decides now, and the console's own commands shrank to a small, fixed set. The OpenAI software library went too, replaced by plain web requests.\u003c/li>\n\u003cli>\u003cstrong>Day five:\u003c/strong> PC control, which became its own future product. And the day-four idea itself: the model no longer decides where a reply goes, and the app no longer reads commands out of the middle of sentences. One rule each, decided by the app.\u003c/li>\n\u003c/ul>\n\u003cp>An early \"code mode\", where JARVIS handed a request to Claude Code, got as far as a plan and a trial run. Each of these felt like a setback at the time. None of them was.\u003c/p>\n\u003ch2>Who did what\u003c/h2>\n\u003cp>I sent 476 messages. A typical one was 14 words. I sent 202 screenshots, and I stopped Claude mid-task 17 times to change course.\u003c/p>\n\u003cp>Claude replied 4,295 times and made 6,354 tool calls: 2,394 commands, 1,620 file edits and 1,464 actions in a browser. That is about nine replies and thirteen actions for every message I wrote.\u003c/p>\n\u003cp>\u003cstrong>[Image: https://articles.edgarasneverdauskas.com/jarvis/numbers-1400.png Caption: Five days, counted from the session logs and git history: what I put in, and what the models did with it. Alt text: By the numbers]\u003c/strong>\u003c/p>\n\u003cp>My part was deciding. What JARVIS is, and what it is not. What looks wrong. When something is getting too complicated. When an idea belongs to a different product. That meant testing on my own devices, and saying no, often.\u003c/p>\n\u003cp>The models' part was everything that turns a decision into working software: the code, the tests, the documentation, the QA log, the commits, and checking all of it in a real browser.\u003c/p>\n\u003cp>The bottleneck was never typing code. It was knowing what I wanted, seeing what was wrong, and saying no.\u003c/p>\n\u003ch2>Opus 5 and Fable 5.1\u003c/h2>\n\u003cp>Two Claude models did almost all of the work.\u003c/p>\n\u003cp>\u003cstrong>Claude Opus 5\u003c/strong> carried most of days one to three: the first build, the web version and the move to one connected service. It came back on day five for the PC experiment and the afternoon's rethink. It gave 2,654 replies, 3.03 million output tokens and 3,761 tool calls.\u003c/p>\n\u003cp>\u003cstrong>Claude Fable 5.1\u003c/strong> joined on day two and carried most of day four and the morning of day five: conversation first, the six-step simplification, faster answers and the thinking slider. It gave 1,579 replies, 2.30 million output tokens and 2,533 tool calls.\u003c/p>\n\u003cp>The logs show a difference in working style. Fable wrote more per reply, 1,454 tokens against 1,142, and made more tool calls per reply, 1.60 against 1.42. Fable also leaned on the command line: 1,261 commands to 535 direct file edits, often writing one small script that changed many files at once. Opus worked file by file, with 1,132 commands to 1,081 edits.\u003c/p>\n\u003cp>Treat this as a record, not a benchmark. The two models worked on different days and on different jobs. A few small runs from Claude Sonnet 5 came from that early code-mode trial.\u003c/p>\n\u003ch2>What it cost\u003c/h2>\n\u003cp>I started on Claude Pro. It lasted about five hours on the first day: I hit its usage limit at 14:21, and again at 19:21. By the third day I had moved to Claude Max, and even that ran out once, late on the fourth night. A build like this runs for hours at a time: reading the whole project, running commands, driving a browser. That is what the subscription pays for.\u003c/p>\n\u003cp>The app itself cost almost nothing to run. Gemini's free tier and a few dollars of OpenAI credit covered testing, and GitHub Pages hosts the web version for free.\u003c/p>\n\u003ch2>What I would tell someone starting\u003c/h2>\n\u003cul>\n\u003cli>\u003cstrong>Your job moves from typing to deciding.\u003c/strong> Most of my messages were one sentence. The hard part was knowing which sentence.\u003c/li>\n\u003cli>\u003cstrong>Say no early.\u003c/strong> The best decisions of the week were removals, and the first came 75 minutes in.\u003c/li>\n\u003cli>\u003cstrong>Write your principles down.\u003c/strong> \"Truthful over friendly\" and \"no hacks\" settled dozens of small arguments before they started.\u003c/li>\n\u003cli>\u003cstrong>Use it like a user.\u003c/strong> Screenshots of real screens found what tests missed. Then turn each find into a test.\u003c/li>\n\u003cli>\u003cstrong>Schedule the simplification.\u003c/strong> Complexity arrives quietly. When you notice two things doing one job, stop and re-read everything.\u003c/li>\n\u003cli>\u003cstrong>Don't let anything guess.\u003c/strong> A rule that is right most of the time produces bugs that look random. When a bug seems random, look for the guess behind it and replace it with one rule.\u003c/li>\n\u003cli>\u003cstrong>Know which product you are building.\u003c/strong> A good idea can still belong somewhere else.\u003c/li>\n\u003cli>\u003cstrong>Measure the machine too.\u003c/strong> The logs told me things my memory had wrong.\u003c/li>\n\u003c/ul>\n\u003ch2>In one paragraph\u003c/h2>\n\u003cp>Five days, 39 hours of active work, one person and two AI models produced a working product, 132 commits and 127 fixes. The models wrote almost every line. The product, though, came from a long run of small human decisions: what to keep, what to drop, what looked wrong, and when to stop and simplify. Building with AI didn't remove the hard part of making software. It removed everything around it, and left the hard part standing in plain view.\u003c/p>\n\u003cp class=\"close\">\u003cem>Try it at \u003ca href=\"https://jarvis.edgarasneverdauskas.com\">jarvis.edgarasneverdauskas.com\u003c/a>. The code is open source under AGPL-3.0 at \u003ca href=\"https://github.com/Evirtual/jarvis\">github.com/Evirtual/jarvis\u003c/a>. Built with Claude Code, Claude Opus 5 and Claude Fable 5.1.\u003c/em>\u003c/p>"}</script>
+</body>
+</html>
