@@ -119,6 +119,10 @@
   transition: opacity .35s var(--ease-soft), border-color .3s var(--ease-soft), box-shadow .3s var(--ease-soft),
               left var(--travel) var(--ease), top var(--travel) var(--ease), transform var(--travel) var(--ease);
 }
+/* Sized from a left or top side, its place moves with its size: both must
+   follow the pointer at once, or the side meant to stay put swims. This rule
+   outweighs the glide above; windows.css's .chatwin.sizing alone does not. */
+.bubble.loose .chatwin.sizing { transition: none; }
 .bubble.loose .chatwin:not(.sized) { width: var(--thread-w); }
 .bb-head {
   display: flex; align-items: center; gap: 7px; padding: 8px 4px 7px; margin-bottom: 2px;
