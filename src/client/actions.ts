@@ -6,7 +6,7 @@ import type { ProviderId } from "../shared/types.js";
 import type { NeuralVoice } from "./voice.js";
 import { PROVIDERS } from "../shared/services/index.js";
 import { api } from "./api.js";
-import { NEEDS_CONFIRMATION, type Action, type ParseContext } from "./commands.js";
+import { NEEDS_CONFIRMATION, panelFrom, type Action, type ParseContext } from "./commands.js";
 import { type Thread } from "./stage.js";
 import { editDistance } from "./text.js";
 import { GENERAL_ID, threadRef, type Group } from "./workspace.js";
@@ -228,6 +228,36 @@ export async function runAction(a: Action, fromModel = false): Promise<string | 
       if (mode === "compact") return "On a phone the threads are already a list, sir — drag one by its title bar to move it.";
       graph.tidy();
       return "Tidied up, sir — everything folded and in its place. Open any thread from its title bar.";
+    }
+    case "arrange_board": {
+      if (mode === "compact") return "On a phone the board is a list, sir — there's nothing to arrange.";
+      panels.toEdges();
+      const open = panels.openNames.length;
+      const r = ws.live.length ? graph.tidy({ fold: false, clear: panels.surfaces().map((p) => p.rect) }) : null;
+      const sides = open ? `The ${open === 1 ? "panel is" : `${open} panels are`} down the sides` : "No panels are open";
+      if (!r) return `${sides}, sir; there are no threads to arrange.`;
+      return `${sides}, sir, and the threads are between them${r.folded ? " — folded, as they didn't fit open" : ""}.`;
+    }
+    case "place": {
+      if (mode === "compact") return "On a phone the board is a list, sir — nothing on it can be moved or sized.";
+      const done = (name: string): string => {
+        const to = a.at ? `to the ${a.at === "centre" ? "centre" : a.at.replace("-", " ")}` : "";
+        return a.at && a.size ? `Moved ${name} ${to} and made it ${a.size}, sir.` : a.at ? `Moved ${name} ${to}, sir.` : `Made ${name} ${a.size}, sir.`;
+      };
+      const panel = panelFrom(a.what);
+      if (panel) { panels.put(panel, a.at, a.size); return done(`the ${panel} panel`); }
+      const g = ws.findGroup(a.what);
+      if (g && g.id !== GENERAL_ID) { graph.put({ group: g }, a.at, a.size); return done(`the group ${g.title}`); }
+      const r = resolve(a.what);
+      if (typeof r === "string") return r;
+      // a window inside a group goes where its group goes
+      const home = ws.groupOf(r);
+      if (home.id !== GENERAL_ID) {
+        graph.put({ group: home }, a.at, a.size);
+        return done(`the group ${home.title}, which “${r.title}” is in,`);
+      }
+      graph.put({ thread: r }, a.at, a.size);
+      return done(`“${r.title}”`);
     }
     case "archive_all": {
       const n = ws.live.length;

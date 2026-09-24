@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { NEEDS_CONFIRMATION, extractDirectives, intentOf, parseUtterance, type ParseContext, type Parsed } from "../src/client/commands.ts";
-import { DIRECTIVES, directiveCatalogue } from "../src/shared/directives.ts";
+import { NEEDS_CONFIRMATION, extractDirectives, intentOf, panelFrom, parseUtterance, type ParseContext, type Parsed } from "../src/client/commands.ts";
+import { DIRECTIVES, directiveCatalogue, placeFrom } from "../src/shared/directives.ts";
 import { effortAsked, rankModels, wantsSearch } from "../src/shared/services/common.ts";
 
 const threads = ["General", "Lithuania", "Trip planning", "Cambodia news"];
@@ -235,6 +235,28 @@ test("the model can't delete, approve, or run unknown actions", () => {
   assert.deepEqual(r.actions, [{ name: "archive_thread" }], "close is archive; the rest are dropped");
 });
 
+test("a directive the console has no control for is refused as written, never shown as text", () => {
+  const r = extractDirectives('Done, sir.\n[[do: reflow_layout grid="3x3" center="trans"]]\n[[do: action="force_fullscreen_reset"]]\n[[do: tidy_board]]');
+  assert.equal(r.text, "Done, sir.");
+  assert.deepEqual(r.actions, [{ name: "tidy_board" }]);
+  assert.deepEqual(r.refused, ['reflow_layout grid="3x3" center="trans"', 'action="force_fullscreen_reset"']);
+  // one without what it needs is refused too, not guessed at
+  assert.deepEqual(extractDirectives('[[do: place what="Lisbon" at="somewhere nice"]]').refused, ['place what="Lisbon" at="somewhere nice"']);
+});
+
+test("a box is placed and sized in the board's own words, however the place is written", () => {
+  assert.deepEqual(extractDirectives('[[do: place what="Network" at="upper right"]] [[do: place what="#SLIN" size="large"]]').actions, [
+    { name: "place", what: "Network", at: "top-right" },
+    { name: "place", what: "#SLIN", size: "large" },
+  ]);
+  assert.equal(placeFrom("center"), "centre");
+  assert.equal(placeFrom("middle left"), "left");
+  assert.equal(placeFrom("Bottom-Right"), "bottom-right");
+  assert.equal(placeFrom("top centre"), "top");
+  assert.equal(placeFrom("the moon"), null);
+  assert.deepEqual(extractDirectives("[[do: place what=\"Lisbon\"]]").actions, [], "nowhere and no size is nothing to do");
+});
+
 test("at most eight directives are taken from one reply", () => {
   const r = extractDirectives(Array.from({ length: 12 }, () => "[[do: archive_all]]").join(" "));
   assert.equal(r.actions.length, 8);
@@ -253,7 +275,7 @@ test("this thread folds and opens by the console's own word; a name goes to JARV
 });
 
 test("the directive table is the one place the model's actions live: every documented directive makes an action", () => {
-  const sample = { title: "T", ask: "q", parent: "P", group: "G", threads: "A; B", thread: "T", a: "A", b: "B", why: "w", open: "yes", provider: "gemini", name: "compute", value: "1.1", tab: "voice", last: "yes" };
+  const sample = { title: "T", ask: "q", parent: "P", group: "G", threads: "A; B", thread: "T", a: "A", b: "B", why: "w", open: "yes", provider: "gemini", name: "compute", value: "1.1", tab: "voice", last: "yes", what: "Lisbon", at: "top-left", size: "large" };
   for (const d of DIRECTIVES) {
     if (!d.doc) continue;
     assert.ok(d.make(sample), `${d.name} makes nothing of a full set of arguments`);
@@ -304,4 +326,20 @@ test("naming a thread is JARVIS's own housekeeping, never something typed or sai
   assert.deepEqual(d.actions, [{ name: "title_thread", title: "Lisbon in October" }]);
   assert.deepEqual(extractDirectives('[[do: new_subject title="Formula 1 results"]]').actions, [], "a directive that no longer exists is ignored");
   assert.equal(intentOf("title thread Lisbon", ctx()), null);
+});
+
+test("a box is placed by the console's own word when what is named is on the board", () => {
+  assert.deepEqual(intentOf("move the radar to the top right", ctx()), { name: "place", what: "perimeter", at: "top-right" });
+  assert.deepEqual(intentOf("put the weather panel on the left", ctx()), { name: "place", what: "environment", at: "left" });
+  assert.deepEqual(intentOf("move Research to the bottom left corner", ctx()), { name: "place", what: "Research", at: "bottom-left" });
+  assert.deepEqual(intentOf("put the panels on the sides", ctx()), { name: "arrange_board" });
+  // not something on the board, or not a place: a question for JARVIS
+  assert.equal(intentOf("move my meeting to the top", ctx()), null);
+  assert.equal(intentOf("move the radar to Lisbon", ctx()), null);
+});
+
+test("a panel is known however it is named", () => {
+  for (const s of ["compute", "panel compute", "the compute panel", "CPU", "processor", "Perimeter panel", "radar"]) assert.ok(panelFrom(s), s);
+  assert.equal(panelFrom("panel perimeter"), "perimeter");
+  assert.equal(panelFrom("Lisbon"), null);
 });

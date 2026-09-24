@@ -28,7 +28,8 @@ import { reduceMotion } from "./motion.js";
 import { forget, raise, stackKey, track } from "./stack.js";
 import { PhoneList } from "./stage-phone.js";
 import { BoardPointer } from "./stage-pointer.js";
-import { gestures } from "./surface.js";
+import { rectAt, roomBetween, sizeOf, type BoxSize, type Place } from "./board-places.js";
+import { gestures, sizeLimits } from "./surface.js";
 import { planTidy, type TidyItem } from "./tidy.js";
 import { ContextWeb, type Related } from "./web.js";
 import { averageHues, GENERAL_ID, THREAD_HUES, threadRef, type Group, type Thread, type Workspace, isHexColour } from "./workspace.js";
@@ -227,9 +228,12 @@ export class Stage {
    * Tidy the board: every thread is folded to its title bar, then everything
    * is seated by the plan in tidy.ts — one column down the middle, more to a
    * row when one is too tall, widths coming down only when a row is too wide.
+   * `fold: false` tries it with the windows left open first, and folds them
+   * only if they don't fit. `clear`: boxes (panels) to tidy between, not over.
    */
-  tidy(): { seated: number } {
-    if (this.compact) return { seated: 0 }; // a phone's board is already a list
+  tidy(opts: { fold?: boolean; clear?: Rect[] } = {}): { seated: number; folded: boolean } {
+    const fold = opts.fold ?? true;
+    if (this.compact) return { seated: 0, folded: false }; // a phone's board is already a list
     const hold = [...this.cards.values(), ...this.bubbles.values()].map((x) => x.el);
     // Measured with their easing held, or a window still changing size would
     // be measured at the size it is leaving.
@@ -238,7 +242,7 @@ export class Stage {
 
     // Fold, give back what an earlier tidy took, and measure what's left.
     for (const t of this.ws.live) {
-      if (this.ws.isOpen(t)) this.ws.setOpen(t.id, false);
+      if (fold && this.ws.isOpen(t)) this.ws.setOpen(t.id, false);
       delete t.fit;
     }
     for (const g of this.ws.groups) delete g.fit;
@@ -266,14 +270,75 @@ export class Stage {
       });
     }
 
-    const plan = planTidy(items, this.room);
+    const plan = planTidy(items, opts.clear?.length ? roomBetween(this.room, opts.clear) : this.room);
+    if (!plan.fitted && !fold) return this.tidy({ ...opts, fold: true });
     items.forEach((it, i) => {
       if (plan.widths[i]! < it.w) it.fit(plan.widths[i]!);
       it.place(plan.seats[i]!.x, plan.seats[i]!.y);
     });
     this.commit();
     requestAnimationFrame(() => { for (const el of hold) el.classList.remove("sizing"); });
-    return { seated: items.length };
+    return { seated: items.length, folded: fold };
+  }
+
+  /* ---------------- the board in words (board-places.ts) ---------------- */
+
+  /** Each loose window and each group as drawn: where it is and how big. None on a phone, whose board is a list. */
+  surfaces(): { kind: "thread" | "group"; id: string; rect: Rect }[] {
+    if (this.compact) return [];
+    const out: { kind: "thread" | "group"; id: string; rect: Rect }[] = [];
+    for (const [gid, r] of this.boxes) {
+      const el = this.bubbles.get(gid)?.el;
+      if (el) out.push({ kind: "group", id: gid, rect: { x: r.x, y: r.y, w: el.offsetWidth, h: el.offsetHeight } });
+    }
+    for (const t of this.ws.treeOrder(GENERAL_ID)) {
+      const el = this.cards.get(t.id)?.el;
+      if (!el?.offsetWidth || !el.style.left) continue;
+      out.push({ kind: "thread", id: t.id, rect: { x: parseFloat(el.style.left), y: parseFloat(el.style.top), w: el.offsetWidth, h: el.offsetHeight } });
+    }
+    return out;
+  }
+
+  /**
+   * A loose window or a group put at a place on the board, given a size, or
+   * both — as dragging it there by hand would. Given a size, it opens: a
+   * size is asked for to read it. Without a place it keeps its top-left
+   * corner; without a size, its size.
+   */
+  put(what: { thread: Thread } | { group: Group }, at?: Place, size?: BoxSize): void {
+    const lim = sizeLimits(this.room);
+    if ("thread" in what) {
+      const t = what.thread;
+      const c = this.cards.get(t.id);
+      if (!c || t.groupId !== GENERAL_ID) return;
+      let w = c.el.offsetWidth, h = c.el.offsetHeight;
+      if (size) {
+        // a window's size is its body's; its title bar sits on top of that (as stage-pointer.ts sizes it)
+        const head = c.el.querySelector<HTMLElement>(".cw-head")?.offsetHeight ?? 40;
+        ({ w, h } = sizeOf(size, { ...lim, maxH: Math.max(lim.minH, lim.maxH - 50) + head }));
+        t.size = { w, h: Math.max(lim.minH, h - head) };
+        delete t.fit;
+        this.ws.setOpen(t.id, true);
+      }
+      const r = at ? rectAt(at, w, h, this.room) : null;
+      if (r) { t.x = r.x; t.y = r.y; }
+    } else {
+      const g = what.group;
+      const el = this.bubbles.get(g.id)?.el;
+      if (!el) return;
+      let w = el.offsetWidth, h = el.offsetHeight;
+      if (size) {
+        ({ w, h } = sizeOf(size, lim));
+        g.size = { w, h };
+        delete g.fit;
+        this.ws.setCollapsed(g.id, false);
+      }
+      const r = at ? rectAt(at, w, h, this.room) : null;
+      if (r) { g.x = r.x; g.y = r.y; }
+    }
+    this.commit();
+    // on top where it lands, as anything carried there by hand is
+    raise("thread" in what ? stackKey.thread(what.thread.id) : stackKey.group(what.group.id));
   }
 
   /* ---------------- thread windows ---------------- */

@@ -24,6 +24,7 @@ import { mode } from "./layout.js";
 import { showKeyboard, tapSpeaks, keyboardShown } from "./voice-ui.js";
 import { setDrawer } from "./drawer.js";
 import { SERVERLESS } from "./server.js";
+import { clearPlaces, placeOf } from "./board-places.js";
 
 /* ===================================================================== *
  * What the reasoning core is told
@@ -95,6 +96,7 @@ function appSnapshot(): string {
     .map((l) => `“${byId.get(l.a)!.title}” ⟷ “${byId.get(l.b)!.title}” (${l.manual ? "connected on purpose" : "shared"}: ${l.why.join(", ")})`);
   out.push(links.length ? `Connections: ${links.join("; ")}.` : "No connections between threads yet.");
   if (ws.archived.length) out.push(`Put away (restorable): ${ws.archived.slice(0, 8).map((t) => `“${t.title} #${threadRef(t)}”`).join(", ")}.`);
+  out.push(boardInWords());
   out.push(whereRunning());
   out.push(
     `Setup: layout ${mode}; open panels: ${panels.openNames.length ? panels.openNames.join(", ") : "none"}; ` +
@@ -102,6 +104,32 @@ function appSnapshot(): string {
     `reasoning core ${conn.activeName()}${conn.activeModel() ? ` (${conn.activeModel()})` : ""}; connected: ${conn.readyNames().join(", ") || "none"}.]`,
   );
   return out.join("\n");
+}
+
+/**
+ * Where everything on the board sits, in the words the place directive
+ * takes — so "move that one to the right" can be done, and "it's already
+ * there" can be said truthfully.
+ */
+function boardInWords(): string {
+  if (mode === "compact") return "Layout: a phone's list — nothing on it can be moved or sized.";
+  const room = graph.room;
+  const boxes = [
+    ...graph.surfaces().map((s) => {
+      if (s.kind === "group") {
+        const g = ws.group(s.id);
+        return { name: `group “${g?.title ?? ""}”${g?.collapsed ? " (folded)" : ""}`, rect: s.rect };
+      }
+      const t = ws.thread(s.id);
+      return { name: `window “${t?.title ?? ""} #${t ? threadRef(t) : ""}”${t && !ws.isOpen(t) ? " (folded)" : ""}`, rect: s.rect };
+    }),
+    ...panels.surfaces().map((p) => ({ name: `${p.name} panel`, rect: p.rect })),
+  ];
+  const B = room.bounds;
+  const where = boxes.map((b) => `${b.name} at ${placeOf(b.rect, room)}, ${Math.round(b.rect.w)}×${Math.round(b.rect.h)}`);
+  const clear = clearPlaces(boxes.map((b) => b.rect), room);
+  return `Layout (board ${Math.round(B.right - B.left)}×${Math.round(B.bottom - B.top)} px; you sit at its bottom centre, which is kept clear): ` +
+    `${where.length ? where.join("; ") : "nothing on it"}. Clear places: ${clear.length ? clear.join(", ") : "none"}.`;
 }
 
 /**
@@ -158,6 +186,8 @@ function threadFor(): Thread {
 class Exchange {
   streamed = "";
   housekeeping: Action[] = [];
+  /** Directives the reply wrote that the console has no control for: done nothing, and said so. */
+  refused: string[] = [];
   /** The reply's row in the thread's window: "Thinking…" until the first words arrive. */
   readonly body: HTMLElement;
 
@@ -262,6 +292,7 @@ function finish(x: Exchange, raw: string): Action[] {
   const d = extractDirectives(raw);
   // his own housekeeping — naming the thread — waits until the exchange is recorded
   x.housekeeping = d.actions.filter(isHousekeeping);
+  x.refused = d.refused;
   const actions = d.actions.filter((a) => !isHousekeeping(a));
   const out = cleanReply(d.text);
   graph.detachLive(x.thread.id, x.body);
@@ -309,6 +340,8 @@ function fail(x: Exchange, err: unknown): void {
  * rather than talked over.
  */
 async function carryOut(x: Exchange, actions: Action[]): Promise<void> {
+  // What he wrote but the console has no control for did nothing; his words may say otherwise, so the thread says so.
+  for (const r of x.refused) noteIn(x.thread.id, `Not done: there is no control for “${clip(r, 80)}”. Nothing on the board changed for it.`);
   for (const a of actions) {
     if (a.name === "new_thread" && a.branch && !a.parent) a.parentId = x.thread.id;
     const note = await runAction(a, true);

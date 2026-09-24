@@ -30,7 +30,7 @@
  * ParseContext, so the rules can be tested on their own.
  */
 
-import { type Action, type PanelName, coreFrom, directiveToAction } from "../shared/directives.js";
+import { type Action, type PanelName, PANEL_NAMES, coreFrom, directiveToAction, placeFrom } from "../shared/directives.js";
 
 export type { Action, ActionName, ConfigTab, PanelName } from "../shared/directives.js";
 export { NEEDS_CONFIRMATION } from "../shared/directives.js";
@@ -114,6 +114,12 @@ const PANEL_WORDS: [RegExp, PanelName][] = [
   [/^(?:uplink|wi-?fi|network|internet|connection)$/, "uplink"],
 ];
 
+/** A panel however it is named: "compute", "the CPU panel", "panel perimeter", "radar". */
+export function panelFrom(words: string): PanelName | null {
+  const w = words.toLowerCase().trim().replace(/^(?:the|my)\s+/, "").replace(/^panel\s+|\s+panel$/, "");
+  return PANEL_NAMES.find((n) => n === w) ?? PANEL_WORDS.find(([rx]) => rx.test(w))?.[1] ?? null;
+}
+
 /**
  * One of the console's own commands, said as a command and nothing else — or
  * null: it is a question, or something for JARVIS. Every rule matches the
@@ -191,6 +197,20 @@ export function intentOf(clause: string, ctx: ParseContext = NO_CONTEXT): Action
   // Deleting a group is for good, so it is the console's own word, never the model's.
   const dg = /^(?:delete|remove|get rid of|bin|scrap)\s+(?:the\s+)?(.+?)\s+(?:group|bubble)$/.exec(q);
   if (dg?.[1] && ctx.knowsGroup(dg[1])) return { name: "delete_group", group: dg[1] };
+
+  // Placing: "move the radar to the top right", "put Lisbon on the left" — a
+  // panel, or a thread or group the board has; anything else is for JARVIS.
+  if (/^(?:put|move|send)\s+(?:all\s+)?(?:the\s+)?panels\s+(?:to|on|at|down)\s+(?:the\s+)?(?:sides|edges)$/.test(q)) return { name: "arrange_board" };
+  const pm = /^(?:move|put|place|send)\s+(?:the\s+|my\s+)?(.+?)\s+(?:to|on|at|in)\s+(?:the\s+)?((?:top|bottom|upper|lower|centre|center|middle)(?:[\s-]+(?:left|right))?|left|right)(?:\s+(?:corner|side|edge))?(?:\s+of\s+the\s+(?:screen|board))?$/.exec(q);
+  const at = pm ? placeFrom(pm[2]!) : null;
+  if (pm && at) {
+    const panel = panelFrom(pm[1]!);
+    if (panel) return { name: "place", what: panel, at };
+    // the name as it was said, capitals and all
+    const from = q.indexOf(pm[1]!);
+    const what = said.slice(from, from + pm[1]!.length);
+    if (ctx.knowsThread(what) || ctx.knowsGroup(what)) return { name: "place", what, at };
+  }
 
   // Tidying: "tidy up", "arrange the windows", "clean up the board" — nothing is removed.
   if (/^(?:tidy|arrange|rearrange|organi[sz]e|sort out|clean up|neaten)(?:\s+up)?(?:\s+(?:the|my|all(?:\s+the)?))?(?:\s+(?:board|screen|desk|windows?|threads?|layout|everything|mess))?$/.test(q)) return { name: "tidy_board" };
@@ -274,16 +294,27 @@ const MAX_DIRECTIVES = 8;
 /**
  * Pull `[[do: …]]` directives out of a reply; return the clean text and the
  * actions. Anything not in the table — deleting, approving, anything
- * unknown — is dropped, not guessed at.
+ * unknown, or written without what it needs — is not carried out, not
+ * guessed at; it is returned as `refused`, as written, so the user can be
+ * told that it did nothing.
  */
-export function extractDirectives(reply: string): { text: string; actions: Action[] } {
+export function extractDirectives(reply: string): { text: string; actions: Action[]; refused: string[] } {
   const actions: Action[] = [];
-  const text = reply.replace(DIRECTIVE, (_m, name: string, argStr: string) => {
+  const refused: string[] = [];
+  const text = reply.replace(DIRECTIVE, (whole: string, name: string, argStr: string) => {
     const args: Record<string, string> = {};
     for (const m of argStr.matchAll(/([a-z_]+)\s*=\s*"([^"]*)"/gi)) args[m[1]!.toLowerCase()] = m[2]!.trim();
     const act = directiveToAction(name, args);
-    if (act && actions.length < MAX_DIRECTIVES) actions.push(act);
+    if (!act) refused.push(asWritten(whole));
+    else if (actions.length < MAX_DIRECTIVES) actions.push(act);
     return "";
-  });
-  return { text: text.replace(/\n{3,}/g, "\n\n").trim(), actions };
+  })
+    // one not even written in the directive's form ([[do: action="…"]]) is no directive either — and not shown as text
+    .replace(/\[\[do:[^\]]*\]\]/gi, (whole) => { refused.push(asWritten(whole)); return ""; });
+  return { text: text.replace(/\n{3,}/g, "\n\n").trim(), actions, refused };
+}
+
+/** A directive as it was written, without its brackets. */
+function asWritten(directive: string): string {
+  return directive.slice(2, -2).replace(/^do:\s*/i, "").trim();
 }

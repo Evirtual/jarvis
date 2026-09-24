@@ -24,6 +24,22 @@ export type PanelName = (typeof PANEL_NAMES)[number];
 export const CONFIG_TABS = ["connections", "voice", "access", "quick"] as const;
 export type ConfigTab = (typeof CONFIG_TABS)[number];
 
+/** The nine places on the board a box can be put, as JARVIS reads and names them (client/board-places.ts). */
+export const PLACES = ["top-left", "top", "top-right", "left", "centre", "right", "bottom-left", "bottom", "bottom-right"] as const;
+export type Place = (typeof PLACES)[number];
+
+/** The sizes a box can be given by name. */
+export const BOX_SIZES = ["small", "medium", "large", "tall", "wide"] as const;
+export type BoxSize = (typeof BOX_SIZES)[number];
+
+/** A place however it is written: "top left", "upper-right", "center", "middle". */
+export function placeFrom(word: string): Place | null {
+  const w = word.toLowerCase().replace(/\bupper\b/g, "top").replace(/\blower\b/g, "bottom")
+    .replace(/\b(?:center|middle)\b/g, "centre").replace(/[\s_-]+/g, "-").replace(/^-|-$/g, "");
+  const aliases: Record<string, Place> = { "top-centre": "top", "bottom-centre": "bottom", "centre-left": "left", "centre-right": "right" };
+  return aliases[w] ?? PLACES.find((p) => p === w) ?? null;
+}
+
 /* ---------------- the actions ---------------- */
 
 export type Action =
@@ -43,6 +59,10 @@ export type Action =
   | { name: "delete_group"; group: string }
   | { name: "archive_all" }
   | { name: "tidy_board" }
+  /** The panels down the sides of the board, the threads and groups tidied between them. */
+  | { name: "arrange_board" }
+  /** A thread's window, a group or a panel put at a place, given a size, or both. */
+  | { name: "place"; what: string; at?: Place; size?: BoxSize }
   | { name: "delete_all" }
   | { name: "clear_archived" }
   /** From JARVIS only: a name for the thread we're in, which has none yet. */
@@ -114,7 +134,18 @@ export const DIRECTIVES: readonly Directive[] = [
   { name: "collapse_group", use: 'group="…|all"', doc: "folds a group to a single orb", make: (a) => a.group ? { name: "collapse_group", group: a.group } : null },
   { name: "expand_group", use: 'group="…|all"', doc: "opens it again", make: (a) => a.group ? { name: "expand_group", group: a.group } : null },
   { name: "archive_all", use: "", doc: "puts every thread away, recoverable", make: () => ({ name: "archive_all" }) },
-  { name: "tidy_board", use: "", doc: "rearranges every window and group neatly, closing nothing", make: () => ({ name: "tidy_board" }) },
+  { name: "tidy_board", use: "", doc: "folds every window and group and stacks them neatly down the middle, closing nothing; panels stay where they are", make: () => ({ name: "tidy_board" }) },
+  { name: "arrange_board", use: "", doc: "the instrument panels down the left and right edges, the threads and groups tidied between them",
+    make: () => ({ name: "arrange_board" }) },
+  { name: "place", use: `what="a thread's title or #ref, a group, or a panel" at="${PLACES.join("|")}" size="${BOX_SIZES.join("|")}"`,
+    doc: "moves one window, group or panel to a place on the board, or sizes it, or both: at and size are each optional, but one is needed",
+    make: (a) => {
+      const at = a.at ? placeFrom(a.at) : null;
+      const size = BOX_SIZES.find((s) => s === a.size?.toLowerCase());
+      // a place or a size that isn't one of the words is no directive, not a guess
+      if (!a.what || (!at && !size) || (a.at && !at) || (a.size && !size)) return null;
+      return { name: "place", what: a.what, ...(at ? { at } : {}), ...(size ? { size } : {}) };
+    } },
   { name: "link_threads", use: 'a="…" b="…" why="two or three words"', doc: "connects two threads; connected threads are put in the same group",
     make: (a) => a.a && a.b ? { name: "link_threads", a: a.a, b: a.b, ...opt("why", a.why) } : null },
   { name: "switch_thread", use: 'title="…"', doc: "brings a thread to the front", make: (a) => a.title ? { name: "switch_thread", title: a.title } : null },
@@ -152,5 +183,5 @@ export function directiveToAction(name: string, args: Args): Action | null {
 /** The directives as the persona tells the model about them. */
 export function directiveCatalogue(): string {
   const list = DIRECTIVES.filter((d) => d.doc).map((d) => `${d.name}${d.use ? ` ${d.use}` : ""} — ${d.doc}`).join("; ");
-  return `Actions: ${list}. You cannot delete threads or groups, answer a confirmation on the user's behalf, or change the model.`;
+  return `Actions: ${list}. There are no others: you cannot delete threads or groups, answer a confirmation on the user's behalf, change the model, lay the board out in a grid, or go full screen.`;
 }

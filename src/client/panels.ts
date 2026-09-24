@@ -15,7 +15,8 @@
 import { KEY, recall, store } from "./storage.js";
 import { ICON } from "./icons.js";
 import { raise, stackKey, track } from "./stack.js";
-import { type Room } from "./board-geometry.js";
+import { type Rect, type Room } from "./board-geometry.js";
+import { rectAt, sizeOf, type BoxSize, type Place } from "./board-places.js";
 import { gestures, putDown, resized, sidesAt, sizeCursor, sizeLimits } from "./surface.js";
 import { clamp } from "./num.js";
 import { PANEL_NAMES, type PanelName } from "../shared/directives.js";
@@ -131,6 +132,53 @@ export class Panels {
     if (!top) return false;
     this.hide(top.n);
     return true;
+  }
+
+  /** Each open panel as drawn: where it is and how big. None on a phone, where they sit in the list. */
+  surfaces(): { name: PanelName; rect: Rect }[] {
+    if (this.compact) return [];
+    return this.openNames.map((name) => {
+      const el = this.els.get(name)!;
+      return { name, rect: { x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0, w: el.offsetWidth, h: el.offsetHeight } };
+    });
+  }
+
+  /**
+   * A panel put at a place on the board, given a size, or both — opened if
+   * it was closed, and kept there as if placed by hand. Without a place it
+   * keeps its top-left corner; without a size, its size.
+   */
+  put(name: PanelName, at?: Place, size?: BoxSize): void {
+    const el = this.els.get(name);
+    if (!el || this.compact) return;
+    if (el.hidden) this.show(name, true);
+    const old = this.seats[name];
+    const { w, h } = size ? sizeOf(size, sizeLimits(this.room())) : { w: el.offsetWidth, h: el.offsetHeight };
+    const { x, y } = at ? rectAt(at, w, h, this.room()) : { x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0 };
+    this.seats[name] = {
+      x, y,
+      ...(size ? { w, h } : {}),
+      ...(!size && old?.w ? { w: old.w } : {}),
+      ...(!size && old?.h ? { h: old.h } : {}),
+    };
+    this.seat(name, el);
+    this.front(el);
+    this.persist();
+    this.onChange?.();
+  }
+
+  /** Every open panel back down its own side of the board at its own size, as when first opened. */
+  toEdges(): void {
+    if (this.compact) return;
+    for (const n of this.openNames) {
+      delete this.seats[n];
+      const el = this.els.get(n)!;
+      // forgotten where it stood, or the first seat would keep it there
+      el.style.left = "";
+      el.style.top = "";
+    }
+    this.reseatUnplaced();
+    this.persist();
   }
 
   /** Re-apply seats after the stage changes size or layout mode. */

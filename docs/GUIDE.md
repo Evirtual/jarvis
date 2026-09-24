@@ -105,6 +105,17 @@ and writes, his own notices included.
   screen do two or three go to a row. Nothing is resized unless a row is too
   wide; then only widths come down, and the next tidy on a bigger screen gives
   them back. Panels are left where they are.
+- **Moving things by asking.** JARVIS can see where every window, group and
+  panel sits, in nine places: top-left, top, top-right, left, centre, right,
+  bottom-left, bottom and bottom-right. Ask him to move or size one ("put the
+  radar in the bottom right", "make Lisbon large"). Sizes are small, medium,
+  large, tall and wide. A thread inside a group moves with its group. Typed
+  alone, "move the radar to the top right" or "put Lisbon on the left" works
+  without him. "Put the panels on the sides" sends every open panel down the
+  left and right edges and tidies the threads between them, still open if
+  they fit, folded if not. He can't put anything at an exact spot or lay the
+  board out as a grid. If he writes a command the console doesn't have, the
+  thread says "Not done", so a promise never passes for an action.
 - **The web.** Press **⌗** on a window (or double-click it) and the threads that
   share its context appear as small copies of their own windows, with chips for
   what they have in common, joined by strands brighter and thicker the stronger
